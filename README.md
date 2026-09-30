@@ -7,4 +7,4 @@ npm install
 npm run dev
 ```
 
-Aç: http://localhost:3000
+Aç: https://alsatport.com
