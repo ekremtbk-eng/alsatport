@@ -1,0 +1,10 @@
+node_modules
+.next
+out
+.env*.local
+.env
+next-env.d.ts
+.vercel
+.data
+data/auth-users.json
+data/abuse-signals.json

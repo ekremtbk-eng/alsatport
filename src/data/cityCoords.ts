@@ -1,0 +1,100 @@
+import { DISTRICT_COORDS, keyOf } from "./regionProfiles";
+
+export const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
+  Adana: { lat: 37.0, lng: 35.3213 },
+  Adıyaman: { lat: 37.7648, lng: 38.2786 },
+  Afyonkarahisar: { lat: 38.7507, lng: 30.5567 },
+  Ağrı: { lat: 39.7191, lng: 43.0503 },
+  Aksaray: { lat: 38.3687, lng: 34.036 },
+  Amasya: { lat: 40.6499, lng: 35.8353 },
+  Ankara: { lat: 39.9334, lng: 32.8597 },
+  Antalya: { lat: 36.8969, lng: 30.7133 },
+  Ardahan: { lat: 41.1105, lng: 42.7022 },
+  Artvin: { lat: 41.1828, lng: 41.8183 },
+  Aydın: { lat: 37.838, lng: 27.8456 },
+  Balıkesir: { lat: 39.6484, lng: 27.8826 },
+  Bartın: { lat: 41.6358, lng: 32.3375 },
+  Batman: { lat: 37.8812, lng: 41.1351 },
+  Bayburt: { lat: 40.2552, lng: 40.2249 },
+  Bilecik: { lat: 40.1426, lng: 29.9793 },
+  Bingöl: { lat: 38.8854, lng: 40.498 },
+  Bitlis: { lat: 38.4004, lng: 42.1095 },
+  Bolu: { lat: 40.7392, lng: 31.6113 },
+  Burdur: { lat: 37.7203, lng: 30.2908 },
+  Bursa: { lat: 40.1826, lng: 29.0665 },
+  Çanakkale: { lat: 40.1553, lng: 26.4142 },
+  Çankırı: { lat: 40.6013, lng: 33.6134 },
+  Çorum: { lat: 40.5499, lng: 34.9537 },
+  Denizli: { lat: 37.7765, lng: 29.0864 },
+  Diyarbakır: { lat: 37.9144, lng: 40.2306 },
+  Düzce: { lat: 40.8389, lng: 31.1639 },
+  Edirne: { lat: 41.6818, lng: 26.5623 },
+  Elazığ: { lat: 38.681, lng: 39.2264 },
+  Erzincan: { lat: 39.75, lng: 39.5 },
+  Erzurum: { lat: 39.9043, lng: 41.2679 },
+  Eskişehir: { lat: 39.7767, lng: 30.5206 },
+  Gaziantep: { lat: 37.0662, lng: 37.3833 },
+  Giresun: { lat: 40.9128, lng: 38.3895 },
+  Gümüşhane: { lat: 40.4603, lng: 39.481 },
+  Hakkari: { lat: 37.5744, lng: 43.7408 },
+  Hatay: { lat: 36.2023, lng: 36.1613 },
+  Iğdır: { lat: 39.9167, lng: 44.0333 },
+  Isparta: { lat: 37.7648, lng: 30.5566 },
+  İstanbul: { lat: 41.0082, lng: 28.9784 },
+  İzmir: { lat: 38.4237, lng: 27.1428 },
+  Kahramanmaraş: { lat: 37.5858, lng: 36.9371 },
+  Karabük: { lat: 41.2061, lng: 32.6204 },
+  Karaman: { lat: 37.181, lng: 33.215 },
+  Kars: { lat: 40.6013, lng: 43.0975 },
+  Kastamonu: { lat: 41.3887, lng: 33.7827 },
+  Kayseri: { lat: 38.7312, lng: 35.4787 },
+  Kırıkkale: { lat: 39.8468, lng: 33.5153 },
+  Kırklareli: { lat: 41.7351, lng: 27.225 },
+  Kırşehir: { lat: 39.1461, lng: 34.1595 },
+  Kilis: { lat: 36.7184, lng: 37.1212 },
+  Kocaeli: { lat: 40.7654, lng: 29.9408 },
+  Konya: { lat: 37.8746, lng: 32.4932 },
+  Kütahya: { lat: 39.4192, lng: 29.9857 },
+  Malatya: { lat: 38.3552, lng: 38.3095 },
+  Manisa: { lat: 38.6191, lng: 27.4289 },
+  Mardin: { lat: 37.3129, lng: 40.734 },
+  Mersin: { lat: 36.8121, lng: 34.6415 },
+  Muğla: { lat: 37.2153, lng: 28.3636 },
+  Muş: { lat: 38.7433, lng: 41.5065 },
+  Nevşehir: { lat: 38.6247, lng: 34.7142 },
+  Niğde: { lat: 37.9667, lng: 34.6793 },
+  Ordu: { lat: 40.9862, lng: 37.8797 },
+  Osmaniye: { lat: 37.0746, lng: 36.2466 },
+  Rize: { lat: 41.0201, lng: 40.5234 },
+  Sakarya: { lat: 40.7889, lng: 30.406 },
+  Samsun: { lat: 41.2867, lng: 36.33 },
+  Siirt: { lat: 37.9274, lng: 41.94 },
+  Sinop: { lat: 42.0267, lng: 35.1551 },
+  Sivas: { lat: 39.7477, lng: 37.0179 },
+  Şanlıurfa: { lat: 37.1674, lng: 38.7955 },
+  Şırnak: { lat: 37.5164, lng: 42.4611 },
+  Tekirdağ: { lat: 40.9781, lng: 27.5117 },
+  Tokat: { lat: 40.3167, lng: 36.55 },
+  Trabzon: { lat: 41.0027, lng: 39.7168 },
+  Tunceli: { lat: 39.1062, lng: 39.5483 },
+  Uşak: { lat: 38.6823, lng: 29.4082 },
+  Van: { lat: 38.4891, lng: 43.4089 },
+  Yalova: { lat: 40.655, lng: 29.2769 },
+  Yozgat: { lat: 39.82, lng: 34.8083 },
+  Zonguldak: { lat: 41.4564, lng: 31.7987 },
+};
+
+function hash(s: string) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+
+export function coordsForPlace(city: string, district: string, mahalle = "") {
+  const pinned = DISTRICT_COORDS[keyOf(city, district)];
+  const base = pinned ?? CITY_COORDS[city] ?? { lat: 39.9334, lng: 32.8597 };
+  const n = hash(`${keyOf(city, district)}|${mahalle}`);
+  const lat = base.lat + (((n % 240) - 120) / 14000);
+  const lng = base.lng + ((((n >>> 8) % 240) - 120) / 14000);
+  return { lat: Number(lat.toFixed(5)), lng: Number(lng.toFixed(5)) };
+}

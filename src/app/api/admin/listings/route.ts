@@ -1,0 +1,29 @@
+import { ListingStatus } from "@prisma/client";
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { requireUser } from "@/lib/security/session";
+import { toClientListing } from "@/lib/listings/store";
+
+const STATUSES = new Set<string>(Object.values(ListingStatus));
+
+export async function GET(req: Request) {
+  const auth = await requireUser("admin");
+  if ("error" in auth) return auth.error;
+  const status = new URL(req.url).searchParams.get("status") || "pending";
+  const rows = await prisma.listing.findMany({
+    where: {
+      deletedAt: null,
+      ...(status === "all" ? {} : { status: (STATUSES.has(status) ? status : "pending") as ListingStatus }),
+    },
+    include: {
+      images: { orderBy: [{ isCover: "desc" }, { sortOrder: "asc" }] },
+      seller: { include: { profile: true } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 80,
+  });
+  return NextResponse.json({
+    ok: true,
+    listings: rows.map((r) => ({ ...toClientListing(r), moderationStatus: r.status })),
+  });
+}

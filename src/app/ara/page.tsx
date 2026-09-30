@@ -1,0 +1,174 @@
+"use client";
+
+import { useMemo, useState, Suspense, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Bookmark, BookmarkCheck } from "lucide-react";
+import { useApp } from "@/context/AppContext";
+import { catName, useI18n } from "@/context/I18nContext";
+import {
+  categoryShortcuts,
+  findCategory,
+  hrefForCategory,
+  hrefForJobCategory,
+  hrefForRenoCategory,
+  inferCategoryFromQuery,
+  isBeautyJobsCategory,
+  isServiceTreeCategory,
+  isServiceTreeLanding,
+  listingMatchesCategory,
+  searchCategories,
+} from "@/data/categories";
+import { listingMatchesFilter, listingMatchesTextQuery, parseListingFilter } from "@/lib/listingQuery";
+import { isPublicListing } from "@/lib/categoryCounts";
+import { ListingBrowse } from "@/components/ListingBrowse";
+import { useAuthModal } from "@/context/AuthModalContext";
+import Link from "next/link";
+import { apiGet } from "@/lib/security/client";
+import type { Listing } from "@/data/store";
+
+function SearchInner() {
+  const params = useSearchParams();
+  const router = useRouter();
+  const q = (params.get("q") ?? "").trim();
+  const city = (params.get("city") ?? "").trim() || undefined;
+  const catSlug = (params.get("kategori") ?? params.get("cat") ?? "").trim();
+  const resolvedCat = catSlug ? findCategory(catSlug) : undefined;
+  const filter = parseListingFilter(params.get("filter")) ?? resolvedCat?.filter;
+  const {
+    listings,
+    saveSearch,
+    removeSavedSearch,
+    savedSearches,
+    isSearchSaved,
+  } = useApp();
+  const { t } = useI18n();
+  const { requireAuth } = useAuthModal();
+  const [hint, setHint] = useState("");
+  const [remote, setRemote] = useState<Listing[] | null>(null);
+
+  useEffect(() => {
+    setRemote(null);
+    const qs = new URLSearchParams();
+    if (q) qs.set("q", q);
+    if (city) qs.set("city", city);
+    if (resolvedCat && !resolvedCat.filter) qs.set("kategori", resolvedCat.id);
+    else if (catSlug && !resolvedCat) qs.set("kategori", catSlug);
+    let cancelled = false;
+    void apiGet<{ ok?: boolean; listings?: Listing[] }>(`/api/listings?${qs.toString()}`).then((res) => {
+      if (!cancelled) {
+        const list = Array.isArray(res.listings) ? res.listings : null;
+        setRemote(list && list.length > 0 ? list : null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [q, city, catSlug, resolvedCat]);
+
+  useEffect(() => {
+    if (filter !== "urgent" && filter !== "h48") return;
+    const next = new URLSearchParams();
+    if (q) next.set("q", q);
+    if (city) next.set("city", city);
+    if (catSlug) next.set("kategori", catSlug);
+    const qs = next.toString();
+    const dest = filter === "urgent" ? "/acil" : "/son-48-saat";
+    router.replace(qs ? `${dest}?${qs}` : dest);
+  }, [filter, q, city, catSlug, router]);
+  const saved = isSearchSaved(q, city);
+  const savedRow = savedSearches.find(
+    (s) =>
+      s.query.trim().toLocaleLowerCase("tr") === q.toLocaleLowerCase("tr") &&
+      (s.city || "") === (city || ""),
+  );
+  const filterCat = categoryShortcuts.find((c) => c.filter === filter);
+  const inferred = !catSlug && !filter ? inferCategoryFromQuery(q) : undefined;
+  const pickedCat = resolvedCat ?? filterCat ?? inferred;
+  const catHits = q ? searchCategories(q).slice(0, 8) : [];
+
+  useEffect(() => {
+    if (pickedCat && isBeautyJobsCategory(pickedCat)) {
+      router.replace(hrefForJobCategory(pickedCat));
+    } else if (pickedCat && isServiceTreeCategory(pickedCat) && !isServiceTreeLanding(pickedCat)) {
+      router.replace(hrefForRenoCategory(pickedCat));
+    }
+  }, [pickedCat, router]);
+
+  const baseList = useMemo(() => {
+    const source = remote ?? listings;
+    const needle = q.toLocaleLowerCase("tr");
+    return source.filter((l) => {
+      if (!isPublicListing(l)) return false;
+      if (!listingMatchesFilter(l, filter)) return false;
+      if (pickedCat && !pickedCat.filter && !listingMatchesCategory(l, pickedCat)) return false;
+      if (city && l.city !== city) return false;
+      if (!needle) return true;
+      return listingMatchesTextQuery(l, q);
+    });
+  }, [listings, remote, q, city, filter, pickedCat]);
+
+  function onSave() {
+    if (!requireAuth("member")) return;
+    if (!q && !city) {
+      setHint(t("search.hint.type"));
+      return;
+    }
+    if (saved && savedRow) {
+      removeSavedSearch(savedRow.id);
+      setHint(t("search.hint.out"));
+      return;
+    }
+    saveSearch({ query: q, city });
+    setHint(t("search.hint.in"));
+  }
+
+  const heading = pickedCat ? catName(t, pickedCat.id, pickedCat.name) : t("common.search");
+
+  return (
+    <div className="mx-auto max-w-[1400px] px-3 py-4 lg:px-5">
+      <ListingBrowse
+        category={pickedCat}
+        listings={baseList}
+        emptyText={t("search.none")}
+        heading={
+          <div className="browse-pagehead justify-between">
+            <h1 className="text-lg font-extrabold tracking-tight text-ink">{heading}</h1>
+            <button
+              type="button"
+              onClick={onSave}
+              className={`btn-ghost h-10 px-4 text-sm ${saved ? "!border-lime/40 !bg-lime/10 !text-lime" : ""}`}
+            >
+              {saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+              {saved ? t("common.saved") : t("common.saveSearch")}
+            </button>
+            {hint ? <p className="w-full text-xs font-medium text-ink">{hint}</p> : null}
+          </div>
+        }
+        extra={
+          catHits.length > 0 ? (
+            <div className="mb-3 flex gap-2 overflow-auto no-scrollbar">
+              {catHits.map((c) => (
+                <Link key={c.id} href={hrefForCategory(c)} className="shortcut-chip">
+                  {catName(t, c.id, c.name)}
+                </Link>
+              ))}
+            </div>
+          ) : null
+        }
+      />
+    </div>
+  );
+}
+
+function SearchFallback() {
+  const { t } = useI18n();
+  return <div className="p-8 text-ink">{t("common.loading")}</div>;
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<SearchFallback />}>
+      <SearchInner />
+    </Suspense>
+  );
+}
