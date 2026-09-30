@@ -1,19 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import {
-  isAdult,
-  isProfileComplete,
-  isValidFullName,
-  isValidIdentityNo,
-  isValidOpenAddress,
-  isValidPhone,
-  stampVerification,
-} from "@/lib/profile";
+import { isProfileComplete, stampVerification } from "@/lib/profile";
 import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
 import { digitsOnly, sanitizeMultiline, sanitizeText } from "@/lib/security/sanitize";
 import { roleForProfile } from "@/lib/security/rbac";
 import { saveUser } from "@/lib/security/userStore";
 import { attachSession, requireMutatingRequest, requireUser } from "@/lib/security/session";
+import { readJson } from "@/lib/security/parseBody";
+import { profileBodySchema, profileFieldErrors } from "@/lib/security/schemas";
 
 export async function POST(req: Request) {
   const blocked = await requireMutatingRequest(req);
@@ -30,36 +24,20 @@ export async function POST(req: Request) {
     );
   }
 
-  const body = (await req.json().catch(() => null)) as {
-    fullName?: string;
-    phone?: string;
-    birthDate?: string;
-    nationalId?: string;
-    address?: string;
-    displayName?: string;
-  } | null;
+  const parsed = await readJson(req, profileBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
 
-  const fullName = sanitizeText(body?.fullName, 80);
-  const displayName = sanitizeText(body?.displayName, 40);
-  const phone = digitsOnly(body?.phone, 11);
-  const birthDate = sanitizeText(body?.birthDate, 10);
-  const nationalId = digitsOnly(body?.nationalId, 11);
-  const address = sanitizeMultiline(body?.address, 400).replace(/\s+/g, " ").trim();
+  const fullName = sanitizeText(body.fullName, 80);
+  const displayName = sanitizeText(body.displayName, 40);
+  const phone = digitsOnly(body.phone, 11);
+  const birthDate = sanitizeText(body.birthDate, 10);
+  const nationalId = digitsOnly(body.nationalId, 11);
+  const address = sanitizeMultiline(body.address, 400).replace(/\s+/g, " ").trim();
 
-  if (fullName && !isValidFullName(fullName)) {
-    return NextResponse.json({ ok: false, error: "complete.err.name" }, { status: 400 });
-  }
-  if (phone && !isValidPhone(phone)) {
-    return NextResponse.json({ ok: false, error: "complete.err.phone" }, { status: 400 });
-  }
-  if (birthDate && !isAdult(birthDate)) {
-    return NextResponse.json({ ok: false, error: "complete.err.age" }, { status: 400 });
-  }
-  if (nationalId && !isValidIdentityNo(nationalId)) {
-    return NextResponse.json({ ok: false, error: "complete.err.id" }, { status: 400 });
-  }
-  if (address && !isValidOpenAddress(address)) {
-    return NextResponse.json({ ok: false, error: "complete.err.address" }, { status: 400 });
+  const fieldErr = profileFieldErrors({ fullName, phone, birthDate, nationalId, address });
+  if (fieldErr) {
+    return NextResponse.json({ ok: false, error: fieldErr }, { status: 400 });
   }
 
   const oldPhone = auth.user.profile.phone;

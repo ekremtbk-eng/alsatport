@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { isValidEmail, normalizeEmail, normalizeUsername } from "@/lib/auth";
-import { isStrongPassword } from "@/lib/security/passwordPolicy";
+import { normalizeUsername } from "@/lib/auth";
 import { hashPassword } from "@/lib/security/password";
 import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
-import { sanitizeEmail, sanitizeText } from "@/lib/security/sanitize";
+import { sanitizeText } from "@/lib/security/sanitize";
 import { findUserByIdentifier, saveUser } from "@/lib/security/userStore";
 import { attachSession, requireMutatingRequest } from "@/lib/security/session";
 import { isProfileComplete, stampVerification } from "@/lib/profile";
@@ -13,6 +12,8 @@ import { standardPackageFields } from "@/lib/entitlements";
 import { recordAccountSignals } from "@/lib/security/abuseGuard";
 import { sendSignupVerificationEmail } from "@/lib/mail/authMail";
 import { verifyRecaptchaToken } from "@/lib/security/recaptcha";
+import { readJson } from "@/lib/security/parseBody";
+import { registerBodySchema } from "@/lib/security/schemas";
 
 export const maxDuration = 60;
 
@@ -61,43 +62,23 @@ export async function POST(req: Request) {
     );
   }
 
-  const body = (await req.json().catch(() => null)) as
-    | {
-        username?: string;
-        email?: string;
-        password?: string;
-        firstName?: string;
-        lastName?: string;
-        marketing?: boolean;
-        phone?: string;
-        recaptchaToken?: string;
-      }
-    | null;
-  const captcha = await verifyRecaptchaToken(body?.recaptchaToken, "register", ip);
+  const parsed = await readJson(req, registerBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
+  const captcha = await verifyRecaptchaToken(body.recaptchaToken, "register", ip);
   if (!captcha.ok) {
     return NextResponse.json({ ok: false, error: captcha.error }, { status: 400 });
   }
-  const email = normalizeEmail(sanitizeEmail(body?.email));
-  const firstName = sanitizeText(body?.firstName, 40);
-  const lastName = sanitizeText(body?.lastName, 40);
+  const email = body.email;
+  const firstName = sanitizeText(body.firstName, 40);
+  const lastName = sanitizeText(body.lastName, 40);
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
-  const password = typeof body?.password === "string" ? body.password : "";
-  const phone = (typeof body?.phone === "string" ? body.phone : "").replace(/\D/g, "").slice(0, 11);
-  const username = normalizeUsername(
-    sanitizeText(body?.username, 40) || email.split("@")[0] || "uye",
-  );
+  const password = body.password;
+  const phone = body.phone.replace(/\D/g, "").slice(0, 11);
+  const username = normalizeUsername(sanitizeText(body.username, 40) || email.split("@")[0] || "uye");
 
-  if (!email || !password || !fullName) {
+  if (!fullName || fullName.split(/\s+/).length < 2) {
     return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
-  }
-  if (fullName.split(/\s+/).length < 2) {
-    return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
-  }
-  if (!isValidEmail(email)) {
-    return NextResponse.json({ ok: false, error: "auth.err.email" }, { status: 400 });
-  }
-  if (!isStrongPassword(password)) {
-    return NextResponse.json({ ok: false, error: "auth.err.passPolicy" }, { status: 400 });
   }
   if (await findUserByIdentifier(email)) {
     return NextResponse.json({ ok: false, error: "auth.err.taken" }, { status: 409 });

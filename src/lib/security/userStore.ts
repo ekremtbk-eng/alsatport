@@ -6,6 +6,7 @@ import { normalizeEmail, normalizeUsername } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import type { Role } from "@/lib/security/rbac";
 import { asPlan } from "@/lib/entitlements";
+import { decryptPii, encryptPii } from "@/lib/security/crypto";
 
 export type StoredUser = {
   id: string;
@@ -55,8 +56,8 @@ function toStored(row: UserRow): StoredUser | undefined {
     fullName: p.fullName || "",
     phone: p.phone || "",
     birthDate: p.birthDate ? p.birthDate.toISOString().slice(0, 10) : "",
-    nationalId: p.nationalId || "",
-    address: p.address || "",
+    nationalId: decryptPii(p.nationalId),
+    address: decryptPii(p.address),
     emailVerified: !!row.emailVerifiedAt,
     phoneVerified: !!p.phoneVerifiedAt,
     profileComplete: p.profileComplete,
@@ -120,8 +121,8 @@ export async function saveUser(user: StoredUser) {
     avatarUrl: p.avatar || null,
     phone: p.phone || null,
     birthDate: birth,
-    nationalId: p.nationalId || null,
-    address: p.address || null,
+    nationalId: p.nationalId ? encryptPii(p.nationalId) : null,
+    address: p.address ? encryptPii(p.address) : null,
     city: p.city || null,
     verified: !!p.verified,
     profileComplete: !!p.profileComplete,

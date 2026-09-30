@@ -5,7 +5,8 @@ import { isUuid } from "@/lib/ids";
 import { isBlockedLiveAnimalListing } from "@/lib/liveAnimalPolicy";
 import { isAllowedListingImageUrl } from "@/lib/listingMedia";
 import { sanitizeMultiline, sanitizeText } from "@/lib/security/sanitize";
-import { sanitizeSearchQuery, sanitizeSlug } from "@/lib/security/inputGuard";
+import { sanitizeSearchQuery } from "@/lib/security/inputGuard";
+import { listingCreateBodySchema } from "@/lib/security/schemas";
 import { categoryQueryIds, findCategory } from "@/data/categories";
 import type { StoredUser } from "@/lib/security/userStore";
 import { deleteStoredObject, isManagedStorageKey, storageKeyFromUrl } from "@/lib/storage/media";
@@ -205,6 +206,8 @@ export type ListingInput = {
 
 export function parseListingInput(body: Record<string, unknown> | null): ListingInput | { error: string } {
   if (!body) return { error: "auth.err.required" };
+  const checked = listingCreateBodySchema.safeParse(body);
+  if (!checked.success) return { error: "auth.err.required" };
   const title = sanitizeText(String(body.title ?? ""), 120);
   const description = sanitizeMultiline(String(body.description ?? ""), 8000);
   const categoryId = sanitizeText(String(body.categoryId ?? ""), 64);

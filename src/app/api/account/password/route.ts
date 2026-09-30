@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { hashPassword, verifyPasswordHash } from "@/lib/security/password";
-import { isStrongPassword } from "@/lib/security/passwordPolicy";
 import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
 import { saveUser } from "@/lib/security/userStore";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
+import { readJson } from "@/lib/security/parseBody";
+import { passwordChangeSchema } from "@/lib/security/schemas";
 
 export async function POST(req: Request) {
   const blocked = await requireMutatingRequest(req);
@@ -24,18 +25,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "dash.pw.oauth" }, { status: 400 });
   }
 
-  const body = (await req.json().catch(() => null)) as {
-    current?: string;
-    next?: string;
-  } | null;
-  const current = typeof body?.current === "string" ? body.current : "";
-  const next = typeof body?.next === "string" ? body.next : "";
-  if (!current || !next) {
-    return NextResponse.json({ ok: false, error: "dash.pw.missing" }, { status: 400 });
-  }
-  if (!isStrongPassword(next)) {
-    return NextResponse.json({ ok: false, error: "auth.err.passPolicy" }, { status: 400 });
-  }
+  const parsed = await readJson(req, passwordChangeSchema);
+  if (!parsed.ok) return parsed.response;
+  const current = parsed.data.current;
+  const next = parsed.data.next;
   const ok = await verifyPasswordHash(current, auth.user.passwordHash);
   if (!ok) {
     return NextResponse.json({ ok: false, error: "dash.pw.current" }, { status: 400 });

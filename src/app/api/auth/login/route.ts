@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { isStrongPassword } from "@/lib/security/passwordPolicy";
 import { verifyPasswordHash } from "@/lib/security/password";
 import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
 import { sanitizeText } from "@/lib/security/sanitize";
@@ -9,16 +8,18 @@ import { attachSession, requireMutatingRequest } from "@/lib/security/session";
 import { promoteConfiguredAdmin } from "@/lib/admin/audit";
 import { isProfileComplete, stampVerification } from "@/lib/profile";
 import { entitlementsChanged, reconcileEntitlements } from "@/lib/entitlements";
+import { readJson } from "@/lib/security/parseBody";
+import { loginBodySchema } from "@/lib/security/schemas";
+import { isStrongPassword } from "@/lib/security/passwordPolicy";
 
 export async function POST(req: Request) {
   const blocked = await requireMutatingRequest(req);
   if (blocked) return blocked;
+  const parsed = await readJson(req, loginBodySchema);
+  if (!parsed.ok) return parsed.response;
   const ip = clientIp(req);
-  const body = (await req.json().catch(() => null)) as
-    | { identifier?: string; password?: string }
-    | null;
-  const identifier = sanitizeText(body?.identifier, 80);
-  const password = typeof body?.password === "string" ? body.password : "";
+  const identifier = sanitizeText(parsed.data.identifier, 80);
+  const password = parsed.data.password;
 
   const ipLimit = rateLimit(`login:${ip}`, LIMITS.login.limit, LIMITS.login.windowMs);
   const idLimit = rateLimit(`login-id:${identifier.toLowerCase()}`, LIMITS.login.limit, LIMITS.login.windowMs);
@@ -29,10 +30,7 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!identifier || !password) {
-    return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
-  }
-  if (!isStrongPassword(password)) {
+  if (!identifier || !password || !isStrongPassword(password)) {
     return NextResponse.json({ ok: false, error: "auth.err.wrong" }, { status: 401 });
   }
 

@@ -9,6 +9,8 @@ import { entitlementsChanged, reconcileEntitlements } from "@/lib/entitlements";
 import { saveUser } from "@/lib/security/userStore";
 import { createListing, parseListingInput, queryListings } from "@/lib/listings/store";
 import { verifyRecaptchaToken } from "@/lib/security/recaptcha";
+import { parseSearch, readJson } from "@/lib/security/parseBody";
+import { listingCreateBodySchema, listingQuerySchema } from "@/lib/security/schemas";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -19,20 +21,24 @@ export async function GET(req: Request) {
       { status: 429, headers: { "Retry-After": String(limited.retryAfter) } },
     );
   }
+  const query = parseSearch(url, listingQuerySchema);
+  if (!query) {
+    return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
+  }
   const claims = await claimsFromCookies();
-  const mine = url.searchParams.get("mine") === "1";
-  const priceMin = Number(url.searchParams.get("priceMin"));
-  const priceMax = Number(url.searchParams.get("priceMax"));
+  const mine = query.mine === "1";
+  const priceMin = Number(query.priceMin);
+  const priceMax = Number(query.priceMax);
   const listings = await queryListings({
-    q: sanitizeSearchQuery(url.searchParams.get("q") ?? ""),
-    categoryId: sanitizeSlug(url.searchParams.get("categoryId") ?? url.searchParams.get("kategori") ?? "") || undefined,
-    city: sanitizeText(url.searchParams.get("city"), 40) || undefined,
-    district: sanitizeText(url.searchParams.get("district"), 40) || undefined,
+    q: sanitizeSearchQuery(query.q),
+    categoryId: sanitizeSlug(query.categoryId || query.kategori) || undefined,
+    city: sanitizeText(query.city, 40) || undefined,
+    district: sanitizeText(query.district, 40) || undefined,
     priceMin: Number.isFinite(priceMin) ? priceMin : undefined,
     priceMax: Number.isFinite(priceMax) ? priceMax : undefined,
-    status: url.searchParams.get("status") === "passive" ? "passive" : url.searchParams.get("status") === "active" ? "active" : undefined,
+    status: query.status,
     viewerId: claims?.sub,
-    sellerId: url.searchParams.get("sellerId") ?? undefined,
+    sellerId: query.sellerId,
     mine: mine && !!claims?.sub,
   });
   return NextResponse.json({ ok: true, listings });
@@ -65,8 +71,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "quota.exhausted" }, { status: 402 });
   }
 
-  const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
-  const captcha = await verifyRecaptchaToken(body?.recaptchaToken, "listing", ip);
+  const parsedBody = await readJson(req, listingCreateBodySchema);
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.data as Record<string, unknown>;
+  const captcha = await verifyRecaptchaToken(
+    typeof parsedBody.data.recaptchaToken === "string" ? parsedBody.data.recaptchaToken : undefined,
+    "listing",
+    ip,
+  );
   if (!captcha.ok) {
     return NextResponse.json({ ok: false, error: captcha.error }, { status: 400 });
   }

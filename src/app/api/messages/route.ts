@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { postMessage } from "@/lib/messages/store";
 import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
+import { readJson } from "@/lib/security/parseBody";
+import { messageBodySchema } from "@/lib/security/schemas";
 
 export async function POST(req: Request) {
   const blocked = await requireMutatingRequest(req);
@@ -18,11 +20,9 @@ export async function POST(req: Request) {
     );
   }
 
-  const body = (await req.json().catch(() => null)) as {
-    conversationId?: string;
-    text?: string;
-  } | null;
-  const result = await postMessage(auth.user.id, body?.conversationId ?? "", body?.text ?? "");
+  const parsed = await readJson(req, messageBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const result = await postMessage(auth.user.id, parsed.data.conversationId, parsed.data.text);
   if ("error" in result) {
     return NextResponse.json({ ok: false, error: result.error }, { status: result.status });
   }
