@@ -6787,6 +6787,58 @@ html[data-device="phone"] .dash-content {
   max-height: var(--auth-vvh, 100dvh);
   transform: translateY(var(--auth-vv-offset, 0px));
   overflow: auto;
+  overscroll-behavior: contain;
+}
+/*
+ * Touch devices: the gate is pinned to the layout viewport and the sheet follows the visual viewport
+ * (--auth-vvh / --auth-vv-offset from AuthStage), so the iOS keyboard cannot push the card off-screen
+ * or scroll the page behind it. Width-independent so landscape phones ("tablet" layout) are covered.
+ */
+@media (hover: none) and (pointer: coarse) {
+  .auth-gate:not(.is-overlay) {
+    position: fixed;
+    inset: 0;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .auth-gate:not(.is-overlay) .auth-gate-sheet {
+    height: var(--auth-vvh, 100dvh);
+    max-height: var(--auth-vvh, 100dvh);
+    transform: translateY(var(--auth-vv-offset, 0px));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Below 16px iOS Safari zooms the page on focus. */
+  .auth-gate-input,
+  .dash-input {
+    font-size: 16px;
+  }
+}
+.auth-gate .auth-gate-sheet {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+.auth-gate.is-kb .auth-gate-sheet {
+  padding-bottom: 0;
+}
+@media (hover: none) and (pointer: coarse) and (max-height: 500px) {
+  .auth-gate-promo {
+    display: none !important;
+  }
+}
+.auth-gate.is-kb .auth-gate-cats,
+.auth-gate.is-kb .auth-gate-foot {
+  display: none;
+}
+html.auth-lock,
+html.auth-lock body {
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 .auth-gate-bg {
   position: absolute;
@@ -7332,12 +7384,16 @@ html.auth-overlay-open .cookie-banner {
   padding: 0.75rem 0 1.25rem;
 }
 html[data-device="phone"] .auth-gate:not(.is-overlay) {
-  height: 100dvh;
+  position: fixed;
+  inset: 0;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
 }
 html[data-device="phone"] .auth-gate:not(.is-overlay) .auth-gate-sheet {
   height: var(--auth-vvh, 100dvh);
   max-height: var(--auth-vvh, 100dvh);
+  transform: translateY(var(--auth-vv-offset, 0px));
   overflow: hidden;
 }
 html[data-device="phone"] .auth-gate-top {
@@ -7351,7 +7407,7 @@ html[data-device="phone"] .auth-gate-layout {
   padding: 0 0.7rem 0.55rem;
   align-items: stretch;
   justify-content: flex-start;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -7360,13 +7416,15 @@ html[data-device="phone"] .auth-gate-promo {
   display: none;
 }
 html[data-device="phone"] .auth-gate-card {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-height: 0;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   width: 100%;
   padding: 0.75rem 0.9rem 0.95rem;
-  overflow: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
 html[data-device="phone"] .auth-gate-scroll,
@@ -7436,7 +7494,8 @@ html[data-device="tablet"] .auth-gate-feats {
   }
 }
 @media (min-width: 768px) and (max-width: 1023.98px) {
-  .auth-gate-layout {
+  .auth-gate-layout,
+  html[data-device="tablet"] .auth-gate-layout {
     grid-template-columns: 1fr;
     width: min(32rem, calc(100% - 2rem));
   }

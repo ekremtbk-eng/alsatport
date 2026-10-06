@@ -97,20 +97,74 @@ export function AuthStage({
     const root = gateRef.current;
     const vv = window.visualViewport;
     if (!root) return;
+    const html = document.documentElement;
+    const touch = window.matchMedia("(hover: none) and (pointer: coarse)");
+    const timers: number[] = [];
+    let keyboard = false;
+
+    const pinned = () => getComputedStyle(root).position === "fixed";
+    const editing = () => {
+      const el = document.activeElement;
+      return el instanceof HTMLElement && root.contains(el) && el.matches("input:not([type=checkbox]):not([type=radio]), textarea, select");
+    };
+
+    // Keeps the focused field inside its own scroll box; scrollIntoView would also scroll the page on iOS.
+    const reveal = () => {
+      const el = document.activeElement;
+      if (!(el instanceof HTMLElement) || !editing()) return;
+      let box = el.parentElement;
+      while (box && box !== root) {
+        const oy = getComputedStyle(box).overflowY;
+        if ((oy === "auto" || oy === "scroll") && box.scrollHeight > box.clientHeight) break;
+        box = box.parentElement;
+      }
+      if (!box || box === root) return;
+      const field = el.getBoundingClientRect();
+      const view = box.getBoundingClientRect();
+      const margin = 16;
+      if (field.top < view.top + margin) box.scrollTop -= view.top + margin - field.top;
+      else if (field.bottom > view.bottom - margin) box.scrollTop += field.bottom - (view.bottom - margin);
+    };
+
     const apply = () => {
       const height = vv?.height ?? window.innerHeight;
       const offset = vv?.offsetTop ?? 0;
       root.style.setProperty("--auth-vvh", `${Math.round(height)}px`);
       root.style.setProperty("--auth-vv-offset", `${Math.round(offset)}px`);
+      html.classList.toggle("auth-lock", pinned());
+      const next = touch.matches && editing();
+      root.classList.toggle("is-kb", next);
+      if (keyboard && !next && pinned() && window.scrollY !== 0) window.scrollTo(0, 0);
+      keyboard = next;
+      if (next) requestAnimationFrame(reveal);
     };
+    const later = (ms: number) => timers.push(window.setTimeout(apply, ms));
+    const onFocusChange = () => {
+      apply();
+      later(120);
+      later(350);
+    };
+    const onOrientation = () => {
+      later(150);
+      later(500);
+    };
+
     apply();
     vv?.addEventListener("resize", apply);
     vv?.addEventListener("scroll", apply);
     window.addEventListener("resize", apply);
+    window.addEventListener("orientationchange", onOrientation);
+    root.addEventListener("focusin", onFocusChange);
+    root.addEventListener("focusout", onFocusChange);
     return () => {
+      timers.forEach((id) => window.clearTimeout(id));
       vv?.removeEventListener("resize", apply);
       vv?.removeEventListener("scroll", apply);
       window.removeEventListener("resize", apply);
+      window.removeEventListener("orientationchange", onOrientation);
+      root.removeEventListener("focusin", onFocusChange);
+      root.removeEventListener("focusout", onFocusChange);
+      html.classList.remove("auth-lock");
     };
   }, []);
 
