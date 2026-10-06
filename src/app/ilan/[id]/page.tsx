@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: Ctx): Promise<Metadata> {
   if (isBlockedLiveAnimalListing(listing)) {
     return { title: "İlan · AlsatPort", robots: { index: false, follow: false } };
   }
-  const priceLabel = formatMoney(listing.price, "TRY", "tr");
+  const priceLabel = formatMoney(listing.price, "tr");
   const place = [listing.city, listing.district].filter(Boolean).join(" / ");
   const title = `${listing.title} · ${priceLabel}`;
   const description = [priceLabel, place, listing.subtitle || listing.description || listing.title]

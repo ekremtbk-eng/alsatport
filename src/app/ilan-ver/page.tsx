@@ -37,7 +37,7 @@ import { PUBLISHED_PARAM } from "@/components/listing/PublishNotifCard";
 
 export default function PostListingPage() {
   const { user, addListing, updateListing, listings, hydrated } = useApp();
-  const { t, formatMoney, currency } = useI18n();
+  const { t, formatMoney } = useI18n();
   const types = [
     { id: "urun", label: t("post.urun"), icon: Package },
     { id: "vasita", label: t("post.vasita"), icon: Car },
@@ -676,7 +676,7 @@ export default function PostListingPage() {
                 maxLength={12}
                 className="h-12 w-full rounded-xl border border-line bg-panel px-3 pe-12 text-sm text-ink shadow-sm"
               />
-              <span className="absolute end-3 top-1/2 -translate-y-1/2 text-sm text-muted">{currency}</span>
+              <span className="absolute end-3 top-1/2 -translate-y-1/2 text-sm text-muted">TL</span>
             </div>
           </Field>
           <SearchSelect

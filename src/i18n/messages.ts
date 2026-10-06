@@ -26,6 +26,11 @@ function pack(rows: Record<string, [string, string, string, string, string]>): {
 export const MESSAGES = pack({
   "lang.label": ["Dil", "Language", "Sprache", "اللغة", "Язык"],
   "currency.label": ["Para birimi", "Currency", "Währung", "العملة", "Валюта"],
+  "flt.sidebar.label": ["Filtreler", "Filters", "Filter", "الفلاتر", "Фильтры"],
+  "flt.sidebar.show": ["Filtre panelini aç", "Show filter panel", "Filterbereich einblenden", "إظهار لوحة الفلاتر", "Показать панель фильтров"],
+  "flt.sidebar.hide": ["Filtre panelini gizle", "Hide filter panel", "Filterbereich ausblenden", "إخفاء لوحة الفلاتر", "Скрыть панель фильтров"],
+  "lang.pair": ["Dil ve para birimi", "Language & currency", "Sprache & Währung", "اللغة والعملة", "Язык и валюта"],
+  "lang.priceNote": ["İlan fiyatları Türk lirası (₺) olarak gösterilir.", "Listing prices are shown in Turkish lira (₺).", "Anzeigenpreise werden in Türkischer Lira (₺) angezeigt.", "تُعرض أسعار الإعلانات بالليرة التركية (₺).", "Цены объявлений указаны в турецких лирах (₺)."],
   "nav.categories": ["Tüm Kategoriler", "All Categories", "Alle Kategorien", "كل الفئات", "Все категории"],
   "nav.cat.search": ["Kategorilerde ara...", "Search categories...", "Kategorien suchen...", "ابحث في الفئات...", "Поиск по категориям..."],
   "nav.cat.empty": ["Eşleşen kategori yok.", "No matching categories.", "Keine passenden Kategorien.", "لا توجد فئات مطابقة.", "Нет подходящих категорий."],

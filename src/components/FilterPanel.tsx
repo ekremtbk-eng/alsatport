@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, X } from "lucide-react";
 import { useState } from "react";
 import { CategoryDrill } from "@/components/CategoryDrill";
 import { SearchSelect } from "@/components/SearchSelect";
@@ -76,31 +76,10 @@ function RangePair({
   presets: string[];
   hideLabel?: boolean;
 }) {
-  const { t, currency, setCurrency } = useI18n();
+  const { t } = useI18n();
   return (
     <div className={hideLabel ? "" : "flt-group"}>
       {hideLabel ? null : <p className="flt-label">{fieldTitle(t, minField.labelKey)}</p>}
-      {minField.currencyTabs ? (
-        <div className="flt-fx">
-          {(
-            [
-              ["TRY", "TL"],
-              ["USD", "USD"],
-              ["EUR", "EUR"],
-              ["GBP", "GBP"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              className={`flt-fx-btn ${currency === id ? "is-on" : ""}`}
-              onClick={() => setCurrency(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      ) : null}
       <div className="flt-range">
         <input
           inputMode="numeric"
@@ -359,6 +338,8 @@ export function FilterPanel({
   onChange,
   onClear,
   onClose,
+  onCollapse,
+  collapseControls,
   variant = "aside",
   subcats,
   activeCatId,
@@ -378,6 +359,8 @@ export function FilterPanel({
   onChange: (key: string, value: string) => void;
   onClear: () => void;
   onClose?: () => void;
+  onCollapse?: () => void;
+  collapseControls?: string;
   variant?: "aside" | "sheet";
   subcats?: Category[];
   activeCatId?: string;
@@ -523,6 +506,20 @@ export function FilterPanel({
           <button type="button" className="flt-side-clear" onClick={onClear}>
             {t("flt.clearShort")}
           </button>
+          {onCollapse ? (
+            <button
+              type="button"
+              className="flt-side-collapse"
+              data-sidebar-collapse
+              aria-expanded
+              aria-controls={collapseControls}
+              aria-label={t("flt.sidebar.hide")}
+              title={t("flt.sidebar.hide")}
+              onClick={onCollapse}
+            >
+              <ChevronLeft className="h-4 w-4" aria-hidden />
+            </button>
+          ) : null}
         </div>
       )}
       <StdFilterSidebar

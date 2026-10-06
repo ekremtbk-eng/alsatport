@@ -25,13 +25,12 @@ export const CURRENCIES: { id: Currency; symbol: string; label: string }[] = [
   { id: "GBP", symbol: "£", label: "British Pound" },
 ];
 
-/** TRY → other (indicative mid-market, refreshed in-app). */
-export const FX_FROM_TRY: Record<Currency, number> = {
-  TRY: 1,
-  USD: 1 / 41.25,
-  EUR: 1 / 44.8,
-  GBP: 1 / 52.4,
-};
+/** Locales offered in the combined language + currency menu; the currency follows the locale. */
+export const MENU_LOCALES: Locale[] = ["tr", "en"];
+
+export function currencySymbol(currency: Currency) {
+  return CURRENCIES.find((c) => c.id === currency)?.symbol ?? currency;
+}
 
 export const NUMBER_LOCALE: Record<Locale, string> = {
   tr: "tr-TR",
@@ -45,17 +44,17 @@ export function localeMeta(id: Locale) {
   return LOCALES.find((l) => l.id === id) ?? LOCALES[0];
 }
 
-export function convertFromTry(amountTry: number, currency: Currency) {
-  return amountTry * FX_FROM_TRY[currency];
-}
-
-export function formatMoney(amountTry: number, currency: Currency, locale: Locale) {
-  const value = convertFromTry(amountTry, currency);
+/**
+ * Listing prices are stored and always shown in TRY. There is no live exchange-rate source,
+ * so prices are never converted into the display currency of the selected language.
+ */
+export function formatMoney(amountTry: number, locale: Locale) {
   return new Intl.NumberFormat(NUMBER_LOCALE[locale], {
     style: "currency",
-    currency,
-    maximumFractionDigits: currency === "TRY" ? 0 : 2,
-  }).format(value);
+    currency: "TRY",
+    currencyDisplay: "narrowSymbol",
+    maximumFractionDigits: 0,
+  }).format(amountTry);
 }
 
 export const PAY_METHODS: {

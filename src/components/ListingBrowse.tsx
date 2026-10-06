@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Filter, LayoutGrid, List, X } from "lucide-react";
+import { Filter, LayoutGrid, List, SlidersHorizontal, X } from "lucide-react";
 import { FilterPanel } from "@/components/FilterPanel";
 import { FilterSheet } from "@/components/FilterSheet";
 import { ListingCard } from "@/components/ListingCard";
@@ -39,6 +39,32 @@ import { ClassifiedSearchTable } from "@/components/ClassifiedSearchTable";
 import { isSeaEquipCategoryId } from "@/data/seaEquip";
 import { isPublicListing } from "@/lib/categoryCounts";
 
+/** Desktop filter sidebar open/closed preference; kept apart from the filter values themselves. */
+const SIDEBAR_KEY = "alsatport-browse-sidebar";
+const SIDEBAR_ID = "browse-filter-sidebar";
+
+function useSidebarPreference() {
+  const [open, setOpen] = useState(true);
+  const [animate, setAnimate] = useState(false);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(SIDEBAR_KEY) === "closed") setOpen(false);
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  const toggle = (next: boolean) => {
+    setAnimate(true);
+    setOpen(next);
+    try {
+      localStorage.setItem(SIDEBAR_KEY, next ? "open" : "closed");
+    } catch {
+      /* storage unavailable */
+    }
+  };
+  return { open, animate, toggle };
+}
+
 export function ListingBrowse({
   category,
   listings,
@@ -68,6 +94,22 @@ export function ListingBrowse({
   const [wordDraft, setWordDraft] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetCat, setSheetCat] = useState<Category | undefined>();
+  const sidebar = useSidebarPreference();
+  const openBtnRef = useRef<HTMLButtonElement>(null);
+  const sideRef = useRef<HTMLDivElement>(null);
+  const focusAfterToggle = useRef(false);
+
+  useEffect(() => {
+    if (!focusAfterToggle.current) return;
+    focusAfterToggle.current = false;
+    if (sidebar.open) sideRef.current?.querySelector<HTMLElement>("[data-sidebar-collapse]")?.focus();
+    else openBtnRef.current?.focus();
+  }, [sidebar.open]);
+
+  const setSidebarOpen = (next: boolean) => {
+    focusAfterToggle.current = true;
+    sidebar.toggle(next);
+  };
   const filterCat = sheetOpen ? (sheetCat ?? category ?? undefined) : category ?? undefined;
   const fields = useMemo(() => filterFieldsForCategory(filterCat), [filterCat]);
   const serviceTree = isServiceTreeCategory(category);
@@ -195,6 +237,8 @@ export function ListingBrowse({
         commit(emptyFilterState());
       }}
       onClose={variant === "sheet" ? () => setSheetOpen(false) : undefined}
+      onCollapse={variant === "aside" ? () => setSidebarOpen(false) : undefined}
+      collapseControls={SIDEBAR_ID}
       subcats={sidebarCats}
       activeCatId={panelCat?.id}
       renoRoot={isServiceTreeCategory(panelCat) ? panelHub ?? null : null}
@@ -268,8 +312,10 @@ export function ListingBrowse({
           commit(emptyFilterState());
         }}
       />
-      <div className="browse-layout">
-        {filterPanel("aside")}
+      <div className={`browse-layout ${sidebar.open ? "" : "is-side-closed"} ${sidebar.animate ? "is-side-anim" : ""}`}>
+        <div ref={sideRef} id={SIDEBAR_ID} className="browse-side" inert={!sidebar.open}>
+          {filterPanel("aside")}
+        </div>
 
         <div className="browse-main">
           <div className="browse-mobile-tools">
@@ -287,6 +333,21 @@ export function ListingBrowse({
             </button>
           </div>
           <div className={`browse-toolbar ${serviceTree ? "is-svc" : ""}`}>
+            {sidebar.open ? null : (
+              <button
+                ref={openBtnRef}
+                type="button"
+                className="browse-side-open"
+                aria-expanded={false}
+                aria-controls={SIDEBAR_ID}
+                aria-label={t("flt.sidebar.show")}
+                onClick={() => setSidebarOpen(true)}
+              >
+                <SlidersHorizontal className="h-4 w-4" aria-hidden />
+                <span>{t("flt.sidebar.label")}</span>
+                {active > 0 ? <span className="browse-filter-badge">{active}</span> : null}
+              </button>
+            )}
             {serviceTree ? (
               <label className="svc-hours">
                 <input
