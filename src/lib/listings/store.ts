@@ -83,7 +83,7 @@ export function toClientListing(row: ListingWithRelations): Listing {
   };
 }
 
-/** Signed-out visitors only get a masked seller number; the full number requires a session. */
+/** Listing payloads only carry a masked hint; the full number comes from POST /api/listings/[id]/phone. */
 export function hideSellerPhone(listing: Listing): Listing {
   if (!listing.sellerPhone) return listing;
   const d = listing.sellerPhone.replace(/\D/g, "");
@@ -496,7 +496,7 @@ export async function updateListingRecord(user: StoredUser, id: string, patch: R
         ...coordsData,
         price: parsed.price,
         status:
-          existing.status === "pending" || existing.status === "rejected" || existing.status === "removed"
+          existing.status !== "active" && existing.status !== "passive"
             ? existing.status
             : parsed.status === "passive"
               ? "passive"
@@ -540,13 +540,22 @@ export async function deleteListingRecord(user: StoredUser, id: string) {
   return { ok: true as const };
 }
 
+/** Moderation outcomes (pending/rejected/removed) and drafts can never be revived by the seller. */
+const RENEWABLE: ListingStatus[] = ["active", "passive", "expired"];
+
 export async function renewListingRecord(user: StoredUser, id: string, expiresAt: number) {
   const existing = await prisma.listing.findFirst({ where: { id, deletedAt: null } });
   if (!existing) return { error: "auth.err.session" as const, status: 404 };
   if (!canMutateListing(user, existing.sellerId)) return { error: "auth.err.forbidden" as const, status: 403 };
+  if (!RENEWABLE.includes(existing.status)) return { error: "auth.err.forbidden" as const, status: 403 };
   const row = await prisma.listing.update({
     where: { id },
-    data: { status: "active", expiresAt: new Date(expiresAt), postedAt: new Date() },
+    data: {
+      status: "active",
+      expiresAt: new Date(expiresAt),
+      // Extending a live listing must not double as a free "bump to top".
+      ...(existing.status === "active" ? {} : { postedAt: new Date() }),
+    },
     include: listingInclude,
   });
   return { listing: toClientListing(row) };

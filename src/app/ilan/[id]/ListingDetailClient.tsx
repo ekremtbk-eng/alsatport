@@ -42,6 +42,7 @@ import { listingSellerLabel } from "@/lib/publicName";
 import { ListingDescriptionPanel } from "@/components/listing/ListingDescriptionPanel";
 import { GuestLock } from "@/components/GuestLock";
 import { apiGet } from "@/lib/security/client";
+import { usePhoneReveal } from "@/lib/usePhoneReveal";
 import { useSellerReviews } from "@/components/useSellerReviews";
 import { isClassifiedPartsListing, listingCategoryChain } from "@/lib/listingFacts";
 import { BreadcrumbNav } from "@/components/BreadcrumbNav";
@@ -90,6 +91,10 @@ export function ListingDetailClient() {
   }, [rawId, listingId, skipRemote, user?.id]);
 
   useEffect(() => {
+    setShowPhone(false);
+  }, [rawId]);
+
+  useEffect(() => {
     if (listing && isServiceListing(listing)) {
       router.replace(serviceFirmHref(listing.id));
     }
@@ -104,8 +109,8 @@ export function ListingDetailClient() {
   }, [regionTarget?.id]);
 
   const liked = listing ? favorites.includes(listing.id) : false;
-  const fullPhone = fetched?.sellerPhone && !fetched.sellerPhone.includes("*") ? fetched.sellerPhone : "";
-  const phone = listing ? fullPhone || getSellerPhone(listing.sellerId, listing) : "";
+  const phoneHint = listing ? getSellerPhone(listing.sellerId, listing) : "";
+  const { phone, revealed, reveal: revealPhone, call } = usePhoneReveal(listing?.id, phoneHint);
   const schema = useMemo(
     () => (listing ? schemaForCategoryId(listing.categoryId) : schemaForCategoryId("phones")),
     [listing],
@@ -132,6 +137,18 @@ export function ListingDetailClient() {
         </Link>
       </div>
     );
+  }
+
+  function togglePhone() {
+    if (!requireAuth("member")) return false;
+    if (!showPhone) void revealPhone();
+    setShowPhone((v) => !v);
+    return true;
+  }
+
+  function callSeller() {
+    if (!requireAuth("member")) return false;
+    return call();
   }
 
   function openChat() {
@@ -193,10 +210,10 @@ export function ListingDetailClient() {
       {phone ? (
       <div className="mt-2 grid grid-cols-2 gap-2">
         <a
-          href={phoneToTel(phone)}
+          href={revealed ? phoneToTel(revealed) : "#"}
           className="btn-orange h-12"
           onClick={(e) => {
-            if (!requireAuth("member")) e.preventDefault();
+            if (!callSeller()) e.preventDefault();
           }}
         >
           <PhoneCall className="relative z-10 h-4 w-4" />
@@ -204,10 +221,7 @@ export function ListingDetailClient() {
         </a>
         <button
           type="button"
-          onClick={() => {
-            if (!requireAuth("member")) return;
-            setShowPhone((v) => !v);
-          }}
+          onClick={togglePhone}
           className="btn-blue h-12"
         >
           {showPhone ? <EyeOff className="relative z-10 h-4 w-4" /> : <Eye className="relative z-10 h-4 w-4" />}
@@ -217,9 +231,9 @@ export function ListingDetailClient() {
       ) : (
         <p className="mt-2 text-center text-[11px] text-muted">{t("seller.nophone")}</p>
       )}
-      {phone && showPhone ? (
+      {revealed && showPhone ? (
         <a
-          href={phoneToTel(phone)}
+          href={phoneToTel(revealed)}
           className="mt-2 flex items-center justify-center gap-2 rounded-xl border border-blue/30 bg-elev py-2 text-sm font-bold text-blue"
         >
           <Phone className="h-4 w-4" />
@@ -254,10 +268,7 @@ export function ListingDetailClient() {
           reportHint={reportHint}
           onFav={fav}
           onChat={openChat}
-          onTogglePhone={() => {
-            if (!requireAuth("member")) return;
-            setShowPhone((v) => !v);
-          }}
+          onTogglePhone={togglePhone}
           onReport={user?.id === listing.sellerId ? undefined : reportListing}
           onTab={(tab) => {
             if (tab === "region" && !requireAuth("member")) return;
@@ -268,10 +279,14 @@ export function ListingDetailClient() {
         <ListingContactBar
           phone={phone}
           maskedPhone={maskPhone(phone)}
-          telHref={phoneToTel(phone)}
+          telHref={revealed ? phoneToTel(revealed) : "#"}
           onMessage={openChat}
-          onRevealPhone={() => requireAuth("member")}
-          onCall={() => requireAuth("member")}
+          onRevealPhone={() => {
+            if (!requireAuth("member")) return false;
+            void revealPhone();
+            return true;
+          }}
+          onCall={callSeller}
           share={{
             listingId: listing.id,
             title: listing.title,
@@ -456,10 +471,14 @@ export function ListingDetailClient() {
       <ListingContactBar
         phone={phone}
         maskedPhone={maskPhone(phone)}
-        telHref={phoneToTel(phone)}
+        telHref={revealed ? phoneToTel(revealed) : "#"}
         onMessage={openChat}
-        onRevealPhone={() => requireAuth("member")}
-        onCall={() => requireAuth("member")}
+        onRevealPhone={() => {
+          if (!requireAuth("member")) return false;
+          void revealPhone();
+          return true;
+        }}
+        onCall={callSeller}
         share={{
           listingId: listing.id,
           title: listing.title,
@@ -472,7 +491,7 @@ export function ListingDetailClient() {
       <SellerChatPopup listing={listing} open={chatOpen} onClose={() => setChatOpen(false)} />
       <ListingPrintSheet listing={listing} mode="standard" formatMoney={formatMoney} />
       {canPoster ? (
-        <ListingPosterDialog listing={listing} phone={user ? phone : ""} open={posterOpen} onOpenChange={setPosterOpen} />
+        <ListingPosterDialog listing={listing} phone={user ? revealed : ""} open={posterOpen} onOpenChange={setPosterOpen} />
       ) : null}
       <ReportListingDialog listingId={listing.id} open={reportOpen} onClose={closeReport} onDone={setReportHint} />
     </div>

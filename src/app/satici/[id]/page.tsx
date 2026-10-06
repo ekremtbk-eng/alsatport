@@ -11,7 +11,9 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { SellerChatPopup } from "@/components/SellerChatPopup";
 import { SellerRatingBlock } from "@/components/SellerRatingBlock";
 import { SellerReviews } from "@/components/SellerReviews";
-import { getSellerPhone, maskPhone, phoneToTel } from "@/data/store";
+import { getSellerPhone, maskPhone } from "@/data/store";
+import { usePhoneReveal } from "@/lib/usePhoneReveal";
+import { useAuthModal } from "@/context/AuthModalContext";
 import { gatePath } from "@/lib/profile";
 import { isPublicListing } from "@/lib/categoryCounts";
 import { useI18n } from "@/context/I18nContext";
@@ -49,6 +51,8 @@ export default function SellerProfilePage() {
   }, [listings, id, remoteAds]);
   const seller = ads[0];
   const phone = getSellerPhone(id, seller);
+  const { requireAuth } = useAuthModal();
+  const { revealed, telHref, reveal, call } = usePhoneReveal(seller?.id, phone);
 
   if (!seller) {
     return (
@@ -105,17 +109,31 @@ export default function SellerProfilePage() {
           {phone ? (
             <>
           <div className="grid grid-cols-2 gap-2">
-            <a href={phoneToTel(phone)} className="btn-orange h-12">
+            <a
+              href={telHref}
+              className="btn-orange h-12"
+              onClick={(e) => {
+                if (!requireAuth("member") || !call()) e.preventDefault();
+              }}
+            >
               <PhoneCall className="relative z-10 h-4 w-4" />
               <span className="relative z-10">{t("list.call")}</span>
             </a>
-            <button type="button" onClick={() => setShowPhone((v) => !v)} className="btn-blue h-12">
+            <button
+              type="button"
+              onClick={() => {
+                if (!requireAuth("member")) return;
+                if (!showPhone) void reveal();
+                setShowPhone((v) => !v);
+              }}
+              className="btn-blue h-12"
+            >
               {showPhone ? (
                 <EyeOff className="relative z-10 h-4 w-4" />
               ) : (
                 <Eye className="relative z-10 h-4 w-4" />
               )}
-              <span className="relative z-10">{showPhone ? phone : t("list.showPhone")}</span>
+              <span className="relative z-10">{showPhone && revealed ? revealed : t("list.showPhone")}</span>
             </button>
           </div>
           {!showPhone && (

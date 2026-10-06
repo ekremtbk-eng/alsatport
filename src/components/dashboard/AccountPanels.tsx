@@ -13,6 +13,7 @@ import { isEmailVerified, isProfileComplete, profileGaps, type ProfileGap } from
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/security/client";
 import { passwordChecks } from "@/lib/security/passwordPolicy";
 import { readReducedMotion, writeReducedMotion } from "@/lib/reducedMotion";
+import { NUMBER_LOCALE } from "@/i18n/config";
 import { Notice, OtpInput, Pane, SandboxCode, ToggleRow } from "./DashUi";
 
 type ApiUser = { ok: boolean; error?: string; user?: UserProfile; sandboxCode?: string; maskedEmail?: string };
@@ -615,6 +616,83 @@ export function BlocksPanel() {
         </ul>
       )}
       <Notice error={error} />
+    </Pane>
+  );
+}
+
+type SessionRow = { id: string; device: string; method: string; ip: string | null; createdAt: string; lastSeenAt: string; current: boolean };
+
+export function SessionsPanel() {
+  const { t, locale } = useI18n();
+  const [rows, setRows] = useState<SessionRow[] | null>(null);
+  const [error, setError] = useState("");
+  const [hint, setHint] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    const res = await apiGet<{ ok: boolean; sessions?: SessionRow[]; error?: string }>("/api/account/sessions").catch(() => null);
+    if (!res?.ok) {
+      setError(t(res?.error ?? "auth.err.server"));
+      setRows([]);
+      return;
+    }
+    setRows(res.sessions ?? []);
+  }, [t]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function revoke(body: { scope: "others" } | { scope: "one"; id: string }) {
+    setBusy(true);
+    setError("");
+    setHint("");
+    const res = await apiDelete<{ ok: boolean; ended?: number; error?: string }>("/api/account/sessions", body);
+    setBusy(false);
+    if (!res.ok) {
+      setError(t(res.error ?? "auth.err.server"));
+      return;
+    }
+    if (body.scope === "others") setHint(t("sess.endedN", { n: res.ended ?? 0 }));
+    await load();
+  }
+
+  const fmt = (iso: string) => new Date(iso).toLocaleString(NUMBER_LOCALE[locale], { dateStyle: "medium", timeStyle: "short" });
+  const others = (rows ?? []).filter((r) => !r.current).length;
+
+  return (
+    <Pane title={t("dash.sec.devices")}>
+      <p className="mb-3 text-sm text-muted">{t("sess.info")}</p>
+      {rows === null ? (
+        <p className="dash-empty">{t("auth.connecting")}</p>
+      ) : (
+        <ul>
+          {rows.map((r) => (
+            <li key={r.id} className="dash-info-row">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">
+                  {r.device}
+                  {r.current ? <span className="ml-2 chip text-xs">{t("dash.device.this")}</span> : null}
+                </p>
+                <p className="text-xs text-muted">
+                  {t("sess.started")}: {fmt(r.createdAt)} · {t("sess.seen")}: {fmt(r.lastSeenAt)}
+                  {r.ip ? ` · ${r.ip}` : ""}
+                </p>
+              </div>
+              {r.current ? null : (
+                <button type="button" className="chip shrink-0" disabled={busy} onClick={() => void revoke({ scope: "one", id: r.id })}>
+                  {t("sess.end")}
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {rows && others === 0 ? <p className="mt-2 text-xs text-muted">{t("sess.none")}</p> : null}
+      <button type="button" className="btn-primary mt-4 h-10 px-4 text-sm" disabled={busy || others === 0} onClick={() => void revoke({ scope: "others" })}>
+        {t("sess.endOthers")}
+      </button>
+      <Notice error={error} hint={hint} />
     </Pane>
   );
 }

@@ -4,9 +4,11 @@ import { mailDebugEnabled, sendOtpEmail, sendSecurityNoticeEmail } from "@/lib/m
 import { createEmailOtp, verifyEmailOtp } from "@/lib/security/emailOtp";
 import { smsAvailableFor } from "@/lib/security/loginFlow";
 import { readJson } from "@/lib/security/parseBody";
-import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
+import { writeAudit } from "@/lib/admin/audit";
+import { LIMITS, clientIp } from "@/lib/security/rateLimit";
+import { throttle } from "@/lib/security/throttle";
 import { twoFactorSchema } from "@/lib/security/schemas";
-import { requireMutatingRequest, requireUser } from "@/lib/security/session";
+import { requireMutatingRequest, requireUser, revokeUserSessions } from "@/lib/security/session";
 import { forgetTrustedDevice, trustDevice } from "@/lib/security/twoFactor";
 import { findUserById, maskEmail, maskPhoneNumber, type StoredUser } from "@/lib/security/userStore";
 import { otpSmsText, sendSms, smsReady } from "@/lib/sms";
@@ -43,7 +45,7 @@ export async function POST(req: Request) {
   const auth = await requireUser("member");
   if ("error" in auth) return auth.error;
 
-  const limited = rateLimit(`2fa:${clientIp(req)}:${auth.user.id}`, LIMITS.emailOtp.limit, LIMITS.emailOtp.windowMs);
+  const limited = await throttle([{ key: `2fa:${auth.user.id}`, limit: LIMITS.emailOtp.limit, windowMs: LIMITS.emailOtp.windowMs }], req);
   if (!limited.ok) {
     return NextResponse.json(
       { ok: false, error: "auth.err.rateLimit" },
@@ -99,6 +101,16 @@ export async function POST(req: Request) {
   await prisma.profile.update({
     where: { userId: user.id },
     data: change === "disable" ? { twoFactorEnabled: false } : { twoFactorEnabled: true, twoFactorMethod: method },
+  });
+  // Turning 2FA on usually means the owner is worried: drop every other session so it takes effect immediately.
+  if (change === "enable") await revokeUserSessions(user.id, "2fa-enabled", auth.session.id);
+  await writeAudit({
+    actorId: user.id,
+    action: `auth.2fa_${change}`,
+    entityType: "security",
+    ip: clientIp(req),
+    userAgent: req.headers.get("user-agent"),
+    payload: { method },
   });
   const fresh = (await findUserById(user.id))!;
   const [subject, body] = NOTICE[change];

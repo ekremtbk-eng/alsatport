@@ -5,12 +5,20 @@ import { entitlementsChanged, reconcileEntitlements } from "@/lib/entitlements";
 import { mailDebugEnabled, sendOtpEmail } from "@/lib/mail/authMail";
 import { isProfileComplete, stampVerification } from "@/lib/profile";
 import { OTP_RESEND_SECONDS, OTP_TTL_SECONDS, createEmailOtp, otpTimers } from "@/lib/security/emailOtp";
-import { attachSession } from "@/lib/security/session";
+import { promoteConfiguredAdmin } from "@/lib/admin/audit";
+import { startSession, type SessionMethod } from "@/lib/security/session";
+import { isTrustedDevice } from "@/lib/security/twoFactor";
 import { maskEmail, maskPhoneNumber, saveUser, type StoredUser } from "@/lib/security/userStore";
 import { normalizeTrMobile, otpSmsText, sendSms, smsReady } from "@/lib/sms";
 
-export async function completeLogin(input: StoredUser, extra?: Record<string, unknown>) {
-  let user = input;
+/** Called only after every required factor passed; always issues a brand-new server-side session. */
+export async function completeLogin(
+  input: StoredUser,
+  req: Request,
+  opts: { method: SessionMethod; mfa?: boolean },
+  extra?: Record<string, unknown>,
+) {
+  let user = await promoteConfiguredAdmin(input);
   const stamped = reconcileEntitlements(stampVerification(user.profile));
   if (
     entitlementsChanged(user.profile, stamped) ||
@@ -29,7 +37,14 @@ export async function completeLogin(input: StoredUser, extra?: Record<string, un
     user: user.profile,
     ...extra,
   });
-  return attachSession(res, user);
+  await startSession(res, user, req, opts);
+  return res;
+}
+
+/** Admins always need a second factor; other users only when they enabled 2FA on an untrusted device. */
+export async function needsSecondFactor(user: StoredUser) {
+  if (user.role === "admin") return true;
+  return user.profile.twoFactorEnabled && !(await isTrustedDevice(user.id));
 }
 
 export async function verifiedRecoveryEmail(userId: string) {

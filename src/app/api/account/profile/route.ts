@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isProfileComplete, stampVerification } from "@/lib/profile";
-import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
+import { LIMITS } from "@/lib/security/rateLimit";
+import { throttle } from "@/lib/security/throttle";
 import { digitsOnly, sanitizeMultiline, sanitizeText } from "@/lib/security/sanitize";
 import { roleForProfile } from "@/lib/security/rbac";
 import { saveUser } from "@/lib/security/userStore";
@@ -14,9 +15,7 @@ export async function POST(req: Request) {
   if (blocked) return blocked;
   const auth = await requireUser("member");
   if ("error" in auth) return auth.error;
-
-  const ip = clientIp(req);
-  const limited = rateLimit(`profile:${ip}:${auth.user.id}`, LIMITS.profile.limit, LIMITS.profile.windowMs);
+  const limited = await throttle([{ key: `profile:${auth.user.id}`, limit: LIMITS.profile.limit, windowMs: LIMITS.profile.windowMs }], req);
   if (!limited.ok) {
     return NextResponse.json(
       { ok: false, error: "auth.err.rateLimit" },

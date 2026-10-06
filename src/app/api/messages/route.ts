@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { postMessage } from "@/lib/messages/store";
-import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
+import { LIMITS } from "@/lib/security/rateLimit";
+import { throttle } from "@/lib/security/throttle";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
 import { readJson } from "@/lib/security/parseBody";
 import { messageBodySchema } from "@/lib/security/schemas";
@@ -10,9 +11,7 @@ export async function POST(req: Request) {
   if (blocked) return blocked;
   const auth = await requireUser("member");
   if ("error" in auth) return auth.error;
-
-  const ip = clientIp(req);
-  const limited = rateLimit(`message:${ip}:${auth.user.id}`, LIMITS.message.limit, LIMITS.message.windowMs);
+  const limited = await throttle([{ key: `message:${auth.user.id}`, limit: LIMITS.message.limit, windowMs: LIMITS.message.windowMs }], req);
   if (!limited.ok) {
     return NextResponse.json(
       { ok: false, error: "auth.err.rateLimit" },

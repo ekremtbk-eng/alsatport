@@ -1,5 +1,5 @@
 import "server-only";
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { clientIp } from "@/lib/security/rateLimit";
 import { productPriceTry, productTitle } from "@/lib/payments/catalog";
 import type { PaidShopProduct } from "@/lib/entitlements";
@@ -38,8 +38,9 @@ export function verifyPaytrCallback(input: {
 }) {
   const c = cfg();
   if (!c) return false;
-  const expected = hmacB64(c.merchantKey, input.merchantOid + c.merchantSalt + input.status + input.totalAmount);
-  return expected === input.hash;
+  const expected = Buffer.from(hmacB64(c.merchantKey, input.merchantOid + c.merchantSalt + input.status + input.totalAmount));
+  const given = Buffer.from(input.hash);
+  return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
 export async function createPaytrToken(input: {

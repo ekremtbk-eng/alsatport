@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { writeAudit } from "@/lib/admin/audit";
 import { isUuid } from "@/lib/ids";
-import { requireMutatingRequest, requireUser } from "@/lib/security/session";
+import { requireAdmin, requireMutatingRequest, revokeUserSessions, stepUpError } from "@/lib/security/session";
 import { sanitizeText } from "@/lib/security/sanitize";
 import { readJson } from "@/lib/security/parseBody";
 import { adminReportPatchSchema } from "@/lib/security/schemas";
@@ -12,13 +12,17 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function PATCH(req: Request, ctx: Ctx) {
   const blocked = await requireMutatingRequest(req);
   if (blocked) return blocked;
-  const auth = await requireUser("admin");
+  const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
   const { id } = await ctx.params;
   if (!isUuid(id)) return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
   const parsed = await readJson(req, adminReportPatchSchema);
   if (!parsed.ok) return parsed.response;
   const body = parsed.data;
+  if (body.removeListing || body.banSeller) {
+    const stale = stepUpError(auth.session);
+    if (stale) return stale;
+  }
   const report = await prisma.report.findUnique({ where: { id } });
   if (!report) return NextResponse.json({ ok: false, error: "auth.err.session" }, { status: 404 });
   await prisma.report.update({
@@ -47,6 +51,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
         where: { id: seller.id },
         data: { bannedAt: new Date(), bannedReason: `report:${id}` },
       });
+      await revokeUserSessions(seller.id, "banned");
       bannedSeller = seller.id;
     }
   }

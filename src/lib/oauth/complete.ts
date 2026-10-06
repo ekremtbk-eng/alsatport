@@ -9,6 +9,7 @@ import { oauthCallbackPath } from "@/lib/site";
 import { isProfileComplete, stampVerification } from "@/lib/profile";
 import { recordAccountSignals } from "@/lib/security/abuseGuard";
 import { findUserByGoogleSub, findUserByIdentifier, saveUser } from "@/lib/security/userStore";
+import { revokeUserSessions } from "@/lib/security/session";
 
 export type VerifiedOAuthIdentity = {
   provider: AuthProviderKind;
@@ -59,12 +60,21 @@ export async function upsertVerifiedOAuthUser(identity: VerifiedOAuthIdentity, r
   }
 
   let user = await findUserByGoogleSub(identity.sub);
+  const linkedBySub = !!user;
   if (!user) user = await findUserByIdentifier(email);
 
   const name = identity.name.trim();
   const completeName = name.split(/\s+/).filter(Boolean).length >= 2 ? name : "";
 
   if (user) {
+    // Pre-registration takeover guard: someone may have signed up with this address and a password
+    // without ever proving ownership. The provider has now proven it, so that password and any of
+    // its sessions are discarded and the address is marked verified.
+    const unprovenEmailAccount = !linkedBySub && user.profile.emailVerified !== true;
+    if (unprovenEmailAccount) {
+      await revokeUserSessions(user.id, "oauth-claimed-unverified-email");
+      user = { ...user, passwordHash: undefined, profile: { ...user.profile, emailVerified: true } };
+    }
     user = await saveUser({
       ...user,
       email,
@@ -145,8 +155,4 @@ export async function upsertVerifiedOAuthUser(identity: VerifiedOAuthIdentity, r
   }
 }
 
-export function safeNextPath(raw: string | null | undefined) {
-  const next = (raw ?? "").trim();
-  if (!next.startsWith("/") || next.startsWith("//") || next.includes("://")) return "/profil";
-  return next.slice(0, 200);
-}
+export { safeNextPath } from "@/lib/oauth/nextPath";

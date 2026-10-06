@@ -13,6 +13,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:seed:demo": "tsx prisma/seed-demo.ts",
+    "test:security": "tsx scripts/test-security.ts",
     "db:setup": "prisma migrate deploy && prisma db seed"
   },
   "prisma": {

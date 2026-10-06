@@ -5,6 +5,7 @@ import { apiGet, apiPatch, apiPost } from "@/lib/security/client";
 import { useApp } from "@/context/AppContext";
 import { useI18n } from "@/context/I18nContext";
 import { SpecialDaysPanel } from "@/components/admin/SpecialDaysPanel";
+import { StepUpProvider, useStepUp } from "@/components/admin/StepUpProvider";
 import { LEGAL_CONTROLLER_MISSING, LEGAL_CONTROLLER_READY, LEGAL_CONTROLLER_WARNING } from "@/data/legal";
 import Link from "next/link";
 
@@ -43,8 +44,17 @@ type AdminUser = {
 };
 
 export default function AdminPage() {
+  return (
+    <StepUpProvider>
+      <AdminConsole />
+    </StepUpProvider>
+  );
+}
+
+function AdminConsole() {
   const { user, hydrated } = useApp();
   const { t } = useI18n();
+  const guard = useStepUp();
   const [tab, setTab] = useState<"listings" | "reports" | "users" | "days">("listings");
   const [overview, setOverview] = useState<Overview | null>(null);
   const [listings, setListings] = useState<AdminListing[]>([]);
@@ -72,12 +82,14 @@ export default function AdminPage() {
   }, [hydrated, user?.role, load]);
 
   async function moderate(id: string, action: "approve" | "reject" | "remove") {
-    await apiPost(`/api/admin/listings/${id}`, { action });
+    const res = await guard(() => apiPost<{ ok?: boolean; error?: string }>(`/api/admin/listings/${id}`, { action }));
+    if (!res.ok) setError(res.error ?? "auth.err.server");
     await load();
   }
 
   async function patchReport(id: string, patch: ReportPatch) {
-    await apiPatch(`/api/admin/reports/${id}`, patch);
+    const res = await guard(() => apiPatch<{ ok?: boolean; error?: string }>(`/api/admin/reports/${id}`, patch));
+    if (!res.ok) setError(res.error ?? "auth.err.server");
     await load();
   }
 
@@ -89,14 +101,18 @@ export default function AdminPage() {
   }
 
   async function ban(id: string, banned: boolean) {
-    await apiPatch(`/api/admin/users/${id}`, { banned });
+    const res = await guard(() => apiPatch<{ ok?: boolean; error?: string }>(`/api/admin/users/${id}`, { banned }));
+    if (!res.ok) setError(res.error ?? "auth.err.server");
     await searchUsers();
     await load();
   }
 
   async function setBusiness(id: string, name: string | null) {
     const trimmed = name?.trim() || null;
-    await apiPatch(`/api/admin/users/${id}`, { business: { name: trimmed, verified: !!trimmed } });
+    const res = await guard(() =>
+      apiPatch<{ ok?: boolean; error?: string }>(`/api/admin/users/${id}`, { business: { name: trimmed, verified: !!trimmed } }),
+    );
+    if (!res.ok) setError(res.error ?? "auth.err.server");
     await searchUsers();
   }
 

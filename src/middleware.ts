@@ -98,9 +98,11 @@ export async function middleware(request: NextRequest) {
   if (needsAuth) {
     const access = request.cookies.get(COOKIE_ACCESS)?.value;
     const refresh = request.cookies.get(COOKIE_REFRESH)?.value;
-    const claims =
+    const verified =
       (access ? await verifyAuthToken(access, "access") : null) ||
       (refresh ? await verifyAuthToken(refresh, "refresh") : null);
+    // Pre-session-table tokens carry no `sid` and can no longer be revoked, so they count as signed out.
+    const claims = verified && typeof verified.sid === "string" && verified.sid ? verified : null;
     if (!claims) {
       const next = `${path}${request.nextUrl.search}`;
       const url = request.nextUrl.clone();

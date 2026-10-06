@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/security/client";
 import { useI18n } from "@/context/I18nContext";
+import { useStepUp } from "@/components/admin/StepUpProvider";
 
 type DayRow = {
   id: string;
@@ -56,6 +57,7 @@ export function SpecialDaysPanel() {
   const [form, setForm] = useState(empty);
   const [editId, setEditId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const guard = useStepUp();
 
   const load = useCallback(async () => {
     const res = await apiGet<{ ok?: boolean; days?: DayRow[]; dateKey?: string }>(
@@ -121,7 +123,8 @@ export function SpecialDaysPanel() {
   }
 
   async function remove(id: string) {
-    await apiDelete(`/api/admin/special-days/${id}`);
+    const res = await guard(() => apiDelete<{ ok?: boolean; error?: string }>(`/api/admin/special-days/${id}`));
+    if (!res.ok) setError(res.error ?? "auth.err.server");
     if (editId === id) reset();
     await load();
   }

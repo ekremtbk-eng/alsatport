@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { mailDebugEnabled, sendOtpEmail } from "@/lib/mail/authMail";
 import { createEmailOtp } from "@/lib/security/emailOtp";
-import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
+import { LIMITS } from "@/lib/security/rateLimit";
+import { throttle } from "@/lib/security/throttle";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
 
 export async function POST(req: Request) {
@@ -19,8 +20,7 @@ export async function POST(req: Request) {
   if (!email) {
     return NextResponse.json({ ok: false, error: "auth.err.email" }, { status: 400 });
   }
-  const ip = clientIp(req);
-  const limited = rateLimit(`phoneotp:${ip}:${auth.user.id}`, LIMITS.emailOtp.limit, LIMITS.emailOtp.windowMs);
+  const limited = await throttle([{ key: `phoneotp:${auth.user.id}`, limit: LIMITS.emailOtp.limit, windowMs: LIMITS.emailOtp.windowMs }], req);
   if (!limited.ok) {
     return NextResponse.json(
       { ok: false, error: "auth.err.rateLimit" },

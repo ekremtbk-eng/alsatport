@@ -74,6 +74,9 @@ export async function GET(req: Request, ctx: Ctx) {
       message,
       stack,
     });
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.redirect(new URL("/giris?oauth=error", req.url));
+    }
     return NextResponse.json(
       { ok: false, error: "oauth.start", message, hint: "Check the terminal for [oauth:start] failed" },
       { status: 500 },

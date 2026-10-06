@@ -164,9 +164,9 @@ export const listingQuerySchema = z.object({
   mine: z.enum(["0", "1"]).optional(),
 });
 
+/** Identity, numbering, lifetime and promotion flags are always assigned on the server. */
 export const listingCreateBodySchema = z
   .object({
-    id: z.string().max(80).optional(),
     title: z.string().min(1, "auth.err.required").max(200),
     subtitle: z.string().max(200).optional(),
     description: z.string().max(12000).optional().default(""),
@@ -183,10 +183,6 @@ export const listingCreateBodySchema = z
     chassis: z.unknown().optional(),
     urgent: z.boolean().optional(),
     refurbished: z.boolean().optional(),
-    listingNo: z.string().max(20).optional(),
-    expiresAt: z.number().optional(),
-    featured: z.boolean().optional(),
-    vip: z.boolean().optional(),
     status: z.enum(["active", "passive"]).optional(),
   });
 

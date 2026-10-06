@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { moderateListingMaterial } from "@/lib/liveAnimalPolicy";
-import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
+import { LIMITS } from "@/lib/security/rateLimit";
+import { throttle } from "@/lib/security/throttle";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
 import { applyListingWatermark } from "@/lib/storage/listingWatermark";
 import {
@@ -18,14 +19,17 @@ export async function POST(req: Request) {
   if (blocked) return blocked;
   const auth = await requireUser("seller");
   if ("error" in auth) return auth.error;
-
-  const ip = clientIp(req);
-  const limited = rateLimit(`upload:${ip}:${auth.user.id}`, LIMITS.upload.limit, LIMITS.upload.windowMs);
+  const limited = await throttle([{ key: `upload:${auth.user.id}`, limit: LIMITS.upload.limit, windowMs: LIMITS.upload.windowMs }], req);
   if (!limited.ok) {
     return NextResponse.json(
       { ok: false, error: "auth.err.rateLimit" },
       { status: 429, headers: { "Retry-After": String(limited.retryAfter) } },
     );
+  }
+
+  const declared = Number(req.headers.get("content-length") ?? "0");
+  if (declared > MAX_UPLOAD_BYTES + 64 * 1024) {
+    return NextResponse.json({ ok: false, error: "photo.mb" }, { status: 413 });
   }
 
   const form = await req.formData().catch(() => null);

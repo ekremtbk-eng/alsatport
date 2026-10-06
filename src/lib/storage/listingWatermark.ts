@@ -4,6 +4,9 @@ import { LISTING_WATERMARK_PNG_BASE64 } from "@/lib/storage/listingWatermarkAsse
 export const LISTING_WATERMARK_TEXT = "alsatport.com";
 export const LISTING_WATERMARK_MARK = "alsatport-wm-v1";
 
+/** Below sharp's ~268 MP default so a small decompression bomb cannot exhaust function memory. */
+const MAX_INPUT_PIXELS = 120_000_000;
+
 const watermarkBase = Buffer.from(LISTING_WATERMARK_PNG_BASE64, "base64");
 
 function alreadyWatermarked(bytes: Buffer) {
@@ -53,11 +56,11 @@ async function overlayFor(width: number, height: number) {
  * to storing the original bytes.
  */
 export async function applyListingWatermark(bytes: Buffer, mime: string) {
-  const meta = await sharp(bytes, { failOn: "none" }).metadata();
+  const meta = await sharp(bytes, { failOn: "none", limitInputPixels: MAX_INPUT_PIXELS }).metadata();
   const size = orientedSize(meta);
   if (!size.width || !size.height) throw new Error("image-decode");
 
-  let pipeline = sharp(bytes, { failOn: "none" }).rotate();
+  let pipeline = sharp(bytes, { failOn: "none", limitInputPixels: MAX_INPUT_PIXELS }).rotate();
   if (!alreadyWatermarked(bytes)) {
     const overlay = await overlayFor(size.width, size.height);
     pipeline = pipeline.composite([{ input: overlay, gravity: "centre" }]);

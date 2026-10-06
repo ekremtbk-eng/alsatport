@@ -3,8 +3,16 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { writeAudit } from "@/lib/admin/audit";
 import { hashPassword, verifyPasswordHash } from "@/lib/security/password";
-import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
-import { clearSession, requireMutatingRequest, requireUser } from "@/lib/security/session";
+import { LIMITS, clientIp } from "@/lib/security/rateLimit";
+import { throttle } from "@/lib/security/throttle";
+import {
+  STEP_UP_WINDOW_MS,
+  clearSession,
+  requireMutatingRequest,
+  requireUser,
+  revokeUserSessions,
+  sessionIsFresh,
+} from "@/lib/security/session";
 import { readJson } from "@/lib/security/parseBody";
 import { accountDeleteSchema } from "@/lib/security/schemas";
 import { deleteStoredObject, isManagedStorageKey, storageKeyFromUrl } from "@/lib/storage/media";
@@ -18,7 +26,7 @@ export async function POST(req: Request) {
   if ("error" in auth) return auth.error;
   const user = auth.user;
 
-  const limited = rateLimit(`acct-del:${clientIp(req)}:${user.id}`, LIMITS.login.limit, LIMITS.login.windowMs);
+  const limited = await throttle([{ key: `acct-del:${user.id}`, limit: LIMITS.login.limit, windowMs: LIMITS.login.windowMs }], req);
   if (!limited.ok) {
     return NextResponse.json(
       { ok: false, error: "auth.err.rateLimit" },
@@ -33,6 +41,9 @@ export async function POST(req: Request) {
   }
   if (user.passwordHash && !(await verifyPasswordHash(parsed.data.password, user.passwordHash))) {
     return NextResponse.json({ ok: false, error: "dash.pw.current" }, { status: 400 });
+  }
+  if (!user.passwordHash && !sessionIsFresh(auth.session, STEP_UP_WINDOW_MS)) {
+    return NextResponse.json({ ok: false, error: "auth.err.reauth" }, { status: 403 });
   }
 
   const images = await prisma.listingImage.findMany({
@@ -107,6 +118,7 @@ export async function POST(req: Request) {
     });
     return listings.count;
   });
+  await revokeUserSessions(user.id, "account-deleted");
 
   await Promise.all(
     images.filter((img) => isManagedStorageKey(img.storageKey)).map((img) => deleteStoredObject(img.storageKey, img.url)),
@@ -118,6 +130,8 @@ export async function POST(req: Request) {
     action: "account.delete",
     entityType: "user",
     entityId: user.id,
+    ip: clientIp(req),
+    userAgent: req.headers.get("user-agent"),
     payload: { removedListings },
   }).catch(() => undefined);
 

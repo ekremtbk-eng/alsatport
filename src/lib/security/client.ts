@@ -61,8 +61,8 @@ export async function apiPatch<T>(url: string, body: unknown): Promise<T & { sta
   return apiSend<T>("PATCH", url, body);
 }
 
-export async function apiDelete<T>(url: string): Promise<T & { status: number }> {
-  return apiSend<T>("DELETE", url);
+export async function apiDelete<T>(url: string, body?: unknown): Promise<T & { status: number }> {
+  return apiSend<T>("DELETE", url, body);
 }
 
 async function apiSend<T>(method: string, url: string, body?: unknown): Promise<T & { status: number }> {

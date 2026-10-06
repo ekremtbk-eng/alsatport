@@ -134,9 +134,11 @@ model User {
   lastLoginAt     DateTime?    @map("last_login_at") @db.Timestamptz(6)
   bannedAt        DateTime?    @map("banned_at") @db.Timestamptz(6)
   bannedReason    String?      @map("banned_reason")
+  securityVersion Int          @default(0) @map("security_version")
   createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  sessions            UserSession[]
   profile             Profile?
   listings            Listing[]          @relation("ListingSeller")
   favorites           Favorite[]
@@ -539,6 +541,38 @@ model VerificationOtp {
   @@unique([userId, kind], map: "verification_otps_user_kind_uidx")
   @@index([expiresAt], map: "verification_otps_expires_idx")
   @@map("verification_otps")
+}
+
+model UserSession {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  method        String    @default("password")
+  deviceHash    String?   @map("device_hash")
+  userAgent     String?   @map("user_agent")
+  ipMasked      String?   @map("ip_masked")
+  mfaAt         DateTime? @map("mfa_at") @db.Timestamptz(6)
+  stepUpAt      DateTime? @map("step_up_at") @db.Timestamptz(6)
+  lastSeenAt    DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  expiresAt     DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revokedReason String?   @map("revoked_reason")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt], map: "user_sessions_user_idx")
+  @@index([userId, deviceHash], map: "user_sessions_device_idx")
+  @@index([expiresAt], map: "user_sessions_expires_idx")
+  @@map("user_sessions")
+}
+
+model RateLimitBucket {
+  key     String   @id
+  count   Int      @default(0)
+  resetAt DateTime @map("reset_at") @db.Timestamptz(6)
+
+  @@index([resetAt], map: "rate_limit_buckets_reset_idx")
+  @@map("rate_limit_buckets")
 }
 
 model AuditLog {

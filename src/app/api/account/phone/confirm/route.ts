@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isProfileComplete, stampVerification } from "@/lib/profile";
 import { digitsOnly } from "@/lib/security/sanitize";
-import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
+import { LIMITS } from "@/lib/security/rateLimit";
+import { throttle } from "@/lib/security/throttle";
 import { attachSession, requireMutatingRequest, requireUser } from "@/lib/security/session";
 import { findUserById, saveUser } from "@/lib/security/userStore";
 import { verifyEmailOtp } from "@/lib/security/emailOtp";
@@ -15,9 +16,7 @@ export async function POST(req: Request) {
   if (blocked) return blocked;
   const auth = await requireUser("member");
   if ("error" in auth) return auth.error;
-
-  const ip = clientIp(req);
-  const limited = rateLimit(`phonecfm:${ip}:${auth.user.id}`, LIMITS.emailOtp.limit, LIMITS.emailOtp.windowMs);
+  const limited = await throttle([{ key: `phonecfm:${auth.user.id}`, limit: LIMITS.emailOtp.limit, windowMs: LIMITS.emailOtp.windowMs }], req);
   if (!limited.ok) {
     return NextResponse.json(
       { ok: false, error: "auth.err.rateLimit" },

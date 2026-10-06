@@ -5,6 +5,7 @@ import { authSecretBytes } from "@/lib/security/secret";
 type TokenInput = {
   sub: string;
   id: string;
+  sid: string;
   role: Role;
   email: string;
   username: string;
@@ -15,6 +16,7 @@ type TokenInput = {
 export type AccessClaims = {
   sub: string;
   id?: string;
+  sid?: string;
   role: Role;
   email: string;
   username: string;
@@ -28,9 +30,10 @@ function secretKey() {
 }
 
 export const ACCESS_TTL = "15m";
-export const REFRESH_TTL = "7d";
 export const ACCESS_MAX_AGE = 60 * 15;
 export const REFRESH_MAX_AGE = 60 * 60 * 24 * 7;
+/** Admin sessions are short-lived regardless of activity. */
+export const ADMIN_SESSION_MAX_AGE = 60 * 60 * 12;
 
 export async function signAccessToken(input: TokenInput) {
   return new SignJWT({ ...input, typ: "access" })
@@ -41,11 +44,11 @@ export async function signAccessToken(input: TokenInput) {
     .sign(secretKey());
 }
 
-export async function signRefreshToken(input: TokenInput) {
+export async function signRefreshToken(input: TokenInput, maxAgeSeconds = REFRESH_MAX_AGE) {
   return new SignJWT({ ...input, typ: "refresh" })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(REFRESH_TTL)
+    .setExpirationTime(`${Math.max(60, Math.floor(maxAgeSeconds))}s`)
     .setSubject(input.sub)
     .sign(secretKey());
 }

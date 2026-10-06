@@ -34,7 +34,7 @@ export async function GET(_req: Request, ctx: Ctx) {
   }
   const listing = toClientListing(row);
   if (row.status === "active") listing.views += 1;
-  return NextResponse.json({ ok: true, listing: claims ? listing : hideSellerPhone(listing) });
+  return NextResponse.json({ ok: true, listing: hideSellerPhone(listing) });
 }
 
 export async function PUT(req: Request, ctx: Ctx) {

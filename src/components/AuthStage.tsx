@@ -21,6 +21,7 @@ import { useI18n } from "@/context/I18nContext";
 import { isValidEmail } from "@/lib/auth";
 import { afterAuthHref, isValidPhone } from "@/lib/profile";
 import { isStrongPassword } from "@/lib/security/passwordPolicy";
+import { apiGet } from "@/lib/security/client";
 import { executeRecaptcha, preloadRecaptcha } from "@/lib/security/recaptchaClient";
 import { RecaptchaNotice } from "@/components/RecaptchaNotice";
 import { HOME_HUBS } from "@/data/homeHubs";
@@ -75,6 +76,14 @@ export function AuthStage({
     if (email && isValidEmail(email)) setIdentifier(email);
     if (params.get("reset") === "1") setNotice("auth.reset.loginNow");
     if (params.get("forgot") === "1") setForgotOpen(true);
+    if (params.get("tfa") === "1") {
+      void apiGet<{ ok?: boolean; error?: string; twoFactor?: TwoFactorChallenge }>("/api/auth/login/verify")
+        .then((res) => {
+          if (res.ok && res.twoFactor) setChallenge(res.twoFactor);
+          else setError(res.error ?? "auth.2fa.expired");
+        })
+        .catch(() => setError("auth.err.server"));
+    }
   }, [variant]);
 
   useEffect(() => {

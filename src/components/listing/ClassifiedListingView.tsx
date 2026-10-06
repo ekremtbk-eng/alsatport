@@ -129,7 +129,17 @@ export function ClassifiedListingView({
               {shop ? (
                 <li>
                   <span>{t("list.phone.work")}</span>
-                  <a href={phoneToTel(phone)}>{showPhone ? phone : maskPhone(phone)}</a>
+                  <a
+                    href={phone.includes("*") ? "#" : phoneToTel(phone)}
+                    onClick={(e) => {
+                      if (phone.includes("*")) {
+                        e.preventDefault();
+                        onTogglePhone();
+                      }
+                    }}
+                  >
+                    {showPhone ? phone : maskPhone(phone)}
+                  </a>
                 </li>
               ) : null}
               <li>

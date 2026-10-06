@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/security/session";
+import { requireAdmin } from "@/lib/security/session";
+
+const REPORT_STATUSES = ["open", "reviewing", "resolved", "dismissed"] as const;
 
 export async function GET(req: Request) {
-  const auth = await requireUser("admin");
+  const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
-  const status = new URL(req.url).searchParams.get("status");
+  const raw = new URL(req.url).searchParams.get("status");
+  const status = REPORT_STATUSES.find((s) => s === raw);
+  if (raw && !status) return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
   const rows = await prisma.report.findMany({
-    where: status ? { status: status as "open" } : { status: { in: ["open", "reviewing"] } },
+    where: status ? { status } : { status: { in: ["open", "reviewing"] } },
     include: {
       reporter: { include: { profile: true } },
       listing: {

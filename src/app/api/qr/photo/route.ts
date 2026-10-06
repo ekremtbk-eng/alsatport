@@ -3,7 +3,8 @@ import { prisma } from "@/lib/db";
 import { isAllowedListingImageUrl } from "@/lib/listingMedia";
 import { parseSearch, readJson } from "@/lib/security/parseBody";
 import { QR_PHOTO_TTL_MS, createPhotoToken, findLiveToken } from "@/lib/security/qr";
-import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
+import { LIMITS } from "@/lib/security/rateLimit";
+import { throttle } from "@/lib/security/throttle";
 import { qrPhotoAddSchema, qrPhotoStartSchema, qrTokenSchema } from "@/lib/security/schemas";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
 import { isManagedStorageKey, storageKeyFromUrl } from "@/lib/storage/media";
@@ -30,7 +31,7 @@ export async function POST(req: Request) {
   if (blocked) return blocked;
   const auth = await requireUser("seller");
   if ("error" in auth) return auth.error;
-  const rl = rateLimit(`qrphoto:${clientIp(req)}:${auth.user.id}`, 20, 15 * 60 * 1000);
+  const rl = await throttle([{ key: `qrphoto:${auth.user.id}`, limit: 20, windowMs: 15 * 60 * 1000 }], req);
   if (!rl.ok) return limited(rl.retryAfter);
   const parsed = await readJson(req, qrPhotoStartSchema);
   if (!parsed.ok) return parsed.response;
@@ -69,7 +70,7 @@ export async function PUT(req: Request) {
   if (blocked) return blocked;
   const auth = await requireUser("seller");
   if ("error" in auth) return auth.error;
-  const rl = rateLimit(`qrphoto-add:${clientIp(req)}:${auth.user.id}`, LIMITS.upload.limit, LIMITS.upload.windowMs);
+  const rl = await throttle([{ key: `qrphoto-add:${auth.user.id}`, limit: LIMITS.upload.limit, windowMs: LIMITS.upload.windowMs }], req);
   if (!rl.ok) return limited(rl.retryAfter);
   const parsed = await readJson(req, qrPhotoAddSchema);
   if (!parsed.ok) return parsed.response;

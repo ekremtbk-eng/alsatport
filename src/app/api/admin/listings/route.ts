@@ -1,13 +1,13 @@
 import { ListingStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/security/session";
+import { requireAdmin } from "@/lib/security/session";
 import { toClientListing } from "@/lib/listings/store";
 
 const STATUSES = new Set<string>(Object.values(ListingStatus));
 
 export async function GET(req: Request) {
-  const auth = await requireUser("admin");
+  const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
   const status = new URL(req.url).searchParams.get("status") || "pending";
   const rows = await prisma.listing.findMany({

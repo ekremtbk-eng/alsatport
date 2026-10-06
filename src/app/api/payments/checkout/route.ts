@@ -4,7 +4,8 @@ import { paymentsPaused } from "@/lib/campaign";
 import { isPaidShopProduct } from "@/lib/entitlements";
 import { createPendingPayment } from "@/lib/payments/store";
 import { createPaytrToken, paytrConfigured } from "@/lib/payments/paytr";
-import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
+import { LIMITS } from "@/lib/security/rateLimit";
+import { throttle } from "@/lib/security/throttle";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
 import { readJson } from "@/lib/security/parseBody";
 import { checkoutBodySchema } from "@/lib/security/schemas";
@@ -20,9 +21,7 @@ export async function POST(req: Request) {
   if (!paytrConfigured()) {
     return NextResponse.json({ ok: false, error: "pay.paytr.off" }, { status: 503 });
   }
-
-  const ip = clientIp(req);
-  const limited = rateLimit(`paytr:${ip}:${auth.user.id}`, LIMITS.paytr.limit, LIMITS.paytr.windowMs);
+  const limited = await throttle([{ key: `paytr:${auth.user.id}`, limit: LIMITS.paytr.limit, windowMs: LIMITS.paytr.windowMs }], req);
   if (!limited.ok) {
     return NextResponse.json(
       { ok: false, error: "auth.err.rateLimit" },

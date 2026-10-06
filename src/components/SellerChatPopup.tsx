@@ -9,6 +9,7 @@ import { useI18n } from "@/context/I18nContext";
 import { useAuthModal } from "@/context/AuthModalContext";
 import { isUuid } from "@/lib/ids";
 import { listingSellerLabel } from "@/lib/publicName";
+import { paymentRiskHint } from "@/lib/fraudHints";
 
 const REPLY_KEYS = ["chat.r1", "chat.r2", "chat.r3", "chat.r4"] as const;
 
@@ -136,7 +137,7 @@ export function SellerChatPopup({
               </p>
             )}
             {convo?.messages.map((m) => (
-              <div key={m.id} className={`flex ${m.fromMe ? "justify-end" : "justify-start"}`}>
+              <div key={m.id} className={`flex flex-col ${m.fromMe ? "items-end" : "items-start"}`}>
                 <div
                   className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${
                     m.fromMe ? "bubble-me" : "bg-elev"
@@ -147,6 +148,11 @@ export function SellerChatPopup({
                     {m.time}
                   </p>
                 </div>
+                {!m.fromMe && paymentRiskHint(m.text) ? (
+                  <p role="note" className="mt-1 max-w-[80%] text-[11px] font-semibold text-orange">
+                    {t("chat.safe.hint")}
+                  </p>
+                ) : null}
               </div>
             ))}
             {typing && (

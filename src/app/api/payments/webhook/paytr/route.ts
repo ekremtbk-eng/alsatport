@@ -13,7 +13,8 @@ export async function POST(req: Request) {
   if (!merchantOid || !hash || !verifyPaytrCallback({ merchantOid, status, totalAmount, hash })) {
     return new NextResponse("FAIL", { status: 400, headers: { "Content-Type": "text/plain" } });
   }
-  const applied = await applyPaytrResult(merchantOid, status, totalAmount);
+  const paymentAmount = String(form?.get("payment_amount") ?? "");
+  const applied = await applyPaytrResult(merchantOid, status, totalAmount, paymentAmount);
   if (!applied.ok) {
     return new NextResponse("FAIL", { status: 404, headers: { "Content-Type": "text/plain" } });
   }

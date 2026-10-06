@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { writeAudit } from "@/lib/admin/audit";
-import { requireMutatingRequest, requireUser } from "@/lib/security/session";
+import { requireAdmin, requireMutatingRequest } from "@/lib/security/session";
 import { specialDayBodySchema } from "@/lib/security/schemas";
 import { sanitizeMultiline, sanitizeText } from "@/lib/security/sanitize";
 import { findActiveSpecialDay, isSpecialDayActive, istanbulDate } from "@/lib/specialDays";
@@ -34,7 +34,7 @@ function serialize(row: {
 }
 
 export async function GET() {
-  const auth = await requireUser("admin");
+  const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
   const today = istanbulDate();
   const live = await findActiveSpecialDay();
@@ -52,7 +52,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const blocked = await requireMutatingRequest(req);
   if (blocked) return blocked;
-  const auth = await requireUser("admin");
+  const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
   const parsed = specialDayBodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {

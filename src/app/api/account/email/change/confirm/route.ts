@@ -4,10 +4,12 @@ import { sendSecurityNoticeEmail } from "@/lib/mail/authMail";
 import { isProfileComplete, stampVerification } from "@/lib/profile";
 import { verifyEmailOtp } from "@/lib/security/emailOtp";
 import { readJson } from "@/lib/security/parseBody";
-import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
+import { writeAudit } from "@/lib/admin/audit";
+import { LIMITS, clientIp } from "@/lib/security/rateLimit";
+import { throttle } from "@/lib/security/throttle";
 import { roleForProfile } from "@/lib/security/rbac";
 import { emailChangeConfirmSchema } from "@/lib/security/schemas";
-import { attachSession, requireMutatingRequest, requireUser } from "@/lib/security/session";
+import { attachSession, requireMutatingRequest, requireUser, revokeUserSessions } from "@/lib/security/session";
 import { maskEmail, saveUser } from "@/lib/security/userStore";
 
 export async function POST(req: Request) {
@@ -16,7 +18,7 @@ export async function POST(req: Request) {
   const auth = await requireUser("member", { allowUnverified: true });
   if ("error" in auth) return auth.error;
 
-  const limited = rateLimit(`emailchgc:${clientIp(req)}:${auth.user.id}`, LIMITS.emailOtp.limit, LIMITS.emailOtp.windowMs);
+  const limited = await throttle([{ key: `emailchgc:${auth.user.id}`, limit: LIMITS.emailOtp.limit, windowMs: LIMITS.emailOtp.windowMs }], req);
   if (!limited.ok) {
     return NextResponse.json(
       { ok: false, error: "auth.err.rateLimit" },
@@ -40,6 +42,15 @@ export async function POST(req: Request) {
   const profile = stampVerification({ ...auth.user.profile, email, emailVerified: true });
   const role = roleForProfile(profile.verified, auth.user.role);
   const user = await saveUser({ ...auth.user, email, role, profile: { ...profile, role } });
+  const ended = await revokeUserSessions(user.id, "email-change", auth.session.id);
+  await writeAudit({
+    actorId: user.id,
+    action: "auth.email_change",
+    entityType: "security",
+    ip: clientIp(req),
+    userAgent: req.headers.get("user-agent"),
+    payload: { otherSessionsEnded: ended },
+  });
   if (oldEmail) {
     await sendSecurityNoticeEmail(
       oldEmail,

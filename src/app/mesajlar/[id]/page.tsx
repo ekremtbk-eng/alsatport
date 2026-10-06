@@ -9,6 +9,8 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { useI18n } from "@/context/I18nContext";
 import { isUuid } from "@/lib/ids";
 import { apiDelete, apiPost } from "@/lib/security/client";
+import { paymentRiskHint } from "@/lib/fraudHints";
+import { SafetyNotice } from "@/components/listing/SafetyNotice";
 
 export default function ChatPage() {
   const { id } = useParams<{ id: string }>();
@@ -95,6 +97,7 @@ export default function ChatPage() {
       ) : null}
       {error ? <p className="px-3 pt-2 text-xs font-semibold text-orange">{error}</p> : null}
       <div className="flex-1 space-y-2 overflow-auto p-3">
+        <SafetyNotice />
         {convo.messages.length === 0 && (
           <p className="py-10 text-center text-sm text-muted">{t("chat.first")}</p>
         )}
@@ -110,6 +113,11 @@ export default function ChatPage() {
                 {m.time}
               </p>
             </div>
+            {!m.fromMe && paymentRiskHint(m.text) ? (
+              <p role="note" className="mt-1 max-w-[80%] text-[11px] font-semibold text-orange">
+                {t("chat.safe.hint")}
+              </p>
+            ) : null}
             {m.id === lastSeenMine ? (
               <span className="mt-0.5 flex items-center gap-1 text-[10px] font-semibold text-lime">
                 <CheckCheck className="h-3 w-3" aria-hidden /> {t("chat.seen")}

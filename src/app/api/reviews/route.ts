@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { listSellerReviews, upsertSellerReview } from "@/lib/reviews/store";
-import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
+import { LIMITS } from "@/lib/security/rateLimit";
+import { throttle } from "@/lib/security/throttle";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
 import { parseSearch, readJson } from "@/lib/security/parseBody";
 import { reviewBodySchema, sellerQuerySchema } from "@/lib/security/schemas";
@@ -19,8 +20,7 @@ export async function POST(req: Request) {
   if (blocked) return blocked;
   const auth = await requireUser("member");
   if ("error" in auth) return auth.error;
-  const ip = clientIp(req);
-  const limited = rateLimit(`review:${ip}:${auth.user.id}`, LIMITS.listing.limit, LIMITS.listing.windowMs);
+  const limited = await throttle([{ key: `review:${auth.user.id}`, limit: LIMITS.listing.limit, windowMs: LIMITS.listing.windowMs }], req);
   if (!limited.ok) {
     return NextResponse.json(
       { ok: false, error: "auth.err.rateLimit" },

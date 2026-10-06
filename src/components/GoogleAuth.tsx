@@ -60,6 +60,8 @@ export function SocialAuth({
             ? "auth.err.rateLimit"
             : code === "email"
               ? "auth.err.email"
+              : code === "mail"
+                ? "auth.err.mail"
               : code === "state" || code === "csrf"
                 ? "auth.err.csrf"
                 : "auth.err.google";

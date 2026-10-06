@@ -8,7 +8,9 @@ import {
   verifyOAuthState,
   type OAuthProvider,
 } from "@/lib/oauth/providers";
-import { attachSession } from "@/lib/security/session";
+import { startSession } from "@/lib/security/session";
+import { needsSecondFactor, sendLoginCode } from "@/lib/security/loginFlow";
+import { setLoginChallenge } from "@/lib/security/twoFactor";
 import { promoteConfiguredAdmin } from "@/lib/admin/audit";
 import { CANONICAL_ORIGIN } from "@/lib/site";
 
@@ -37,7 +39,17 @@ async function finish(req: Request, provider: OAuthProvider, code: string, state
 
   const upserted = await upsertVerifiedOAuthUser(identity, req);
   if ("error" in upserted) return oauthFail("email");
+  if (upserted.user.bannedAt) return oauthFail("denied");
   const user = await promoteConfiguredAdmin(upserted.user);
+
+  if (await needsSecondFactor(user)) {
+    const sent = await sendLoginCode(user);
+    if (!sent.ok) return oauthFail("mail");
+    const res = NextResponse.redirect(new URL("/giris?tfa=1", CANONICAL_ORIGIN));
+    res.cookies.set("ap_oauth_nonce", "", { path: "/", maxAge: 0 });
+    await setLoginChallenge(res, user.id);
+    return res;
+  }
 
   const next = upserted.needsEmailVerify
     ? "/eposta-dogrula"
@@ -52,7 +64,8 @@ async function finish(req: Request, provider: OAuthProvider, code: string, state
   }
   const res = NextResponse.redirect(dest);
   res.cookies.set("ap_oauth_nonce", "", { path: "/", maxAge: 0 });
-  return attachSession(res, user);
+  await startSession(res, user, req, { method: "oauth" });
+  return res;
 }
 
 export async function GET(req: Request, ctx: Ctx) {

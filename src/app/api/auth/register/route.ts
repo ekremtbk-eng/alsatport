@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { normalizeUsername } from "@/lib/auth";
 import { hashPassword } from "@/lib/security/password";
-import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
+import { clientIp } from "@/lib/security/rateLimit";
 import { sanitizeText } from "@/lib/security/sanitize";
 import { findUserByIdentifier, saveUser } from "@/lib/security/userStore";
-import { attachSession, requireMutatingRequest } from "@/lib/security/session";
+import { requireMutatingRequest, startSession } from "@/lib/security/session";
+import { THROTTLE, throttle, tooMany } from "@/lib/security/throttle";
 import { isProfileComplete, stampVerification } from "@/lib/profile";
 import type { UserProfile } from "@/data/store";
 import { FREE_LISTING_QUOTA } from "@/lib/listingQuota";
@@ -53,13 +54,8 @@ export async function POST(req: Request) {
   const blocked = await requireMutatingRequest(req);
   if (blocked) return blocked;
   const ip = clientIp(req);
-  const limited = rateLimit(`register:${ip}`, LIMITS.register.limit, LIMITS.register.windowMs);
-  if (!limited.ok) {
-    return NextResponse.json(
-      { ok: false, error: "auth.err.rateLimit" },
-      { status: 429, headers: { "Retry-After": String(limited.retryAfter) } },
-    );
-  }
+  const limited = await throttle([{ key: `register:ip:${ip}`, ...THROTTLE.register }], req);
+  if (!limited.ok) return tooMany(limited.retryAfter);
 
   const parsed = await readJson(req, registerBodySchema);
   if (!parsed.ok) return parsed.response;
@@ -129,5 +125,6 @@ export async function POST(req: Request) {
     needsEmailVerify: true,
     user: user.profile,
   });
-  return attachSession(res, user);
+  await startSession(res, user, req, { method: "register" });
+  return res;
 }

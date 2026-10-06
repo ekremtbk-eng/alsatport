@@ -63,7 +63,8 @@ export const PROFILE_NUDGE_TEXT =
 const AUTH_LOOP_PATHS = new Set(["/giris", "/kayit", "/welcome", "/hesap-tamamla", "/eposta-dogrula"]);
 
 export function safeNextPath(value: string | null | undefined, fallback = "/ilan-ver") {
-  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return fallback;
+   
+  if (!value || !value.startsWith("/") || value.startsWith("//") || /[\\\u0000-\u001f\u007f]/.test(value)) return fallback;
   const path = value.split("?")[0] ?? value;
   if (AUTH_LOOP_PATHS.has(path)) return fallback;
   return value;

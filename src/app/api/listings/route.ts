@@ -1,5 +1,6 @@
 import { NextResponse, after } from "next/server";
-import { LIMITS, clientIp, clientRateKey, rateLimit } from "@/lib/security/rateLimit";
+import { LIMITS, clientRateKey, rateLimit } from "@/lib/security/rateLimit";
+import { throttle } from "@/lib/security/throttle";
 import { sanitizeSearchQuery, sanitizeSlug } from "@/lib/security/inputGuard";
 import { sanitizeText } from "@/lib/security/sanitize";
 import { claimsFromCookies, requireMutatingRequest, requireUser } from "@/lib/security/session";
@@ -44,7 +45,7 @@ export async function GET(req: Request) {
     sellerId: query.sellerId,
     mine: mine && !!claims?.sub,
   });
-  return NextResponse.json({ ok: true, listings: claims ? listings : listings.map(hideSellerPhone) });
+  return NextResponse.json({ ok: true, listings: listings.map(hideSellerPhone) });
 }
 
 export async function POST(req: Request) {
@@ -60,9 +61,7 @@ export async function POST(req: Request) {
   if (!isProfileComplete(auth.user.profile)) {
     return NextResponse.json({ ok: false, error: "auth.err.forbidden" }, { status: 403 });
   }
-
-  const ip = clientIp(req);
-  const limited = rateLimit(`listing:${ip}:${auth.user.id}`, LIMITS.listing.limit, LIMITS.listing.windowMs);
+  const limited = await throttle([{ key: `listing:${auth.user.id}`, limit: LIMITS.listing.limit, windowMs: LIMITS.listing.windowMs }], req);
   if (!limited.ok) {
     return NextResponse.json(
       { ok: false, error: "auth.err.rateLimit" },
@@ -83,7 +82,7 @@ export async function POST(req: Request) {
   }
 
   const plan = auth.user.profile.plan;
-  parsed.expiresAt = parsed.expiresAt ?? expiresAtForUser(auth.user.profile);
+  parsed.expiresAt = expiresAtForUser(auth.user.profile);
   parsed.featured = listingIsPromoted(auth.user.profile);
   parsed.vip = plan === "vip" || listingIsPromoted(auth.user.profile);
 

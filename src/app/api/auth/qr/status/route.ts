@@ -37,8 +37,8 @@ export async function POST(req: Request) {
   });
   if (claimed.count !== 1) return done("expired");
   const user = await findUserById(row.userId);
-  if (!user || user.bannedAt) return done("expired");
-  const res = await completeLogin(user, { status: "approved" });
+  if (!user || user.bannedAt || user.role === "admin") return done("expired");
+  const res = await completeLogin(user, req, { method: "qr" }, { status: "approved" });
   res.cookies.set(COOKIE_QR_SECRET, "", sessionCookieOptions(0));
   return res;
 }

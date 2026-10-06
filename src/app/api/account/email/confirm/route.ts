@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { digitsOnly } from "@/lib/security/sanitize";
-import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
+import { LIMITS } from "@/lib/security/rateLimit";
+import { throttle } from "@/lib/security/throttle";
 import { attachSession, requireMutatingRequest, requireUser } from "@/lib/security/session";
 import { saveUser } from "@/lib/security/userStore";
 import { verifyEmailOtp } from "@/lib/security/emailOtp";
@@ -14,9 +15,7 @@ export async function POST(req: Request) {
   if (blocked) return blocked;
   const auth = await requireUser("member", { allowUnverified: true });
   if ("error" in auth) return auth.error;
-
-  const ip = clientIp(req);
-  const limited = rateLimit(`emailcfm:${ip}:${auth.user.id}`, LIMITS.emailOtp.limit, LIMITS.emailOtp.windowMs);
+  const limited = await throttle([{ key: `emailcfm:${auth.user.id}`, limit: LIMITS.emailOtp.limit, windowMs: LIMITS.emailOtp.windowMs }], req);
   if (!limited.ok) {
     return NextResponse.json(
       { ok: false, error: "auth.err.rateLimit" },

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/security/session";
+import { requireAdmin } from "@/lib/security/session";
 
 export async function GET() {
-  const auth = await requireUser("admin");
+  const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
   const [pending, openReports, users, banned] = await Promise.all([
     prisma.listing.count({ where: { deletedAt: null, status: "pending" } }),

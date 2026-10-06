@@ -95,7 +95,7 @@ export async function startConversation(userId: string, listingId: string) {
   if (!isUuid(listingId)) return { error: "auth.err.required" as const, status: 400 };
   const listing = await prisma.listing.findFirst({
     where: { id: listingId, deletedAt: null },
-    select: { id: true, sellerId: true },
+    select: { id: true, sellerId: true, status: true },
   });
   if (!listing) return { error: "auth.err.session" as const, status: 404 };
   if (listing.sellerId === userId) return { error: "auth.err.forbidden" as const, status: 403 };
@@ -107,6 +107,7 @@ export async function startConversation(userId: string, listingId: string) {
     include: convoInclude,
   });
   if (existing) return { conversation: toClientConversation(existing, userId) };
+  if (listing.status !== "active") return { error: "list.notfound" as const, status: 404 };
 
   try {
     const created = await prisma.conversation.create({

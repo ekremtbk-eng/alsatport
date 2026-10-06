@@ -52,6 +52,7 @@ import {
   QrPanel,
   ReadReceiptPanel,
   SecurityPanel,
+  SessionsPanel,
   TwoFactorPanel,
   VerificationStatusCard,
 } from "./AccountPanels";
@@ -112,7 +113,7 @@ export function DashboardPanel({ panel }: { panel: DashPanelId }) {
     case "engellenenler":
       return <BlocksPanel />;
     case "cihazlar":
-      return <DevicesPanel />;
+      return <SessionsPanel />;
     case "bildirim-ayarlari":
       return <NotifPrefsPanel />;
     case "okundu":
@@ -1089,25 +1090,6 @@ function CancelPanel() {
           {busy ? t("account.delete.busy") : t("account.delete.go")}
         </button>
       </form>
-    </Pane>
-  );
-}
-
-function DevicesPanel() {
-  const { t } = useI18n();
-  const [ua, setUa] = useState("");
-  useEffect(() => {
-    setUa(navigator.userAgent);
-  }, []);
-  return (
-    <Pane title={t("dash.sec.devices")}>
-      <div className="dash-info-row">
-        <div>
-          <p className="dash-row-label">{t("dash.device.this")}</p>
-          <p className="text-sm">{t("dash.device.active")}</p>
-          <p className="mt-1 text-xs text-muted break-all">{ua}</p>
-        </div>
-      </div>
     </Pane>
   );
 }

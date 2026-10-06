@@ -3,6 +3,7 @@ import { listConversations, startConversation } from "@/lib/messages/store";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
 import { readJson } from "@/lib/security/parseBody";
 import { listingIdBodySchema } from "@/lib/security/schemas";
+import { THROTTLE, throttle, tooMany } from "@/lib/security/throttle";
 
 export async function GET() {
   const auth = await requireUser("member");
@@ -16,6 +17,8 @@ export async function POST(req: Request) {
   if (blocked) return blocked;
   const auth = await requireUser("member");
   if ("error" in auth) return auth.error;
+  const limited = await throttle([{ key: `convo:${auth.user.id}`, ...THROTTLE.convoStart }], req);
+  if (!limited.ok) return tooMany(limited.retryAfter);
   const parsed = await readJson(req, listingIdBodySchema);
   if (!parsed.ok) return parsed.response;
   const result = await startConversation(auth.user.id, parsed.data.listingId);

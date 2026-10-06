@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { parseSearch, readJson } from "@/lib/security/parseBody";
 import { findLiveToken, qrHash } from "@/lib/security/qr";
-import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
+import { clientIp } from "@/lib/security/rateLimit";
+import { THROTTLE, throttle, tooMany } from "@/lib/security/throttle";
 import { qrApproveSchema, qrTokenSchema } from "@/lib/security/schemas";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
 
@@ -26,10 +27,13 @@ export async function POST(req: Request) {
   if (blocked) return blocked;
   const auth = await requireUser("member");
   if ("error" in auth) return auth.error;
-  const limited = rateLimit(`qrapprove:${clientIp(req)}:${auth.user.id}`, LIMITS.apiWrite.limit, LIMITS.apiWrite.windowMs);
-  if (!limited.ok) return NextResponse.json({ ok: false, error: "auth.err.rateLimit" }, { status: 429 });
+  const limited = await throttle([{ key: `qr-approve:${auth.user.id}:${clientIp(req)}`, ...THROTTLE.qr }], req);
+  if (!limited.ok) return tooMany(limited.retryAfter);
   const parsed = await readJson(req, qrApproveSchema);
   if (!parsed.ok) return parsed.response;
+  if (parsed.data.approve && auth.user.role === "admin") {
+    return NextResponse.json({ ok: false, error: "qr.err.admin" }, { status: 403 });
+  }
   const updated = await prisma.qrToken.updateMany({
     where: {
       tokenHash: await qrHash(parsed.data.t),

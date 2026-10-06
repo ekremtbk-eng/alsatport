@@ -21,7 +21,9 @@ function isLoopback(value: string) {
 
 export function isLocalDevRequest(req?: Request) {
   if (process.env.NODE_ENV !== "production") return true;
-  if (!req) return false;
+  // Host and forwarding headers are client-controlled; never trust them on the real platform.
+  if (!req || process.env.VERCEL) return false;
+  if (req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip")) return false;
   const host = (req.headers.get("host") ?? "").split(":")[0]?.toLowerCase() ?? "";
   if (host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1") return true;
   return isLoopback(clientIp(req));

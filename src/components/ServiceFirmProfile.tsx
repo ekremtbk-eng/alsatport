@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, ChevronLeft, ChevronRight, Home, MapPin, Star } from "lucide-react";
 import type { Listing } from "@/data/store";
-import { getSellerPhone, phoneToTel } from "@/data/store";
+import { getSellerPhone } from "@/data/store";
+import { usePhoneReveal } from "@/lib/usePhoneReveal";
 import { formatListingCount } from "@/data/categories";
 import { useApp } from "@/context/AppContext";
 import { useI18n } from "@/context/I18nContext";
@@ -65,7 +66,8 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regionKey]);
 
-  const phone = getSellerPhone(listing.sellerId, listing);
+  const phoneHint = getSellerPhone(listing.sellerId, listing);
+  const { revealed: phone, telHref, reveal } = usePhoneReveal(listing.id, phoneHint);
   const aboutLimit = 280;
   const aboutLong = profile.about.length > aboutLimit;
   const aboutText = !aboutLong || aboutOpen ? profile.about : `${profile.about.slice(0, aboutLimit).trim()}…`;
@@ -87,6 +89,7 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
       router.push(gate);
       return;
     }
+    if (!phoneOpen) void reveal();
     setPhoneOpen((v) => !v);
   }
 
@@ -372,10 +375,10 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
               {phoneOpen && phone ? t("list.hide") : t("firm.phone")}
             </button>
             {phoneOpen && phone ? (
-              <a className="firm-phone-num" href={phoneToTel(phone)}>
+              <a className="firm-phone-num" href={telHref}>
                 {phone}
               </a>
-            ) : phoneOpen && !phone ? (
+            ) : phoneOpen && !phoneHint ? (
               <p className="firm-hint">{t("seller.nophone")}</p>
             ) : null}
             <button type="button" className="firm-quote" onClick={openQuote}>

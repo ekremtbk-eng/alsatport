@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/security/session";
+import { requireAdmin } from "@/lib/security/session";
 
 export async function GET(req: Request) {
-  const auth = await requireUser("admin");
+  const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
   const q = (new URL(req.url).searchParams.get("q") ?? "").trim();
   const rows = await prisma.user.findMany({

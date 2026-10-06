@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { writeAudit } from "@/lib/admin/audit";
 import { isUuid } from "@/lib/ids";
-import { requireMutatingRequest, requireUser } from "@/lib/security/session";
+import { requireAdmin, requireMutatingRequest } from "@/lib/security/session";
 import { specialDayBodySchema } from "@/lib/security/schemas";
 import { sanitizeMultiline, sanitizeText } from "@/lib/security/sanitize";
 import { isSpecialDayActive, istanbulDate } from "@/lib/specialDays";
@@ -35,7 +35,7 @@ function serialize(row: {
 export async function PATCH(req: Request, ctx: Ctx) {
   const blocked = await requireMutatingRequest(req);
   if (blocked) return blocked;
-  const auth = await requireUser("admin");
+  const auth = await requireAdmin();
   if ("error" in auth) return auth.error;
   const { id } = await ctx.params;
   if (!isUuid(id)) return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
@@ -83,7 +83,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
 export async function DELETE(req: Request, ctx: Ctx) {
   const blocked = await requireMutatingRequest(req);
   if (blocked) return blocked;
-  const auth = await requireUser("admin");
+  const auth = await requireAdmin({ stepUp: true });
   if ("error" in auth) return auth.error;
   const { id } = await ctx.params;
   if (!isUuid(id)) return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });

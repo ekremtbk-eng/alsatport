@@ -1,34 +1,25 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { COOKIE_ACCESS, COOKIE_REFRESH } from "@/lib/security/cookies";
-import { verifyAuthToken } from "@/lib/security/jwt";
 import { findUserById, publicProfile, saveUser } from "@/lib/security/userStore";
-import { attachSession, clearSession } from "@/lib/security/session";
-import { promoteConfiguredAdmin } from "@/lib/admin/audit";
+import { attachSession, clearSession, currentSession, revokeSession } from "@/lib/security/session";
 import { isProfileComplete, stampVerification } from "@/lib/profile";
 import { entitlementsChanged, listingPatchForProfile, reconcileEntitlements } from "@/lib/entitlements";
 
 export async function GET() {
-  const jar = await cookies();
-  const access = jar.get(COOKIE_ACCESS)?.value;
-  const refresh = jar.get(COOKIE_REFRESH)?.value;
-  let id: string | null = null;
-  if (access) {
-    const claims = await verifyAuthToken(access, "access");
-    if (claims) id = claims.id || claims.sub;
-  }
-  if (!id && refresh) {
-    const claims = await verifyAuthToken(refresh, "refresh");
-    if (claims) id = claims.id || claims.sub;
-  }
-  if (!id) return NextResponse.json({ ok: true, user: null });
-  let user = await findUserById(id);
-  if (!user) return NextResponse.json({ ok: true, user: null });
-  if (user.bannedAt) {
+  const current = await currentSession();
+  if (!current) {
+    const jar = await cookies();
     const res = NextResponse.json({ ok: true, user: null });
-    return clearSession(res);
+    // Revoked, expired or pre-session-table tokens: drop the stale cookies.
+    return jar.get(COOKIE_ACCESS) || jar.get(COOKIE_REFRESH) ? clearSession(res) : res;
   }
-  user = await promoteConfiguredAdmin(user);
+  const user = await findUserById(current.claims.sub);
+  if (!user) return clearSession(NextResponse.json({ ok: true, user: null }));
+  if (user.bannedAt) {
+    await revokeSession(current.session.id, "banned");
+    return clearSession(NextResponse.json({ ok: true, user: null }));
+  }
   const stamped = reconcileEntitlements(stampVerification(user.profile));
   const stored =
     entitlementsChanged(user.profile, stamped) || stamped.verified !== user.profile.verified
@@ -41,6 +32,7 @@ export async function GET() {
     userId: stored.id,
     listingPatch: listingPatchForProfile(profile),
     needsProfile: !isProfileComplete(profile),
+    adminMfa: stored.role === "admin" ? !!current.session.mfaAt : undefined,
   });
   return attachSession(res, stored);
 }

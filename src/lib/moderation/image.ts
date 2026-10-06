@@ -1,6 +1,9 @@
 import "server-only";
 import sharp from "sharp";
 
+/** Avatars are tiny once normalised; this caps decode memory for decompression-bomb uploads. */
+const SHARP_INPUT = { limitInputPixels: 60_000_000 } as const;
+
 const EXPLICIT_NAME =
   /\b(nsfw|nude|nudes|naked|porn|xxx|sex|explicit|onlyfans|çıplak|ciplak|porno|seks)\b/i;
 
@@ -24,7 +27,7 @@ function isSkinPixel(r: number, g: number, b: number) {
 }
 
 async function heuristicNudity(bytes: Buffer) {
-  const { data, info } = await sharp(bytes)
+  const { data, info } = await sharp(bytes, SHARP_INPUT)
     .rotate()
     .resize(96, 96, { fit: "cover" })
     .removeAlpha()
@@ -57,7 +60,7 @@ async function sightengineNudity(bytes: Buffer) {
   const secret = process.env.SIGHTENGINE_API_SECRET?.trim();
   if (!user || !secret) return null;
   // Only decoded pixels leave the server; EXIF/GPS from the original file is not forwarded.
-  const clean = await sharp(bytes).rotate().jpeg({ quality: 85 }).toBuffer();
+  const clean = await sharp(bytes, SHARP_INPUT).rotate().jpeg({ quality: 85 }).toBuffer();
   const body = new FormData();
   body.set("media", new Blob([new Uint8Array(clean)]), "photo.jpg");
   body.set("models", "nudity-2.0");
@@ -84,7 +87,7 @@ export async function moderateAvatarImage(bytes: Buffer, filename = "photo.jpg")
     return { blocked: true as const, reason: "photo.nsfw" as const };
   }
   try {
-    const meta = await sharp(bytes).metadata();
+    const meta = await sharp(bytes, SHARP_INPUT).metadata();
     if (!meta.width || !meta.height || meta.width < 32 || meta.height < 32) {
       return { blocked: true as const, reason: "photo.only" as const };
     }
@@ -105,7 +108,7 @@ export async function moderateAvatarImage(bytes: Buffer, filename = "photo.jpg")
 }
 
 export async function normalizeAvatar(bytes: Buffer) {
-  return sharp(bytes)
+  return sharp(bytes, SHARP_INPUT)
     .rotate()
     .resize(512, 512, { fit: "cover", position: "attention" })
     .webp({ quality: 82 })

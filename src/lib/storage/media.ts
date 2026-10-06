@@ -38,13 +38,25 @@ export function storageKeyFromUrl(url: string) {
   }
   try {
     const parsed = new URL(url);
-    if (parsed.hostname.includes("blob.vercel-storage.com")) {
+    const ownHost = ownBlobHost();
+    if (parsed.protocol === "https:" && ownHost && parsed.hostname.toLowerCase() === ownHost) {
       return decodeURIComponent(parsed.pathname.replace(/^\//, ""));
     }
   } catch {
     /* ignore */
   }
   return `remote/${crypto.randomUUID()}`;
+}
+
+/**
+ * Public host of *this* project's Blob store. Any other `*.blob.vercel-storage.com` host is someone
+ * else's store and must never count as one of our managed (moderated, EXIF-stripped) uploads.
+ */
+function ownBlobHost() {
+  const explicit = process.env.BLOB_PUBLIC_HOST?.trim().toLowerCase();
+  if (explicit) return explicit;
+  const storeId = process.env.BLOB_READ_WRITE_TOKEN?.split("_")[3]?.trim().toLowerCase();
+  return storeId ? `${storeId}.public.blob.vercel-storage.com` : "";
 }
 
 function blobEnabled() {
@@ -92,7 +104,7 @@ export async function deleteStoredObject(storageKey: string, url?: string) {
   if (!isManagedStorageKey(storageKey)) return;
   if (blobEnabled()) {
     const token = process.env.BLOB_READ_WRITE_TOKEN;
-    const target = url && url.includes("blob.vercel-storage.com") ? url : storageKey;
+    const target = url?.startsWith("https://") && storageKeyFromUrl(url) === storageKey ? url : storageKey;
     await del(target, { token }).catch(() => undefined);
     return;
   }
