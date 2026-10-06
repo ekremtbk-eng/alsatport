@@ -18,6 +18,7 @@ import {
 } from "@/data/store";
 import { seedReviews, type SellerReview } from "@/data/reviews";
 import { cityPoint, isNearbyListing, nearestCity } from "@/lib/geo";
+import { hasConsent } from "@/lib/consent";
 import { isBlockedLiveAnimalListing } from "@/lib/liveAnimalPolicy";
 import {
   DEFAULT_NOTIF_PREFS,
@@ -49,6 +50,9 @@ type AppState = {
   hydrated: boolean;
   unreadNotifications: number;
   loginWithPassword: (identifier: string, password: string) => Promise<AuthResult>;
+  verifyLoginCode: (otp: string, trust: boolean) => Promise<AuthResult>;
+  /** Applies a fresh profile returned by an account API. */
+  adoptSession: (user: UserProfile) => void;
   registerAccount: (input: {
     username: string;
     email: string;
@@ -62,8 +66,6 @@ type AppState = {
   completeProfile: (input: {
     fullName: string;
     phone: string;
-    birthDate?: string;
-    nationalId: string;
     address: string;
     displayName?: string;
   }) => Promise<AuthResult>;
@@ -73,8 +75,8 @@ type AppState = {
   confirmPhoneVerify: (otp: string) => Promise<AuthResult>;
   logout: () => void;
   toggleFavorite: (id: string) => void;
-  addListing: (listing: Listing, recaptchaToken?: string) => Promise<{ ok: boolean; error?: string }>;
-  updateListing: (id: string, patch: Partial<Listing>) => Promise<{ ok: boolean; error?: string }>;
+  addListing: (listing: Listing) => Promise<{ ok: boolean; error?: string; listing?: Listing; status?: number }>;
+  updateListing: (id: string, patch: Partial<Listing>) => Promise<{ ok: boolean; error?: string; status?: number }>;
   removeListing: (id: string) => Promise<void>;
   updateListingPrice: (id: string, price: number) => void;
   setListingStatus: (id: string, status: Listing["status"]) => void;
@@ -100,6 +102,7 @@ type AppState = {
   removeSavedSearch: (id: string) => void;
   isSearchSaved: (query: string, city?: string, filter?: string) => boolean;
   setNotifPrefs: (patch: Partial<NotifPrefs>) => void;
+  pushNotifs: (items: AppNotification[]) => void;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   clearNotifications: () => void;
@@ -227,7 +230,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const pushNotifs = useCallback((items: AppNotification[]) => {
     if (!items.length) return;
-    setNotifications((prev) => capNotifs([...items, ...prev]));
+    setNotifications((prev) => {
+      const have = new Set(prev.map((n) => n.id));
+      const fresh = items.filter((n) => n.id && !have.has(n.id));
+      if (!fresh.length) return prev;
+      return capNotifs([...fresh, ...prev]);
+    });
   }, []);
 
   useEffect(() => {
@@ -360,7 +368,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           ...parsed,
           reviews,
           notifications,
-          geo: geoRef.current,
+          geo: hasConsent("functional") ? geoRef.current : undefined,
           watchedPrices: pricesRef.current,
           savedSearches: signedIn ? parsed.savedSearches : searchesRef.current,
           notifPrefs: signedIn ? parsed.notifPrefs : prefsRef.current,
@@ -571,13 +579,55 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       needsProfile?: boolean;
       needsEmailVerify?: boolean;
       user?: UserProfile;
+      twoFactor?: boolean;
+      method?: "email" | "sms";
+      maskedTarget?: string;
+      maskedEmail?: string;
+      hasRecovery?: boolean;
+      canEmail?: boolean;
+      expiresIn?: number;
+      resendIn?: number;
+      sandboxCode?: string;
     }>(
       "/api/auth/login",
       { identifier, password },
     );
+    if (res.ok && res.twoFactor) {
+      return {
+        ok: true,
+        needsProfile: false,
+        twoFactor: {
+          method: res.method ?? "email",
+          maskedTarget: res.maskedTarget ?? res.maskedEmail ?? "",
+          maskedEmail: res.maskedEmail ?? "",
+          hasRecovery: !!res.hasRecovery,
+          canEmail: !!res.canEmail,
+          expiresIn: res.expiresIn ?? 0,
+          resendIn: res.resendIn ?? 0,
+          sandboxCode: res.sandboxCode,
+        },
+      };
+    }
     if (!res.ok || !res.user) return { ok: false, error: res.error ?? "auth.err.wrong" };
     setUser(res.user);
     return { ok: true, needsProfile: !!res.needsProfile, needsEmailVerify: !!res.needsEmailVerify || res.user.emailVerified === false };
+  }, []);
+
+  const verifyLoginCode = useCallback(async (otp: string, trust: boolean): Promise<AuthResult> => {
+    const res = await apiPost<{
+      ok: boolean;
+      error?: string;
+      needsProfile?: boolean;
+      needsEmailVerify?: boolean;
+      user?: UserProfile;
+    }>("/api/auth/login/verify", { otp, trust });
+    if (!res.ok || !res.user) return { ok: false, error: res.error ?? "complete.err.emailCode" };
+    setUser(res.user);
+    return { ok: true, needsProfile: !!res.needsProfile, needsEmailVerify: !!res.needsEmailVerify || res.user.emailVerified === false };
+  }, []);
+
+  const adoptSession = useCallback((next: UserProfile) => {
+    setUser(next);
   }, []);
 
   const registerAccount = useCallback(
@@ -606,8 +656,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     async (input: {
       fullName: string;
       phone: string;
-      birthDate?: string;
-      nationalId: string;
       address: string;
       displayName?: string;
     }): Promise<AuthResult> => {
@@ -692,20 +740,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updateListing = useCallback(async (id: string, patch: Partial<Listing>) => {
     const res = await apiPut<{ ok: boolean; error?: string; listing?: Listing }>(`/api/listings/${id}`, patch);
-    if (!res.ok || !res.listing) return { ok: false, error: res.error ?? "auth.err.server" };
+    if (!res.ok || !res.listing) return { ok: false, error: res.error ?? "auth.err.server", status: res.status };
     setListings((prev) => prev.map((l) => (l.id === id ? res.listing! : l)));
     return { ok: true };
   }, []);
 
-  const addListing = useCallback(async (listing: Listing, recaptchaToken?: string) => {
+  const addListing = useCallback(async (listing: Listing) => {
     if (isBlockedLiveAnimalListing(listing)) return { ok: false, error: "mod.animal" };
+    const payload = {
+      id: listing.id,
+      title: listing.title,
+      subtitle: listing.subtitle,
+      price: listing.price,
+      categoryId: listing.categoryId,
+      city: listing.city,
+      district: listing.district,
+      neighborhood: listing.neighborhood,
+      lat: listing.lat,
+      lng: listing.lng,
+      images: listing.images,
+      description: listing.description,
+      specs: listing.specs,
+      features: listing.features,
+      chassis: listing.chassis,
+      listingNo: listing.listingNo,
+      expiresAt: listing.expiresAt,
+      urgent: listing.urgent,
+    };
     const res = await apiPost<{
       ok: boolean;
       error?: string;
       listing?: Listing;
       listingsPosted?: number;
-    }>("/api/listings", { ...listing, recaptchaToken });
-    if (!res.ok) return { ok: false, error: res.error ?? "auth.err.server" };
+    }>("/api/listings", payload);
+    if (!res.ok) return { ok: false, error: res.error ?? "auth.err.server", status: res.status };
     const nextListing = res.listing ?? { ...listing, status: "active" as const };
     setListings((prev) => [nextListing, ...prev.filter((l) => l.id !== nextListing.id)]);
     setUser((u) =>
@@ -717,7 +785,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
         : u,
     );
-    return { ok: true };
+    return { ok: true, listing: nextListing };
   }, []);
 
   const removeListing = useCallback(async (id: string) => {
@@ -799,9 +867,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [applyListingPatch],
   );
 
-  const purchaseProduct = useCallback(async (product: "profesyonel" | "vip" | "doping") => {
-    window.location.assign(`/odeme?plan=${product}`);
-    return { ok: true };
+  const purchaseProduct = useCallback(async (_product: "profesyonel" | "vip" | "doping") => {
+    return { ok: false, error: "pay.campaign" };
   }, []);
 
   const refreshConversation = useCallback(async (id: string) => {
@@ -1105,6 +1172,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       hydrated,
       unreadNotifications,
       loginWithPassword,
+      verifyLoginCode,
+      adoptSession,
       registerAccount,
       startPaytrCheckout,
       pollPayment,
@@ -1133,6 +1202,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       removeSavedSearch,
       isSearchSaved,
       setNotifPrefs,
+      pushNotifs,
       markNotificationRead,
       markAllNotificationsRead,
       clearNotifications,
@@ -1155,6 +1225,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       hydrated,
       unreadNotifications,
       loginWithPassword,
+      verifyLoginCode,
+      adoptSession,
       registerAccount,
       startPaytrCheckout,
       pollPayment,
@@ -1183,6 +1255,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       removeSavedSearch,
       isSearchSaved,
       setNotifPrefs,
+      pushNotifs,
       markNotificationRead,
       markAllNotificationsRead,
       clearNotifications,

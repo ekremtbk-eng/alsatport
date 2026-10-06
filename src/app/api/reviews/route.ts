@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 import { listSellerReviews, upsertSellerReview } from "@/lib/reviews/store";
 import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
+import { parseSearch, readJson } from "@/lib/security/parseBody";
+import { reviewBodySchema, sellerQuerySchema } from "@/lib/security/schemas";
 
 export const maxDuration = 30;
 
 export async function GET(req: Request) {
-  const sellerId = new URL(req.url).searchParams.get("sellerId") ?? "";
-  const reviews = await listSellerReviews(sellerId);
+  const query = parseSearch(new URL(req.url), sellerQuerySchema);
+  if (!query?.sellerId) return NextResponse.json({ ok: true, reviews: [] });
+  const reviews = await listSellerReviews(query.sellerId);
   return NextResponse.json({ ok: true, reviews });
 }
 
@@ -24,18 +27,14 @@ export async function POST(req: Request) {
       { status: 429, headers: { "Retry-After": String(limited.retryAfter) } },
     );
   }
-  const body = (await req.json().catch(() => null)) as {
-    sellerId?: string;
-    listingId?: string;
-    rating?: number;
-    text?: string;
-  } | null;
+  const parsed = await readJson(req, reviewBodySchema);
+  if (!parsed.ok) return parsed.response;
   const saved = await upsertSellerReview({
-    sellerId: body?.sellerId ?? "",
+    sellerId: parsed.data.sellerId,
     authorId: auth.user.id,
-    listingId: body?.listingId,
-    rating: Number(body?.rating ?? 0),
-    text: body?.text ?? "",
+    listingId: parsed.data.listingId,
+    rating: parsed.data.rating,
+    text: parsed.data.text ?? "",
   });
   if ("error" in saved) {
     return NextResponse.json({ ok: false, error: saved.error }, { status: saved.status });

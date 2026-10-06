@@ -2,15 +2,15 @@ import { PrivacyPolicyBody } from "@/components/PrivacyPolicyBody";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata = pageMetadata({
-  title: "Gizlilik Politikası · AlsatPort",
+  title: "Gizlilik Politikası · AlSatPort",
   description:
-    "AlsatPort gizlilik politikası. Veri sorumlusu AlSatPort Bilgi Teknolojileri A.Ş. Google ile girişte yalnızca ad, e-posta ve profil resmi alınır; üçüncü taraflara satılmaz. İletişim: destek@alsatport.com",
+    "AlSatPort gizlilik politikası: Google ile giriş, hesap, ilan ve mesaj verileri, güvenlik kayıtları, çerezler, hizmet sağlayıcılar ve hesap silme. Verileriniz satılmaz.",
   path: "/gizlilik-politikasi",
 });
 
 export default function PrivacyPolicyPage() {
   return (
-    <article className="mx-auto max-w-3xl px-4 py-8">
+    <article className="legal-page mx-auto max-w-4xl px-4 py-8 sm:px-6">
       <PrivacyPolicyBody />
     </article>
   );

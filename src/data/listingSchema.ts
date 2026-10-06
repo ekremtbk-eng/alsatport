@@ -1,4 +1,4 @@
-import { brandsForCategory, findCategory, rootOf } from "@/data/categories";
+import { brandsForCategory, lookupCategory, rootOf } from "@/data/categories";
 import {
   APPLIANCE_BRANDS,
   AUDIO_BRANDS,
@@ -74,6 +74,8 @@ import {
   BERTHS,
   COMMERCIAL_BODIES,
   ZONING,
+  kimdenOptionsForRoot,
+  VEHICLE_FROM,
 } from "@/data/listingOptions";
 import { TUTOR_PLACES, tutorLevelsFor, tutorSubjectsFor } from "@/data/tutorOptions";
 
@@ -475,7 +477,11 @@ function vehicleFields(segment: VehicleSegment = "auto", profile: VehicleProfile
       f("charge", "Hızlı şarj süresi", "select", { options: FAST_CHARGE, specLabel: "Şarj" }),
     );
   }
-  fields.push(f("year", "Yıl", "select", { options: years, required: true }));
+  fields.push(f("year", "Yıl", "select", {
+    options: years,
+    required: true,
+    dependsOn: skipBody ? "engine" : "body",
+  }));
   if (!skipKm) fields.push(f("km", "Kilometre", "number", { required: true, specLabel: "Km" }));
   if (!skipGear) {
     fields.push(
@@ -522,6 +528,13 @@ function vehicleFields(segment: VehicleSegment = "auto", profile: VehicleProfile
     fields.push(f("kit", "Engelli donanımı", "select", { options: DISABLED_KITS, specLabel: "Donanım" }));
   }
   fields.push(f("color", "Renk", "select", { options: COLORS, required: true }));
+  fields.push(
+    f("kimden", "Kimden", "select", {
+      options: VEHICLE_FROM,
+      required: true,
+      specLabel: "Kimden",
+    }),
+  );
   if (!isAir) {
     fields.push(
       f("damage", "Hasar kaydı", "select", {
@@ -1044,8 +1057,28 @@ function autoSpareFields(categoryId: string): AttrField[] {
   return fields;
 }
 
+function withKimden(schema: ListingSchema, root: string): ListingSchema {
+  if (schema.fields.some((field) => field.key === "kimden")) return schema;
+  return {
+    ...schema,
+    fields: [
+      ...schema.fields,
+      f("kimden", "Kimden", "select", {
+        options: kimdenOptionsForRoot(root),
+        required: root === "vasita",
+        specLabel: "Kimden",
+      }),
+    ],
+  };
+}
+
 export function schemaForCategoryId(categoryId: string): ListingSchema {
-  const cat = findCategory(categoryId);
+  const cat = lookupCategory(categoryId);
+  return withKimden(buildSchemaForCategoryId(categoryId), cat ? rootOf(cat).id : categoryId);
+}
+
+function buildSchemaForCategoryId(categoryId: string): ListingSchema {
+  const cat = lookupCategory(categoryId);
   const root = cat ? rootOf(cat).id : categoryId;
   const id = cat?.id ?? categoryId;
 
@@ -1385,7 +1418,8 @@ export function specsFromAttrs(schema: ListingSchema, attrs: Record<string, stri
   for (const field of schema.fields) {
     const raw = attrs[field.key]?.trim();
     if (!raw) continue;
-    const value = field.key === "km" ? `${Number(raw).toLocaleString("tr-TR")} km` : raw;
+    const kmDigits = field.key === "km" ? raw.replace(/\D/g, "") : "";
+    const value = kmDigits ? `${Number(kmDigits).toLocaleString("tr-TR")} km` : raw;
     specs.push({ label: field.specLabel, value });
   }
   return specs;
@@ -1409,9 +1443,9 @@ export function specsWithChassis(
 export function highlightSpecs(specs: { label: string; value: string }[], family: ListingSchema["family"]) {
   const order =
     family === "vasita"
-      ? ["Yıl", "Km", "Yakıt", "Vites", "Motor gücü", "Motor", "Motor hacmi", "Menzil", "Batarya", "Şarj", "Yük"]
-      : family === "emlak"
-        ? ["m²", "Oda", "Kat", "Isıtma", "Bina yaşı", "Cephe"]
+      ? ["Yıl", "Km", "Yakıt", "Vites", "Motor gücü", "Motor", "Motor hacmi", "Menzil", "Batarya", "Şarj", "Yük", "Kimden"]
+        : family === "emlak"
+          ? ["m²", "Oda", "Kat", "Isıtma", "Bina yaşı", "Cephe", "Kimden"]
         : family === "hizmet"
           ? ["Hizmet yeri", "Çalışma", "Garanti", "Deneyim", "Süre", "Fatura"]
           : specs.map((s) => s.label);

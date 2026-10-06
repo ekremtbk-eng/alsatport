@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { loadUserAlertSettings, updateNotifPrefs } from "@/lib/alerts/store";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
+import { readJson } from "@/lib/security/parseBody";
+import { notifPrefsSchema } from "@/lib/security/schemas";
 
 export async function GET() {
   const auth = await requireUser("member", { allowUnverified: true });
@@ -14,15 +16,8 @@ export async function PATCH(req: Request) {
   if (blocked) return blocked;
   const auth = await requireUser("member", { allowUnverified: true });
   if ("error" in auth) return auth.error;
-  const body = (await req.json().catch(() => null)) as {
-    priceDrop?: boolean;
-    savedSearch?: boolean;
-    nearby?: boolean;
-  } | null;
-  const data = await updateNotifPrefs(auth.user.id, {
-    priceDrop: body?.priceDrop,
-    savedSearch: body?.savedSearch,
-    nearby: body?.nearby,
-  });
+  const parsed = await readJson(req, notifPrefsSchema);
+  if (!parsed.ok) return parsed.response;
+  const data = await updateNotifPrefs(auth.user.id, parsed.data);
   return NextResponse.json({ ok: true, ...data });
 }

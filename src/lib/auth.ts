@@ -13,8 +13,22 @@ export type AuthAccount = {
   profile: UserProfile;
 };
 
+export type TwoFactorChallenge = {
+  method: "email" | "sms";
+  /** Masked phone (05** *** ** 00) or email (e***@x.com); the full value never reaches the client. */
+  maskedTarget: string;
+  maskedEmail: string;
+  hasRecovery: boolean;
+  /** SMS users may ask for the code by email instead. */
+  canEmail: boolean;
+  /** Seconds until the pending code expires / another code may be requested. */
+  expiresIn: number;
+  resendIn: number;
+  sandboxCode?: string;
+};
+
 export type AuthResult =
-  | { ok: true; needsProfile: boolean; needsEmailVerify?: boolean }
+  | { ok: true; needsProfile: boolean; needsEmailVerify?: boolean; twoFactor?: TwoFactorChallenge }
   | { ok: false; error: string };
 
 export const SEED_OWNER_ID = "u-ekrem";

@@ -20,11 +20,13 @@ export function FilterRenoTree({
   root,
   selectedIds,
   onToggleLeaf,
+  onSelect,
 }: {
   current: Category;
   root: Category;
   selectedIds: string[];
   onToggleLeaf: (id: string) => void;
+  onSelect?: (cat: Category) => void;
 }) {
   const { t } = useI18n();
   const { categoryCounts } = useApp();
@@ -40,20 +42,37 @@ export function FilterRenoTree({
   return (
     <div className="flt-reno-tree">
       <p className="flt-reno-root">
-        <Link href={hrefForCategory(root)}>{catName(t, root.id, root.name)}</Link>
+        {onSelect ? (
+          <button type="button" onClick={() => onSelect(root)}>
+            {catName(t, root.id, root.name)}
+          </button>
+        ) : (
+          <Link href={hrefForCategory(root)}>{catName(t, root.id, root.name)}</Link>
+        )}
       </p>
       <ul className="flt-reno-branches">
         {branches.map((branch) => {
           const on = activeBranch.id === branch.id;
           const kids = visibleChildren(branch);
+          const branchInner = (
+            <>
+              <span className="flt-reno-mark" aria-hidden />
+              <span className="min-w-0 flex-1 truncate">{catName(t, branch.id, branch.name)}</span>
+              <span className="flt-reno-n">({formatListingCount(countOf(branch))})</span>
+            </>
+          );
           return (
             <li key={branch.id}>
-              <Link href={hrefForCategory(branch)} className={`flt-reno-radio ${on ? "is-on" : ""}`}>
-                <span className="flt-reno-mark" aria-hidden />
-                <span className="min-w-0 flex-1 truncate">{catName(t, branch.id, branch.name)}</span>
-                <span className="flt-reno-n">({formatListingCount(countOf(branch))})</span>
-              </Link>
-              {on && kids.length ? (
+              {onSelect ? (
+                <button type="button" className={`flt-reno-radio ${on ? "is-on" : ""}`} onClick={() => onSelect(branch)}>
+                  {branchInner}
+                </button>
+              ) : (
+                <Link href={hrefForCategory(branch)} className={`flt-reno-radio ${on ? "is-on" : ""}`}>
+                  {branchInner}
+                </Link>
+              )}
+              {kids.length ? (
                 <ul className="flt-reno-leaves">
                   {kids.map((leaf) => {
                     const checked = selected.has(leaf.id) || current.id === leaf.id;

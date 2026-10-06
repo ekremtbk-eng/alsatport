@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
+import { sendSecurityNoticeEmail } from "@/lib/mail/authMail";
 import { hashPassword } from "@/lib/security/password";
-import { verifyPasswordResetToken } from "@/lib/security/passwordReset";
+import { resetStampMatches, verifyPasswordResetToken } from "@/lib/security/passwordReset";
 import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
 import { requireMutatingRequest } from "@/lib/security/session";
 import { findUserById, saveUser } from "@/lib/security/userStore";
@@ -20,17 +21,18 @@ export async function POST(req: Request) {
   }
   const parsed = await readJson(req, resetBodySchema);
   if (!parsed.ok) return parsed.response;
-  const token = parsed.data.token;
-  const password = parsed.data.password;
-  const userId = await verifyPasswordResetToken(token);
-  if (!userId) {
-    return NextResponse.json({ ok: false, error: "auth.err.session" }, { status: 400 });
+  const claims = await verifyPasswordResetToken(parsed.data.token);
+  const user = claims ? await findUserById(claims.userId) : undefined;
+  if (!claims || !user || user.bannedAt || !(await resetStampMatches(claims.stamp, user.passwordHash))) {
+    return NextResponse.json({ ok: false, error: "auth.reset.invalid" }, { status: 400 });
   }
-  const user = await findUserById(userId);
-  if (!user || user.bannedAt || user.provider !== "email") {
-    return NextResponse.json({ ok: false, error: "auth.err.session" }, { status: 400 });
-  }
-  const passwordHash = await hashPassword(password);
+  const passwordHash = await hashPassword(parsed.data.password);
   await saveUser({ ...user, passwordHash });
+  after(() =>
+    sendSecurityNoticeEmail(user.email, "Şifreniz sıfırlandı", "AlsatPort hesabınızın şifresi sıfırlama bağlantısıyla değiştirildi.").then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
   return NextResponse.json({ ok: true });
 }

@@ -22,6 +22,17 @@ export type StoredUser = {
 
 type UserRow = Prisma.UserGetPayload<{ include: { profile: true } }>;
 
+export function maskEmail(email: string) {
+  return email.replace(/^(.)[^@]*(@.+)$/, "$1***$2");
+}
+
+/** Turkish mobile shown as 05** *** ** 00; only the operator digit and last two digits stay visible. */
+export function maskPhoneNumber(phone: string) {
+  const d = phone.replace(/\D/g, "").replace(/^90(?=5\d{9}$)/, "").replace(/^(?=5\d{9}$)/, "0");
+  if (d.length < 4) return "*** *** ** **";
+  return `${d.slice(0, 2)}** *** ** ${d.slice(-2)}`;
+}
+
 function memberSince(createdAt: Date) {
   return createdAt.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
 }
@@ -39,6 +50,7 @@ function toStored(row: UserRow): StoredUser | undefined {
     avatar: p.avatarUrl || "",
     verified: p.verified,
     memberSince: memberSince(row.createdAt),
+    joinedAt: row.createdAt.getTime(),
     listings: p.listingsPosted,
     sales: p.salesCount,
     stars: p.stars,
@@ -55,14 +67,23 @@ function toStored(row: UserRow): StoredUser | undefined {
     email: row.email,
     fullName: p.fullName || "",
     phone: p.phone || "",
-    birthDate: p.birthDate ? p.birthDate.toISOString().slice(0, 10) : "",
-    nationalId: decryptPii(p.nationalId),
     address: decryptPii(p.address),
     emailVerified: !!row.emailVerifiedAt,
     phoneVerified: !!p.phoneVerifiedAt,
     profileComplete: p.profileComplete,
     authProvider: provider,
     role,
+    businessName: p.businessName || undefined,
+    businessVerified: !!p.businessVerifiedAt,
+    hasPassword: !!row.passwordHash,
+    twoFactorEnabled: p.twoFactorEnabled,
+    twoFactorMethod: p.twoFactorMethod === "sms" ? "sms" : "email",
+    recoveryEmailMasked: p.recoveryEmail ? maskEmail(p.recoveryEmail) : undefined,
+    recoveryEmailVerified: !!p.recoveryEmailVerifiedAt,
+    readReceipts: p.readReceipts,
+    marketingEmail: p.marketingEmail,
+    marketingSms: p.marketingSms,
+    marketingPush: p.marketingPush,
   };
   return {
     id: row.id,
@@ -114,14 +135,11 @@ export async function findUserByGoogleSub(sub: string) {
 
 export async function saveUser(user: StoredUser) {
   const p = user.profile;
-  const birth = p.birthDate && /^\d{4}-\d{2}-\d{2}$/.test(p.birthDate) ? new Date(p.birthDate) : null;
   const profileData = {
     displayName: p.displayName || p.fullName || user.username,
     fullName: p.fullName || null,
     avatarUrl: p.avatar || null,
     phone: p.phone || null,
-    birthDate: birth,
-    nationalId: p.nationalId ? encryptPii(p.nationalId) : null,
     address: p.address ? encryptPii(p.address) : null,
     city: p.city || null,
     verified: !!p.verified,

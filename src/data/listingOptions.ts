@@ -9,6 +9,7 @@ export {
   brandNamesForSegment,
   catalogForSegment,
   enginesOfModel,
+  equipmentForVehicleCombo,
   modelsOfBrand,
   modelsOfSeries,
   packagesOfModel,
@@ -60,6 +61,15 @@ export const FLOOR_COUNTS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10+"]
 export const USAGE_STATUS = ["Boş", "Kiracılı", "Mülk Sahibi"];
 export const DEED_STATUS = ["Kat Mülkiyeti", "Kat İrtifakı", "Arsa Tapusu", "Hisseli Tapu", "Tahsis"];
 export const LISTING_FROM = ["Sahibinden", "Emlak Ofisinden", "İnşaat Firmasından", "Bankadan"];
+export const PART_FROM = ["Sahibinden", "Mağazadan"];
+export const VEHICLE_FROM = ["Sahibinden", "Galeriden"];
+
+/** Shared “Kimden” options keyed by catalog root — reuse existing vocabularies only. */
+export function kimdenOptionsForRoot(root?: string): string[] {
+  if (root === "vasita") return VEHICLE_FROM;
+  if (root === "emlak") return LISTING_FROM;
+  return PART_FROM;
+}
 export const BATHS = ["1", "2", "3", "4+"];
 export const ZONING = ["Konut", "Ticari", "Tarla", "Bağ & Bahçe", "Sanayi", "Turizm"];
 export const BOAT_TYPES = ["Motoryat", "Yelkenli", "Sürat Teknesi", "Şişme Bot", "Katamaran", "Gulet", "Jet Ski"];
@@ -195,7 +205,6 @@ export const PART_BRANDS = [
   "NGK",
   "Mann Filter",
 ];
-export const PART_FROM = ["Sahibinden", "Mağazadan"];
 export const USED_PART = ["Evet", "Hayır"];
 
 export function photoLimitForPlan(_plan?: "standart" | "profesyonel" | "vip") {

@@ -8,9 +8,11 @@ import { AuthModalProvider } from "@/context/AuthModalContext";
 import { CompareProvider } from "@/context/CompareContext";
 import { CompletionGuard } from "./CompletionGuard";
 import { LocationPrompt } from "./LocationPrompt";
+import { CelebrationHost } from "./CelebrationHost";
 import { NotificationToasts } from "./NotificationToasts";
 import { useI18n } from "@/context/I18nContext";
 import { isServicesPortalPath, ServicesPortalNav } from "@/components/ServicesPortalNav";
+import { MobileSplash } from "@/components/home/MobileSplash";
 
 const BARE = ["/welcome", "/giris", "/kayit", "/hesap-tamamla", "/hizmet-vermek-istiyorum"];
 
@@ -31,10 +33,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <AuthModalProvider>
       <CompareProvider>
-      <div dir={dir} className="app-shell min-h-screen">
+      <div dir={dir} className={`app-shell min-h-screen${path === "/" ? " is-home" : ""}`}>
+        <MobileSplash />
         <CompletionGuard />
         {isServicesPortalPath(path) ? <ServicesPortalNav /> : <Header />}
         <LocationPrompt />
+        <CelebrationHost />
         <main id="main-content">{children}</main>
         <SiteFooter />
         <BottomNav />

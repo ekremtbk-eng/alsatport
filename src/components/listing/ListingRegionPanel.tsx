@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  Baby,
   Bus,
   GraduationCap,
   HeartPulse,
@@ -10,17 +9,21 @@ import {
   Navigation,
   ShoppingBag,
   Trees,
-  Users,
 } from "lucide-react";
 import type { Listing } from "@/data/store";
 import { useI18n } from "@/context/I18nContext";
+import { useConsent } from "@/context/CookieContext";
+import { directionsUrl, osmEmbed, satelliteEmbed } from "@/lib/regionIntel";
 import {
-  directionsUrl,
-  osmEmbed,
-  regionIntel,
-  satelliteEmbed,
+  NEARBY_KINDS,
+  formatDistance,
+  loadNearby,
+  loadRegionCoords,
+  regionVersion,
+  type NearbyItem,
   type NearbyKind,
-} from "@/lib/regionIntel";
+  type RegionCoords,
+} from "@/lib/regionClient";
 
 const TABS: { id: NearbyKind; icon: typeof Bus }[] = [
   { id: "transport", icon: Bus },
@@ -31,42 +34,109 @@ const TABS: { id: NearbyKind; icon: typeof Bus }[] = [
 ];
 
 export function ListingRegionPanel({ listing }: { listing: Listing }) {
-  const { t, formatMoney } = useI18n();
-  const data = useMemo(
-    () => regionIntel(listing.city, listing.district, listing.id, listing.price),
-    [listing.city, listing.district, listing.id, listing.price],
-  );
+  const { t } = useI18n();
   const [layer, setLayer] = useState<"map" | "sat">("map");
-  const [heat, setHeat] = useState(false);
   const [poi, setPoi] = useState<NearbyKind>("transport");
+  const [coords, setCoords] = useState<RegionCoords | undefined>(undefined);
+  const [coordsLoading, setCoordsLoading] = useState(true);
+  const [nearby, setNearby] = useState<Partial<Record<NearbyKind, NearbyItem[]>>>({});
+  const functionalOk = useConsent("functional");
+  const [mapOptIn, setMapOptIn] = useState(false);
+  const showMap = functionalOk || mapOptIn;
+  const poiRef = useRef(poi);
+  poiRef.current = poi;
 
-  const src = layer === "sat" ? satelliteEmbed(data.coords.lat, data.coords.lng) : osmEmbed(data.coords.lat, data.coords.lng);
-  const items = data.nearby[poi];
+  const version = regionVersion(listing);
+
+  useEffect(() => {
+    let alive = true;
+    setCoordsLoading(true);
+    setCoords(undefined);
+    setNearby({});
+    void loadRegionCoords(listing).then((c) => {
+      if (!alive) return;
+      setCoords(c ?? null);
+      setCoordsLoading(false);
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [version]);
+
+  useEffect(() => {
+    if (!coords) return;
+    let alive = true;
+    void (async () => {
+      const order = [poiRef.current, ...NEARBY_KINDS.filter((k) => k !== poiRef.current)];
+      for (const kind of order) {
+        if (!alive) return;
+        const rows = await loadNearby(listing, kind);
+        if (!alive) return;
+        setNearby((prev) => ({ ...prev, [kind]: rows ?? [] }));
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coords, version]);
+
+  useEffect(() => {
+    if (!coords || nearby[poi]) return;
+    let alive = true;
+    void loadNearby(listing, poi).then((rows) => {
+      if (alive) setNearby((prev) => ({ ...prev, [poi]: rows ?? [] }));
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poi, coords, version]);
+
+  const loading = coordsLoading || (!!coords && nearby[poi] === undefined);
+  const items = nearby[poi] ?? [];
   const groups = [...new Set(items.map((i) => i.group))];
+  const src = coords
+    ? layer === "sat"
+      ? satelliteEmbed(coords.lat, coords.lng)
+      : osmEmbed(coords.lat, coords.lng)
+    : "";
+  const placeBits = [listing.city, listing.district, listing.neighborhood].filter(Boolean);
 
   return (
     <section className="loc-panel">
       <div className="loc-map-wrap">
-        <iframe
-          title={t("loc.map")}
-          className="loc-map"
-          src={src}
-          loading="lazy"
-          referrerPolicy="no-referrer-when-downgrade"
-        />
-        {heat ? <div className="loc-heat" aria-hidden /> : null}
-        <div className="loc-pin" aria-hidden>
-          <MapPinned className="h-7 w-7" />
-        </div>
+        {coords && src && showMap ? (
+          <iframe
+            title={t("loc.map")}
+            className="loc-map"
+            src={src}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+        ) : coords && src ? (
+          <div className="loc-map-empty loc-map-consent">
+            <p>{t(layer === "sat" ? "loc.map.consentSat" : "loc.map.consent")}</p>
+            <button type="button" className="btn-primary h-9 px-4 text-xs" onClick={() => setMapOptIn(true)}>
+              {t("loc.map.load")}
+            </button>
+          </div>
+        ) : (
+          <p className="loc-map-empty">{coordsLoading ? t("loc.near.loading") : t("loc.map.empty")}</p>
+        )}
+        {coords ? (
+          <div className="loc-pin" aria-hidden>
+            <MapPinned className="h-7 w-7" />
+          </div>
+        ) : null}
         <div className="loc-map-tools">
-          <button type="button" className={heat ? "is-on" : ""} onClick={() => setHeat((v) => !v)}>
-            m² {t("loc.heat")}
-            <span className="loc-new">{t("loc.new")}</span>
-          </button>
-          <a href={directionsUrl(data.coords.lat, data.coords.lng)} target="_blank" rel="noreferrer">
-            <Navigation className="h-3.5 w-3.5" />
-            {t("loc.dir")}
-          </a>
+          {coords ? (
+            <a href={directionsUrl(coords.lat, coords.lng)} target="_blank" rel="noreferrer">
+              <Navigation className="h-3.5 w-3.5" />
+              {t("loc.dir")}
+            </a>
+          ) : null}
           <div className="loc-layer">
             <button type="button" className={layer === "map" ? "is-on" : ""} onClick={() => setLayer("map")}>
               {t("loc.layer.map")}
@@ -80,7 +150,7 @@ export function ListingRegionPanel({ listing }: { listing: Listing }) {
 
       <div className="loc-near">
         <h3>{t("loc.near")}</h3>
-        <p className="mb-2 text-xs text-muted">{t("loc.region.indicative")}</p>
+        {placeBits.length ? <p className="loc-demo-place">{placeBits.join(" / ")}</p> : null}
         <div className="loc-near-tabs" role="tablist">
           {TABS.map((tab) => {
             const Icon = tab.icon;
@@ -99,73 +169,30 @@ export function ListingRegionPanel({ listing }: { listing: Listing }) {
             );
           })}
         </div>
-        <div className="loc-near-grid">
-          {groups.map((group) => (
-            <div key={group} className="loc-near-card">
-              <p className="loc-near-group">{group}</p>
-              <ul>
-                {items
-                  .filter((i) => i.group === group)
-                  .map((i) => (
-                    <li key={`${i.group}-${i.name}-${i.meters}`}>
-                      <span>{i.name}</span>
-                      <strong>{i.meters} m</strong>
-                    </li>
-                  ))}
-              </ul>
-            </div>
-          ))}
-        </div>
+        {loading ? (
+          <p className="loc-near-note">{t("loc.near.loading")}</p>
+        ) : groups.length ? (
+          <div className="loc-near-grid">
+            {groups.map((group) => (
+              <div key={group} className="loc-near-card">
+                <p className="loc-near-group">{group}</p>
+                <ul>
+                  {items
+                    .filter((i) => i.group === group)
+                    .map((i) => (
+                      <li key={`${i.group}-${i.name}-${i.meters}`}>
+                        <span>{i.name}</span>
+                        <strong>{formatDistance(i.meters)}</strong>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="loc-near-note">{t("loc.near.empty")}</p>
+        )}
         <p className="loc-near-note">{t("loc.near.note")}</p>
-      </div>
-
-      <div className="loc-demo">
-        <div className="loc-demo-head">
-          <h3>{t("loc.demo")}</h3>
-          <p>{t("loc.demo.src", { y: data.year })}</p>
-        </div>
-        <p className="loc-demo-place">
-          {listing.city} / {listing.district} / {data.mahalle}
-        </p>
-        <div className="loc-demo-grid">
-          <article>
-            <p>
-              <Baby className="h-4 w-4" /> {t("loc.demo.age")}
-            </p>
-            <strong>{data.demo.age} {t("loc.years")}</strong>
-          </article>
-          <article>
-            <p>
-              <GraduationCap className="h-4 w-4" /> {t("loc.demo.uni")}
-            </p>
-            <strong>%{data.demo.uni}</strong>
-          </article>
-          <article>
-            <p>
-              <Users className="h-4 w-4" /> {t("loc.demo.pop")}
-            </p>
-            <strong>{data.demo.pop.toLocaleString("tr-TR")} {t("loc.people")}</strong>
-          </article>
-          <article>
-            <p>
-              <HeartPulse className="h-4 w-4" /> {t("loc.demo.marital")}
-            </p>
-            <div className="loc-bars">
-              <span>
-                {t("loc.married")} <b>%{data.demo.married}</b>
-              </span>
-              <span>
-                {t("loc.single")} <b>%{data.demo.single}</b>
-              </span>
-              <span>
-                {t("loc.other")} <b>%{data.demo.unspecified}</b>
-              </span>
-            </div>
-          </article>
-        </div>
-        <p className="loc-sqm">
-          {t("loc.sqmHint")}: <b>{formatMoney(data.sqm)}</b> / m²
-        </p>
       </div>
     </section>
   );

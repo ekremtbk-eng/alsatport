@@ -1,240 +1,185 @@
 import Link from "next/link";
-import {
-  LEGAL_ADDRESS,
-  LEGAL_BRAND,
-  LEGAL_COMPANY,
-  LEGAL_EMAIL_DESTEK,
-  LEGAL_KEP,
-  LEGAL_PHONE,
-  LEGAL_WEB,
-} from "@/data/legal";
-
-const UPDATED = "30 Eylül 2026";
-
-function Mail({ to }: { to: string }) {
-  return (
-    <a className="font-semibold text-lime hover:underline" href={`mailto:${to}`}>
-      {to}
-    </a>
-  );
-}
+import { CookiePrefsLink } from "@/components/CookiePrefsLink";
+import { LEGAL_BRAND, LEGAL_DOMAIN, LEGAL_PRIVACY_EMAIL } from "@/data/legal";
+import { LEGAL_SERVICES } from "@/lib/legalServices";
+import { ControllerIdentity, LegalHeader, LegalToc, Mail, ProcessorTable } from "@/components/legal/LegalUi";
 
 export function PrivacyPolicyBody() {
+  const s = LEGAL_SERVICES;
   return (
     <div className="legal-prose text-sm leading-relaxed">
-      <p className="text-xs font-semibold uppercase tracking-wider text-lime">Privacy Policy · Gizlilik Politikası</p>
-      <h1 className="mt-1 text-2xl font-extrabold md:text-3xl">Gizlilik Politikası</h1>
-      <p className="mt-2 text-muted">Yürürlük / son güncelleme: {UPDATED}</p>
-      <p className="mt-1 text-muted">
-        Bu politika {LEGAL_WEB} üretim ortamında yayımlanır ve Google OAuth 2.0 (OpenID Connect)
-        ile giriş dâhil tüm AlsatPort hesap işlemleri için geçerlidir.
+      <LegalHeader kicker="Gizlilik" title="Gizlilik Politikası" />
+      <p className="mt-4">
+        Bu politika, {LEGAL_BRAND} ({LEGAL_DOMAIN}) kullanırken hangi bilgilerin toplandığını, ne için
+        kullanıldığını, kimlerle paylaşıldığını ve bu bilgiler üzerinde hangi kontrollere sahip olduğunuzu sade bir
+        dille anlatır. Hukuki sebepler, saklama süreleri ve KVKK kapsamındaki haklarınız{" "}
+        <Link href="/kvkk" className="font-semibold text-lime">
+          KVKK Aydınlatma Metni
+        </Link>
+        ’nde ayrıntılı olarak yer alır.
       </p>
 
-      <aside className="mt-5 rounded-xl border border-lime/30 bg-lime/10 p-4 text-sm text-ink">
-        <p className="font-extrabold">Google Sign-In — what we collect</p>
-        <p className="mt-2">
-          When you sign in with Google, AlsatPort receives only your <strong>name</strong>,{" "}
-          <strong>email address</strong> and <strong>profile picture</strong> (plus a Google account
-          ID to recognise you on later visits). We use this solely to create and operate your
-          AlsatPort account. We do <strong>not</strong> sell, rent or share this Google user data
-          with third parties for advertising or other unrelated purposes. Contact:{" "}
-          <Mail to={LEGAL_EMAIL_DESTEK} />
-        </p>
-      </aside>
+      <LegalToc
+        items={[
+          ["#gp-kim", "Biz kimiz"],
+          ["#gp-giris", "Giriş"],
+          ["#gp-hesap", "Hesap ve profil"],
+          ["#gp-ilan", "İlanlar"],
+          ["#gp-mesaj", "Mesajlar"],
+          ["#gp-guvenlik", "Güvenlik kayıtları"],
+          ["#gp-cerez", "Çerezler"],
+          ["#gp-ucuncu", "Üçüncü taraflar"],
+          ["#gp-satis", "Veri satışı"],
+          ["#gp-silme", "Silme"],
+          ["#gp-iletisim", "İletişim"],
+        ]}
+      />
 
-      <nav className="mt-5 flex flex-wrap gap-2 text-xs">
-        {[
-          ["#veri-sorumlusu", "1. Veri sorumlusu"],
-          ["#toplanan", "2. Toplanan veriler"],
-          ["#google", "3. Google ile giriş"],
-          ["#amac", "4. Kullanım amacı"],
-          ["#paylasim", "5. Üçüncü kişiler"],
-          ["#cerez", "6. Çerezler"],
-          ["#iletisim", "7. İletişim"],
-        ].map(([href, label]) => (
-          <a key={href} href={href} className="chip">
-            {label}
-          </a>
-        ))}
-      </nav>
-
-      <section id="veri-sorumlusu" className="mt-8 scroll-mt-24">
-        <h2>1. Veri sorumlusu</h2>
+      <section id="gp-kim" className="mt-6">
+        <h2>1. Biz kimiz</h2>
         <p>
-          6698 sayılı Kişisel Verilerin Korunması Kanunu (“KVKK”) uyarınca kişisel verilerinizin
-          veri sorumlusu aşağıdaki tüzel kişidir:
+          {LEGAL_BRAND}, kullanıcıların ikinci el ve sıfır ürün, araç, emlak ve hizmet ilanı yayımlayıp birbirleriyle
+          mesajlaştığı bir ilan platformudur. {LEGAL_BRAND} alım-satımın tarafı değildir.
         </p>
-        <ul>
-          <li>
-            <strong>Unvan:</strong> {LEGAL_COMPANY} (“AlsatPort”, “Şirket”, “biz”)
-          </li>
-          <li>
-            <strong>Marka / platform:</strong> {LEGAL_BRAND} — {LEGAL_WEB}
-          </li>
-          <li>
-            <strong>Adres:</strong> {LEGAL_ADDRESS}
-          </li>
-          <li>
-            <strong>Telefon:</strong> {LEGAL_PHONE}
-          </li>
-          <li>
-            <strong>KEP:</strong> {LEGAL_KEP}
-          </li>
-          <li>
-            <strong>Gizlilik, Google OAuth ve kullanıcı verileri için tek iletişim:</strong>{" "}
-            <Mail to={LEGAL_EMAIL_DESTEK} />
-          </li>
-        </ul>
-        <p>
-          Tüm gizlilik talepleri, Google kullanıcı verilerinizin silinmesi veya düzeltilmesi ve
-          OAuth izinleriyle ilgili sorular <Mail to={LEGAL_EMAIL_DESTEK} /> adresine yöneltilir.
-        </p>
+        <ControllerIdentity />
       </section>
 
-      <section id="toplanan" className="mt-8 scroll-mt-24">
-        <h2>2. Toplanan kişisel veriler</h2>
-        <p>AlsatPort aşağıdaki kategorilerde kişisel veri işleyebilir:</p>
+      <section id="gp-giris">
+        <h2>2. Giriş yöntemleri</h2>
         <ul>
           <li>
-            <strong>Google ile girişte:</strong> ad (profil adı), e-posta adresi, profil resmi,
-            Google hesap kimliği (sub).
+            <strong>E-posta ve şifre:</strong> şifreniz yalnızca geri döndürülemez bir özet (bcrypt) olarak saklanır;
+            çalışanlarımız dahil kimse şifrenizi göremez.
+          </li>
+          {s.google ? (
+            <li>
+              <strong>Google ile giriş:</strong> Google, giriş için gerekli olan yalnızca şu bilgileri bize iletir:
+              Google hesap kimliği, ad-soyad, e-posta adresi ve profil fotoğrafı bağlantısı (OpenID Connect
+              kapsamları: <code>openid</code>, <code>email</code>, <code>profile</code>). Google şifreniz bize hiçbir
+              şekilde iletilmez; şifrenizi görmeyiz ve saklamayız. Rehber, takvim, Drive veya başka bir Google
+              verisine erişim istemeyiz.
+            </li>
+          ) : null}
+          <li>
+            <strong>QR kod ile giriş:</strong> zaten giriş yapmış olduğunuz telefonunuzla başka bir tarayıcıda oturum
+            açmanızı sağlar; bu sırada giriş isteyen tarayıcının tarayıcı bilgisi (user-agent) onay ekranında
+            gösterilmek üzere kısa süreli saklanır.
           </li>
           <li>
-            <strong>E-posta/şifre kaydında:</strong> e-posta, kullanıcı adı, şifre özeti (düz metin
-            şifre saklanmaz).
-          </li>
-          <li>
-            <strong>Profil tamamlama (ilan vermek için):</strong> ad soyad, telefon, doğum tarihi,
-            T.C. kimlik veya vergi no, açık adres.
-          </li>
-          <li>
-            <strong>Hizmet kullanımı:</strong> ilanlar, mesajlar, favoriler, kayıtlı aramalar,
-            yüklenen fotoğraflar, bildirim tercihleri.
-          </li>
-          <li>
-            <strong>Teknik:</strong> IP adresi, tarayıcı/cihaz bilgisi, oturum ve güvenlik
-            çerezleri.
+            <strong>İki adımlı doğrulama (isteğe bağlı):</strong> açarsanız girişte e-posta adresinize 6 haneli kod
+            gönderilir. Kodlar yalnızca özet olarak saklanır ve kısa sürede geçersiz olur.
           </li>
         </ul>
       </section>
 
-      <section id="google" className="mt-8 scroll-mt-24">
-        <h2>3. Google OAuth 2.0 ile giriş — ad, e-posta, profil resmi</h2>
+      <section id="gp-hesap">
+        <h2>3. Hesap ve profil bilgileri</h2>
         <p>
-          Kullanıcı “Google ile devam et” düğmesine bastığında Google’ın OAuth 2.0 / OpenID
-          Connect akışı çalışır. AlsatPort’un talep ettiği kapsamlar (scopes) yalnızca{" "}
-          <code>openid</code>, <code>email</code> ve <code>profile</code> ile sınırlıdır.
-        </p>
-        <p>
-          <strong>Google’dan alınan kişisel veriler açıkça şunlardır ve başka Google verisi
-          alınmaz:</strong>
-        </p>
-        <ul>
-          <li>
-            <strong>Ad (name / display name):</strong> AlsatPort üyelik profilinde ve ilanlarda
-            görünen ad olarak kullanılır.
-          </li>
-          <li>
-            <strong>E-posta adresi:</strong> hesabın benzersiz kimliği, oturum açma, e-posta
-            doğrulama ve güvenlik/destek iletileri ({LEGAL_EMAIL_DESTEK} altyapısı) için
-            kullanılır. Gmail kutunuz, taslaklarınız veya diğer postalarınıza erişilmez.
-          </li>
-          <li>
-            <strong>Profil resmi (picture):</strong> varsayılan profil fotoğrafı olarak gösterilir.
-            Kullanıcı dilerse AlsatPort galeri/kamera yüklemesi ile değiştirebilir. Google
-            Fotoğraflar albümüne erişilmez.
-          </li>
-        </ul>
-        <p>
-          Google Drive, Gmail, Rehber, Takvim, konum geçmişi veya ödeme bilgisi talep edilmez ve
-          işlenmez. Google kullanıcı verileri yapay zekâ/model eğitiminde, bağımsız insan
-          incelemesinde (hesap güvenliği veya yasal zorunluluk dışında) veya Google API Services
-          User Data Policy — Limited Use kurallarının izin vermediği başka amaçlarla
-          kullanılmaz.
+          Hesabınız için e-posta, ad-soyad ve kullanıcı adı; ilan verebilmek için ayrıca telefon numarası ve açık
+          adres istenir. Açık adresiniz sunucuda şifrelenmiş olarak saklanır ve hiçbir ilanda veya profilde
+          yayımlanmaz. Profil fotoğrafı yüklemek isteğe bağlıdır
+          {s.sightengine ? "; yüklenen fotoğraflar uygunsuz içerik denetimi için otomatik olarak taranır" : ""}.
+          Kurtarma e-postası ve iki adımlı doğrulama ayarları yalnızca siz eklerseniz tutulur. T.C. kimlik numarası,
+          kimlik belgesi veya ödeme bilgisi istenmez.
         </p>
       </section>
 
-      <section id="amac" className="mt-8 scroll-mt-24">
-        <h2>4. Verilerin kullanım amacı</h2>
-        <p>Toplanan veriler yalnızca aşağıdaki meşru amaçlarla işlenir:</p>
-        <ul>
-          <li>AlsatPort hesabını oluşturmak, oturum açmak ve hesabı sizinle eşleştirmek</li>
-          <li>İlan yayımlama, arama, mesajlaşma ve profil görüntülemesi</li>
-          <li>Hesap güvenliği, sahtecilik önleme, KVKK ve e-ticaret yükümlülükleri</li>
-          <li>
-            Destek ve doğrulama e-postaları göndermek (gönderen: {LEGAL_EMAIL_DESTEK})
-          </li>
-          <li>Kanunların zorunlu kıldığı hallerde yetkili mercilere bilgi vermek</li>
-        </ul>
+      <section id="gp-ilan">
+        <h2>4. İlanlar</h2>
         <p>
-          Google’dan gelen ad, e-posta ve profil resmi <strong>yalnızca AlsatPort hesabınızın
-          işletilmesi</strong> için kullanılır; reklam hedefleme, üçüncü taraf pazarlama veya
-          unrelated ürün geliştirme için kullanılmaz.
-        </p>
-      </section>
-
-      <section id="paylasim" className="mt-8 scroll-mt-24">
-        <h2>5. Üçüncü taraflarla paylaşılmama</h2>
-        <p>
-          <strong>
-            Google ile girişte alınan ad, e-posta adresi ve profil resmi üçüncü taraflara
-            satılmaz, kiralanmaz, takas edilmez veya reklam / veri broker amaçlı paylaşılmaz.
-          </strong>
+          Yayımladığınız ilanın başlığı, açıklaması, fiyatı, özellikleri, fotoğrafları ve il/ilçe/mahalle bilgisi
+          herkese açıktır. Harita konumu, girdiğiniz il/ilçe/mahalle bilgisinden yaklaşık olarak hesaplanır;
+          cihazınızın GPS konumu ilana eklenmez. İlanda satıcı adı olarak adınız ve soyadınızın baş harfi (ör. “Ayşe
+          K.”) ya da yönetici tarafından doğrulanmış işletme adınız görünür. Telefon numaranız yalnızca giriş yapmış
+          üyelere gösterilir; giriş yapmamış ziyaretçiler numarayı maskeli görür.
         </p>
         <p>
-          Bu veriler başka mobil uygulamalara, sosyal ağlara veya analitik reklam platformlarına
-          aktarılmaz. Yalnızca AlsatPort hizmetinin barındırılması için teknik alt işlemciler
-          (uygulama barındırma, veritabanı, e-posta iletimi) kullanılır; bunlar veriyi kendi
-          pazarlama amaçlarıyla kullanamaz. Ödeme altyapısı (PayTR) yalnızca sizin başlattığınız
-          ücretli işlemde devreye girer ve Google profil verisini almaz.
-        </p>
-        <p>
-          Zorunlu istisna: yürürlükteki hukuk, mahkeme veya yetkili kamu kurumu kararı. Google,
-          kimlik doğrulamayı sizin onay verdiğiniz OAuth ekranı üzerinden sağlar; AlsatPort
-          Google’dan aldığını veriyi Google’a geri “satmaz”.
-        </p>
-      </section>
-
-      <section id="cerez" className="mt-8 scroll-mt-24">
-        <h2>6. Çerezler</h2>
-        <p>
-          AlsatPort, oturumun sürdürülmesi, CSRF koruması ve güvenlik için zorunlu çerezler
-          kullanır. Bu çerezler Google kullanıcı verilerinizi reklam ağına aktarmak için
-          kullanılmaz. Tercih yönetimi sitedeki “Çerez ayarları” üzerinden yapılır. Ayrıntılı
-          çerez ve KVKK aydınlatması:{" "}
-          <Link href="/cerez-aydinlatma" className="font-semibold text-lime hover:underline">
-            KVKK / Çerez Aydınlatma Metni
+          Fotoğraflarınızda kişisel veri (yüz, plaka, adres, belge) bulunmamasına dikkat ediniz. Ayrıntılar için{" "}
+          <Link href="/ilan-kurallari" className="font-semibold text-lime">
+            İlan Kuralları
           </Link>
-          .
+          ’na bakınız.
         </p>
       </section>
 
-      <section className="mt-8 scroll-mt-24">
-        <h2>7. Saklama, güvenlik ve silme</h2>
+      <section id="gp-mesaj">
+        <h2>5. Mesajlaşma</h2>
         <p>
-          Ad, e-posta ve profil resmi HTTPS ile iletilir ve hesap kaydınızda saklanır. Üyelik
-          sona erdiğinde veya <Mail to={LEGAL_EMAIL_DESTEK} /> üzerinden silme talebinizde, yasal
-          saklama yükümlülükleri saklı kalmak kaydıyla silinir veya anonimleştirilir. Google
-          hesabınızdaki AlsatPort erişimini Google hesap izinlerinden de iptal edebilirsiniz.
+          Mesajlarınız yalnızca yazıştığınız kullanıcıya iletilir ve hesabınızda saklanır. Mesajlar reklam veya
+          profilleme amacıyla okunmaz ya da analiz edilmez. Bir mesaj şikâyet edildiğinde veya kötüye kullanım
+          şüphesi bulunduğunda yetkili yöneticiler ilgili yazışmayı inceleyebilir. Okundu bilgisini ayarlarınızdan
+          kapatabilirsiniz. Platform dışına (ör. kapora için banka hesabı) yönlendiren mesajlara itibar etmeyiniz.
         </p>
       </section>
 
-      <section id="iletisim" className="mt-8 scroll-mt-24">
-        <h2>8. İletişim</h2>
+      <section id="gp-guvenlik">
+        <h2>6. Güvenlik kayıtları</h2>
         <p>
-          Gizlilik politikası, Google OAuth verileri ve KVKK talepleri için iletişim adresi:
+          Hesabınızı ve diğer kullanıcıları korumak için şunlar işlenir: son giriş zamanı, oturum ve güvenlik
+          çerezleri, istek sınırlaması için IP adresi, yeni hesap açılışlarında çoklu hesapla kötüye kullanımı
+          önlemek amacıyla IP adresi, cihaz parmak izi ve cihaz çerezinin geri döndürülemez özetleri, şikâyetler ve
+          yönetici işlem kayıtları. Barındırma sağlayıcımız sitenin çalışması için standart sunucu erişim kayıtları
+          tutar.
+          {s.recaptcha
+            ? " Üye olma formunda otomatik kayıtları engellemek için Google reCAPTCHA kullanılır; reCAPTCHA yalnızca bu formda yüklenir."
+            : ""}
         </p>
-        <p className="text-base font-extrabold">
-          <Mail to={LEGAL_EMAIL_DESTEK} />
-        </p>
+      </section>
+
+      <section id="gp-cerez">
+        <h2>7. Çerezler ve tarayıcı depolama</h2>
         <p>
-          {LEGAL_COMPANY} — {LEGAL_ADDRESS}
-        </p>
-        <p>
-          Kullanım koşulları:{" "}
-          <Link href="/kullanim-kosullari" className="font-semibold text-lime hover:underline">
-            /kullanim-kosullari
+          Zorunlu çerezler dışında hiçbir çerez veya depolama kaydı izniniz olmadan kullanılmaz. Şu anda analitik veya
+          pazarlama amaçlı hiçbir araç kullanılmamaktadır. Tam liste için{" "}
+          <Link href="/cerez-aydinlatma" className="font-semibold text-lime">
+            Çerez Politikası
           </Link>
+          ’na bakınız. Tercihleriniz: <CookiePrefsLink />
+        </p>
+      </section>
+
+      <section id="gp-ucuncu">
+        <h2>8. Üçüncü taraf hizmetler</h2>
+        <p>Sitenin çalışması için aşağıdaki hizmet sağlayıcılar kullanılmaktadır:</p>
+        <ProcessorTable />
+        <p>
+          Ayrıca ilan konum haritası (OpenStreetMap, Google Haritalar; yalnızca izninizle veya düğmeye bastığınızda),
+          kategori görselleri (Unsplash) ve Google profil fotoğrafları doğrudan ilgili sağlayıcının sunucusundan
+          yüklenir. İlan konumunun koordinatlara çevrilmesi ve yakın çevre bilgisi için sunucumuz OpenStreetMap
+          Nominatim ve Overpass hizmetlerine yalnızca il/ilçe/mahalle ve koordinat bilgisi gönderir; bu isteklerde sizin
+          kişisel bilginiz gönderilmez.
+        </p>
+      </section>
+
+      <section id="gp-satis">
+        <h2>9. Verilerinizi satmıyoruz</h2>
+        <p>
+          Kişisel verileriniz satılmaz, kiralanmaz, reklam ağlarıyla paylaşılmaz ve size hedefli reklam göstermek
+          için kullanılmaz. Pazarlama e-postası almak isteğe bağlıdır; şu anda pazarlama amaçlı ileti
+          gönderilmemektedir.
+        </p>
+      </section>
+
+      <section id="gp-silme">
+        <h2>10. Verilerinizin silinmesi</h2>
+        <p>
+          Hesabınızı giriş yaptıktan sonra{" "}
+          <Link href="/profil?p=iptal" className="font-semibold text-lime">
+            Hesap ve Verilerim
+          </Link>{" "}
+          ekranından kendiniz silebilirsiniz. Silme işleminde ilanlarınız yayından kaldırılır ve fotoğrafları
+          silinir; profil bilgileriniz, favorileriniz, kayıtlı aramalarınız ve değerlendirmeleriniz silinir;
+          gönderdiğiniz mesajların içeriği silinir; e-posta adresiniz ve kullanıcı adınız anonimleştirilir.
+          Şikâyet ve yönetici işlem kayıtları, kötüye kullanımla mücadele için adınız ve e-postanız olmadan saklanır.
+          Silme dışındaki talepleriniz (erişim, düzeltme, kopya) için aşağıdaki adrese yazabilirsiniz.
+        </p>
+      </section>
+
+      <section id="gp-iletisim">
+        <h2>11. İletişim</h2>
+        <p>
+          Gizlilikle ilgili tüm sorularınız ve KVKK başvurularınız için: <Mail to={LEGAL_PRIVACY_EMAIL} />. Bu
+          politika değiştiğinde güncelleme tarihi bu sayfada yenilenir; önemli değişiklikler sitede ayrıca duyurulur.
         </p>
       </section>
     </div>

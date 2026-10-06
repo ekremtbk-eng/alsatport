@@ -9,6 +9,7 @@ import { summarizeReviews } from "@/data/reviews";
 import { StarRating } from "@/components/StarRating";
 import { useI18n } from "@/context/I18nContext";
 import { useSellerReviews } from "@/components/useSellerReviews";
+import { reviewAuthorLabel } from "@/lib/publicName";
 
 export function SellerReviews({
   sellerId,
@@ -126,7 +127,7 @@ export function SellerReviews({
                 <img src={r.authorAvatar} alt="" className="h-10 w-10 rounded-full object-cover" />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-bold">{r.authorName}</p>
+                    <p className="text-sm font-bold">{reviewAuthorLabel(r)}</p>
                     <span className="text-[11px] text-muted">{r.createdAt}</span>
                   </div>
                   <StarRating value={r.rating} readOnly size={14} />

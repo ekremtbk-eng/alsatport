@@ -24,6 +24,8 @@ import { ListingBrowse } from "@/components/ListingBrowse";
 import { useAuthModal } from "@/context/AuthModalContext";
 import Link from "next/link";
 import { apiGet } from "@/lib/security/client";
+import { listingCategoryChain } from "@/lib/listingFacts";
+import { BreadcrumbNav } from "@/components/BreadcrumbNav";
 import type { Listing } from "@/data/store";
 
 function SearchInner() {
@@ -45,21 +47,28 @@ function SearchInner() {
   const { requireAuth } = useAuthModal();
   const [hint, setHint] = useState("");
   const [remote, setRemote] = useState<Listing[] | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setRemote(null);
+    setLoading(true);
     const qs = new URLSearchParams();
     if (q) qs.set("q", q);
     if (city) qs.set("city", city);
     if (resolvedCat && !resolvedCat.filter) qs.set("kategori", resolvedCat.id);
     else if (catSlug && !resolvedCat) qs.set("kategori", catSlug);
     let cancelled = false;
-    void apiGet<{ ok?: boolean; listings?: Listing[] }>(`/api/listings?${qs.toString()}`).then((res) => {
-      if (!cancelled) {
-        const list = Array.isArray(res.listings) ? res.listings : null;
-        setRemote(list && list.length > 0 ? list : null);
-      }
-    });
+    void apiGet<{ ok?: boolean; listings?: Listing[] }>(`/api/listings?${qs.toString()}`)
+      .then((res) => {
+        if (!cancelled) {
+          const list = Array.isArray(res.listings) ? res.listings : null;
+          setRemote(list);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -123,16 +132,32 @@ function SearchInner() {
   }
 
   const heading = pickedCat ? catName(t, pickedCat.id, pickedCat.name) : t("common.search");
+  const crumbItems = pickedCat
+    ? [
+        { href: "/", label: t("nav.home") },
+        ...listingCategoryChain(pickedCat.id).map((c, i, arr) => ({
+          href: i === arr.length - 1 ? undefined : hrefForCategory(c),
+          label: catName(t, c.id, c.name),
+        })),
+      ]
+    : [
+        { href: "/", label: t("nav.home") },
+        { label: q ? `"${q}"` : t("common.search") },
+      ];
 
   return (
     <div className="mx-auto max-w-[1400px] px-3 py-4 lg:px-5">
+      <BreadcrumbNav items={crumbItems} className="hub-crumb mb-3" />
       <ListingBrowse
         category={pickedCat}
         listings={baseList}
-        emptyText={t("search.none")}
+        loading={loading}
+        emptyText={t("search.noneFilters")}
         heading={
           <div className="browse-pagehead justify-between">
-            <h1 className="text-lg font-extrabold tracking-tight text-ink">{heading}</h1>
+                <h1 className="text-lg font-extrabold tracking-tight text-ink">
+                  {city && pickedCat ? t("search.headingCity", { city, name: heading }) : heading}
+                </h1>
             <button
               type="button"
               onClick={onSave}
@@ -146,7 +171,7 @@ function SearchInner() {
         }
         extra={
           catHits.length > 0 ? (
-            <div className="mb-3 flex gap-2 overflow-auto no-scrollbar">
+            <div className="browse-extra-cats mb-3 flex gap-2 overflow-auto no-scrollbar">
               {catHits.map((c) => (
                 <Link key={c.id} href={hrefForCategory(c)} className="shortcut-chip">
                   {catName(t, c.id, c.name)}

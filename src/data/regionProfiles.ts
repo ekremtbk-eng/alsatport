@@ -55,6 +55,10 @@ export const DISTRICT_COORDS: Record<string, { lat: number; lng: number }> = {
   "Bursa|Osmangazi": { lat: 40.199, lng: 29.06 },
   "Eskişehir|Tepebaşı": { lat: 39.784, lng: 30.519 },
   "Eskişehir|Odunpazarı": { lat: 39.766, lng: 30.525 },
+  "Mersin|Toroslar": { lat: 36.8716, lng: 34.6123 },
+  "Mersin|Yenişehir": { lat: 36.784, lng: 34.59 },
+  "Mersin|Mezitli": { lat: 36.755, lng: 34.525 },
+  "Mersin|Akdeniz": { lat: 36.8, lng: 34.633 },
 };
 
 /** Mahalle katalogu: aynı il+ilçe+mahalle → aynı demografik kart. */

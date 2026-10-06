@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { createSavedSearch, deleteSavedSearch, loadUserAlertSettings } from "@/lib/alerts/store";
 import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
+import { readJson } from "@/lib/security/parseBody";
+import { savedSearchBodySchema } from "@/lib/security/schemas";
+import { isUuid } from "@/lib/ids";
 
 export async function GET() {
   const auth = await requireUser("member", { allowUnverified: true });
@@ -27,17 +30,13 @@ export async function POST(req: Request) {
       { status: 429, headers: { "Retry-After": String(limited.retryAfter) } },
     );
   }
-  const body = (await req.json().catch(() => null)) as {
-    query?: string;
-    city?: string;
-    filter?: string;
-    seenIds?: string[];
-  } | null;
+  const parsed = await readJson(req, savedSearchBodySchema);
+  if (!parsed.ok) return parsed.response;
   const saved = await createSavedSearch(auth.user.id, {
-    query: body?.query,
-    city: body?.city,
-    filter: body?.filter,
-    seenIds: body?.seenIds,
+    query: parsed.data.query,
+    city: parsed.data.city,
+    filter: parsed.data.filter,
+    seenIds: parsed.data.seenIds,
   });
   if ("error" in saved) {
     return NextResponse.json({ ok: false, error: saved.error }, { status: saved.status });
@@ -51,6 +50,9 @@ export async function DELETE(req: Request) {
   const auth = await requireUser("member", { allowUnverified: true });
   if ("error" in auth) return auth.error;
   const id = new URL(req.url).searchParams.get("id") ?? "";
+  if (!isUuid(id)) {
+    return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
+  }
   const deleted = await deleteSavedSearch(auth.user.id, id);
   if ("error" in deleted) {
     return NextResponse.json({ ok: false, error: deleted.error }, { status: deleted.status });

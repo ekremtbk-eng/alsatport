@@ -1,8 +1,16 @@
 import type { Listing } from "@/data/store";
 import type { ListingFilter } from "@/data/categories";
+import { paymentsPaused } from "@/lib/campaign";
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
+
+/** Selected by paid promotion flags; while the platform is free every listing carries them. */
+const PROMOTION_FILTERS: readonly string[] = ["picks", "legend"];
+
+export function isListingFilterEnabled(filter: string | null | undefined) {
+  return !filter || !(paymentsPaused() && PROMOTION_FILTERS.includes(filter));
+}
 
 export function listingPostedAt(listing: Listing) {
   return listing.postedAt ?? Date.now() - 3 * DAY;
@@ -10,6 +18,7 @@ export function listingPostedAt(listing: Listing) {
 
 export function listingMatchesFilter(listing: Listing, filter?: ListingFilter | null) {
   if (!filter) return true;
+  if (!isListingFilterEnabled(filter)) return false;
   const age = Date.now() - listingPostedAt(listing);
   switch (filter) {
     case "urgent":
@@ -102,6 +111,6 @@ export function parseListingFilter(raw: string | null): ListingFilter | undefine
     "odd",
     "circular",
   ];
-  if (raw && allowed.includes(raw as ListingFilter)) return raw as ListingFilter;
+  if (raw && allowed.includes(raw as ListingFilter) && isListingFilterEnabled(raw)) return raw as ListingFilter;
   return undefined;
 }

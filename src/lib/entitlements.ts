@@ -29,7 +29,7 @@ export function asPlan(plan?: string): PlanId {
   return "standart";
 }
 
-/** Yeni üye: 3 aylık ücretsiz VIP sınıfı erişim (kampanya). */
+/** Yeni üye: ücretsiz VIP sınıfı erişim (platform ücretsiz). */
 export function standardPackageFields(freeListingQuota = FREE_LISTING_QUOTA): Pick<
   UserProfile,
   | "plan"

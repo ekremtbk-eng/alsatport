@@ -55,7 +55,7 @@ export function KvkkLink({
   const { t } = useI18n();
   return (
     <a
-      href="/cerez-aydinlatma"
+      href="/kvkk"
       className={className}
       onClick={(e) => {
         e.preventDefault();

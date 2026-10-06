@@ -173,12 +173,21 @@ export function foldPolicyText(value: string) {
     .trim();
 }
 
+/** Live-animal rules apply only to Hayvanlar Alemi IDs (`pets`, `pets-*`), never by name. */
 export function isPetsCategoryId(categoryId: string) {
-  if (ALLOWED_PET_CATEGORY_IDS.includes(categoryId as (typeof ALLOWED_PET_CATEGORY_IDS)[number])) return true;
-  if (BANNED_LIVE_ANIMAL_CATEGORY_IDS.includes(categoryId as (typeof BANNED_LIVE_ANIMAL_CATEGORY_IDS)[number])) {
+  const id = categoryId.trim();
+  if (!id) return false;
+  if (ALLOWED_PET_CATEGORY_IDS.includes(id as (typeof ALLOWED_PET_CATEGORY_IDS)[number])) return true;
+  if (BANNED_LIVE_ANIMAL_CATEGORY_IDS.includes(id as (typeof BANNED_LIVE_ANIMAL_CATEGORY_IDS)[number])) {
     return true;
   }
-  return categoryId.startsWith("pets");
+  return id === "pets" || id.startsWith("pets-");
+}
+
+export type ListingPolicyKind = "live-animal";
+
+export function applicableListingPolicies(categoryId: string): ListingPolicyKind[] {
+  return isPetsCategoryId(categoryId) ? ["live-animal"] : [];
 }
 
 export function isBannedLiveAnimalCategory(categoryId: string) {
@@ -191,15 +200,31 @@ export function isBannedLiveAnimalSlug(slug: string) {
   return BANNED_LIVE_ANIMAL_SLUGS.includes(slug as (typeof BANNED_LIVE_ANIMAL_SLUGS)[number]);
 }
 
-function hasAny(hay: string, needles: string[]) {
-  return needles.some((n) => hay.includes(n));
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function detectInText(text: string, categoryId?: string): ModerationHit {
+/** Whole-token match so "at" (horse) cannot fire inside "satılık" / "fiyat". */
+function hasToken(hay: string, needle: string) {
+  const n = needle.trim();
+  if (!n) return false;
+  if (n.includes(" ")) return hay.includes(n);
+  return new RegExp(`(?:^|[^a-z0-9])${escapeRegExp(n)}(?:$|[^a-z0-9])`).test(hay);
+}
+
+function hasAny(hay: string, needles: string[]) {
+  return needles.some((n) => hasToken(hay, n));
+}
+
+function detectInText(text: string, categoryId: string): ModerationHit {
+  if (!applicableListingPolicies(categoryId).includes("live-animal")) {
+    return { blocked: false };
+  }
+
   const hay = foldPolicyText(text);
   if (!hay) return { blocked: false };
 
-  if (hasAny(hay, VIDEO_HINT) && (hasAny(hay, SPECIES) || hasAny(hay, LIVE_SALE) || isPetsCategoryId(categoryId ?? ""))) {
+  if (hasAny(hay, VIDEO_HINT) && (hasAny(hay, SPECIES) || hasAny(hay, LIVE_SALE))) {
     return { blocked: true, reason: "mod.animal.video" };
   }
 
@@ -219,18 +244,20 @@ function detectInText(text: string, categoryId?: string): ModerationHit {
     return { blocked: true, reason: "mod.animal" };
   }
 
-  if (isPetsCategoryId(categoryId ?? "") && species && !accessory) {
+  if (species && !accessory) {
     return { blocked: true, reason: "mod.animal" };
   }
 
   return { blocked: false };
 }
 
-export function moderateListingMaterial(file: File): ModerationHit {
-  if (file.type.startsWith("video/") || /\.(mp4|mov|webm|avi|mkv)$/i.test(file.name)) {
+export function moderateListingMaterial(file: File, categoryId = ""): ModerationHit {
+  const video = file.type.startsWith("video/") || /\.(mp4|mov|webm|avi|mkv)$/i.test(file.name);
+  if (video) {
+    if (!applicableListingPolicies(categoryId).includes("live-animal")) return { blocked: false };
     return { blocked: true, reason: "mod.animal.video" };
   }
-  return detectInText(file.name);
+  return detectInText(file.name, categoryId);
 }
 
 export function moderateListingDraft(input: {
@@ -243,6 +270,9 @@ export function moderateListingDraft(input: {
   const categoryId = input.categoryId ?? "";
   if (isBannedLiveAnimalCategory(categoryId)) {
     return { blocked: true, reason: "mod.animal.cat" };
+  }
+  if (!applicableListingPolicies(categoryId).includes("live-animal")) {
+    return { blocked: false };
   }
 
   const images = input.images ?? [];

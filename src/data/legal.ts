@@ -1,24 +1,47 @@
-export const LEGAL_COMPANY = "AlSatPort Bilgi Teknolojileri A.Ş.";
+/**
+ * Central legal identity. Real data-controller details come only from env
+ * (LEGAL_DATA_CONTROLLER_NAME, LEGAL_CONTACT_EMAIL, LEGAL_ADDRESS, LEGAL_LAST_UPDATED),
+ * inlined at build time via next.config.ts. Never put placeholder company data here.
+ */
+function env(value: string | undefined) {
+  return (value ?? "").trim();
+}
+
 export const LEGAL_BRAND = "AlSatPort";
-export const LEGAL_ADDRESS =
-  "Esentepe Mahallesi, Büyükdere Caddesi, No: 120, 34394 Şişli / İstanbul, Türkiye";
-export const LEGAL_EMAIL_KVKK = "kvkk@alsatport.com";
-export const LEGAL_EMAIL_DESTEK = "destek@alsatport.com";
-export const LEGAL_PHONE = "0850 255 00 00";
-export const LEGAL_KEP = "alsatport@hs03.kep.tr";
+export const LEGAL_DOMAIN = "alsatport.com";
 export const LEGAL_WEB = "https://alsatport.com";
-export const LEGAL_PHONE_E164 = "+90-850-255-0000";
-export const LEGAL_UPDATED = "24 Eylül 2026";
 
-/** Kurumsal sameAs profilleri (JSON-LD Organization). */
-export const LEGAL_SOCIAL = [
-  "https://www.instagram.com/alsatport",
-  "https://www.facebook.com/alsatport",
-  "https://www.linkedin.com/company/alsatport",
-  "https://x.com/alsatport",
-  "https://www.youtube.com/@alsatport",
-] as const;
+export const LEGAL_DATA_CONTROLLER_NAME = env(process.env.LEGAL_DATA_CONTROLLER_NAME);
+export const LEGAL_CONTACT_EMAIL = env(process.env.LEGAL_CONTACT_EMAIL);
+export const LEGAL_ADDRESS = env(process.env.LEGAL_ADDRESS);
 
-/** 6502 sayılı TKHK — anında ifa edilen dijital üyelik; checkout ve sözleşmelerde birebir yer alır. */
-export const CAYMA_YOK =
-  "Dijital içerikler ve anında ifa edilen üyelik hizmetleri kapsamında, 6502 sayılı Tüketicinin Korunması Hakkında Kanun gereğince cayma hakkı bulunmamakta olup satın alım sonrasında kesinlikle iade ve iptal yapılamaz";
+/** Support mailbox the site already sends from and links to. */
+export const LEGAL_EMAIL_DESTEK = "destek@alsatport.com";
+
+/** Address for KVKK applications and privacy questions. */
+export const LEGAL_PRIVACY_EMAIL = LEGAL_CONTACT_EMAIL || LEGAL_EMAIL_DESTEK;
+
+export const LEGAL_CONTROLLER_MISSING: string[] = [
+  !LEGAL_DATA_CONTROLLER_NAME ? "LEGAL_DATA_CONTROLLER_NAME" : "",
+  !LEGAL_CONTACT_EMAIL ? "LEGAL_CONTACT_EMAIL" : "",
+  !LEGAL_ADDRESS ? "LEGAL_ADDRESS" : "",
+].filter(Boolean);
+
+export const LEGAL_CONTROLLER_READY = LEGAL_CONTROLLER_MISSING.length === 0;
+export const LEGAL_CONTROLLER_WARNING = "Yayına alınmadan önce gerçek veri sorumlusu bilgileri girilmelidir.";
+
+/** ISO date (YYYY-MM-DD) of the last legal-text revision. */
+export const LEGAL_LAST_UPDATED = env(process.env.LEGAL_LAST_UPDATED) || "2026-10-06";
+
+const TR_MONTHS = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+
+export function legalUpdatedLabel() {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(LEGAL_LAST_UPDATED);
+  if (!m) return LEGAL_LAST_UPDATED;
+  return `${Number(m[3])} ${TR_MONTHS[Number(m[2]) - 1] ?? ""} ${m[1]}`;
+}
+
+export const LEGAL_INSTAGRAM = "https://www.instagram.com/alsatport";
+
+/** Kurumsal sameAs profilleri (JSON-LD Organization) — yalnızca doğrulanmış resmi hesap. */
+export const LEGAL_SOCIAL = [LEGAL_INSTAGRAM] as const;

@@ -5,6 +5,7 @@ import { saveUser } from "@/lib/security/userStore";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
 import { readJson } from "@/lib/security/parseBody";
 import { passwordChangeSchema } from "@/lib/security/schemas";
+import { sendSecurityNoticeEmail } from "@/lib/mail/authMail";
 
 export async function POST(req: Request) {
   const blocked = await requireMutatingRequest(req);
@@ -21,19 +22,24 @@ export async function POST(req: Request) {
     );
   }
 
-  if (auth.user.provider !== "email" || !auth.user.passwordHash) {
-    return NextResponse.json({ ok: false, error: "dash.pw.oauth" }, { status: 400 });
-  }
-
   const parsed = await readJson(req, passwordChangeSchema);
   if (!parsed.ok) return parsed.response;
   const current = parsed.data.current;
   const next = parsed.data.next;
-  const ok = await verifyPasswordHash(current, auth.user.passwordHash);
-  if (!ok) {
+  const hadPassword = !!auth.user.passwordHash;
+  if (hadPassword && !(await verifyPasswordHash(current, auth.user.passwordHash!))) {
     return NextResponse.json({ ok: false, error: "dash.pw.current" }, { status: 400 });
   }
   const passwordHash = await hashPassword(next);
-  await saveUser({ ...auth.user, passwordHash });
-  return NextResponse.json({ ok: true });
+  const user = await saveUser({ ...auth.user, passwordHash });
+  if (auth.user.email) {
+    await sendSecurityNoticeEmail(
+      auth.user.email,
+      hadPassword ? "Şifreniz değiştirildi" : "Hesabınıza şifre eklendi",
+      hadPassword
+        ? "AlsatPort hesabınızın şifresi değiştirildi."
+        : "Artık e-posta adresiniz ve belirlediğiniz şifreyle de giriş yapabilirsiniz.",
+    ).catch(() => undefined);
+  }
+  return NextResponse.json({ ok: true, user: user.profile });
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useApp } from "@/context/AppContext";
 import { useI18n } from "@/context/I18nContext";
+import { posterSupported } from "@/lib/poster";
 
 export default function MyListingsPage() {
   const { user, listings, setListingStatus, removeListing, renewListing } = useApp();
@@ -102,6 +103,14 @@ export default function MyListingsPage() {
               >
                 {t("common.edit")}
               </Link>
+              {l.status === "active" && posterSupported(l) ? (
+                <Link
+                  href={`/ilan/${l.id}?afis=1`}
+                  className="rounded-full bg-lime/10 px-2 py-0.5 text-[10px] font-bold text-lime"
+                >
+                  {t("poster.short")}
+                </Link>
+              ) : null}
               <button
                 type="button"
                 onClick={() => removeListing(l.id)}

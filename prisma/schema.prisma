@@ -97,6 +97,10 @@ enum ReportReason {
   counterfeit
   wrong_category
   other
+  misleading
+  prohibited
+  copyright
+  privacy
 
   @@map("report_reason")
 }
@@ -134,23 +138,26 @@ model User {
   updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   profile             Profile?
-  listings            Listing[]            @relation("ListingSeller")
+  listings            Listing[]          @relation("ListingSeller")
   favorites           Favorite[]
-  buyerConversations  Conversation[]       @relation("ConversationBuyer")
-  sellerConversations Conversation[]       @relation("ConversationSeller")
+  buyerConversations  Conversation[]     @relation("ConversationBuyer")
+  sellerConversations Conversation[]     @relation("ConversationSeller")
   sentMessages        Message[]
   conversationReads   ConversationRead[]
   payments            Payment[]
   subscriptions       Subscription[]
   promotions          ListingPromotion[]
-  reportsFiled        Report[]             @relation("ReportReporter")
-  reportsAgainst      Report[]             @relation("ReportSubject")
-  assignedReports     Report[]             @relation("ReportAssignee")
+  reportsFiled        Report[]           @relation("ReportReporter")
+  reportsAgainst      Report[]           @relation("ReportSubject")
+  assignedReports     Report[]           @relation("ReportAssignee")
   auditLogs           AuditLog[]
   verificationOtps    VerificationOtp[]
-  reviewsReceived     SellerReview[]       @relation("ReviewSeller")
-  reviewsWritten      SellerReview[]       @relation("ReviewAuthor")
+  reviewsReceived     SellerReview[]     @relation("ReviewSeller")
+  reviewsWritten      SellerReview[]     @relation("ReviewAuthor")
   savedSearches       SavedSearch[]
+  blocksMade          UserBlock[]        @relation("BlocksMade")
+  blocksReceived      UserBlock[]        @relation("BlocksReceived")
+  qrTokens            QrToken[]
 
   @@unique([provider, providerSub], map: "users_provider_sub_uidx")
   @@index([role], map: "users_role_idx")
@@ -158,38 +165,85 @@ model User {
 }
 
 model Profile {
-  userId                String    @id @map("user_id") @db.Uuid
-  displayName           String    @map("display_name")
-  fullName              String?   @map("full_name")
-  avatarUrl             String?   @map("avatar_url")
-  phone                 String?
-  phoneVerifiedAt       DateTime? @map("phone_verified_at") @db.Timestamptz(6)
-  birthDate             DateTime? @map("birth_date") @db.Date
-  nationalId            String?   @map("national_id")
-  address               String?
-  city                  String?
-  verified              Boolean   @default(false)
-  profileComplete       Boolean   @default(false) @map("profile_complete")
-  listingsPosted        Int       @default(0) @map("listings_posted")
-  salesCount            Int       @default(0) @map("sales_count")
-  stars                 Int       @default(0)
-  followers             Int       @default(0)
-  following             Int       @default(0)
-  freeListingQuota      Int       @default(3) @map("free_listing_quota")
-  planListingAllowance  Int       @default(0) @map("plan_listing_allowance")
-  plan                  PlanId    @default(standart)
-    dopingUntil           DateTime? @map("doping_until") @db.Timestamptz(6)
-  planUntil             DateTime? @map("plan_until") @db.Timestamptz(6)
-  openAccessUntil       DateTime? @map("open_access_until") @db.Timestamptz(6)
-  notifPriceDrop        Boolean   @default(true) @map("notif_price_drop")
-  notifSavedSearch      Boolean   @default(true) @map("notif_saved_search")
-  notifNearby           Boolean   @default(true) @map("notif_nearby")
-  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  userId                  String    @id @map("user_id") @db.Uuid
+  displayName             String    @map("display_name")
+  fullName                String?   @map("full_name")
+  avatarUrl               String?   @map("avatar_url")
+  phone                   String?
+  phoneVerifiedAt         DateTime? @map("phone_verified_at") @db.Timestamptz(6)
+  birthDate               DateTime? @map("birth_date") @db.Date
+  nationalId              String?   @map("national_id")
+  address                 String?
+  city                    String?
+  verified                Boolean   @default(false)
+  businessName            String?   @map("business_name")
+  businessVerifiedAt      DateTime? @map("business_verified_at") @db.Timestamptz(6)
+  profileComplete         Boolean   @default(false) @map("profile_complete")
+  listingsPosted          Int       @default(0) @map("listings_posted")
+  salesCount              Int       @default(0) @map("sales_count")
+  stars                   Int       @default(0)
+  followers               Int       @default(0)
+  following               Int       @default(0)
+  freeListingQuota        Int       @default(3) @map("free_listing_quota")
+  planListingAllowance    Int       @default(0) @map("plan_listing_allowance")
+  plan                    PlanId    @default(standart)
+  dopingUntil             DateTime? @map("doping_until") @db.Timestamptz(6)
+  planUntil               DateTime? @map("plan_until") @db.Timestamptz(6)
+  openAccessUntil         DateTime? @map("open_access_until") @db.Timestamptz(6)
+  notifPriceDrop          Boolean   @default(true) @map("notif_price_drop")
+  notifSavedSearch        Boolean   @default(true) @map("notif_saved_search")
+  notifNearby             Boolean   @default(true) @map("notif_nearby")
+  twoFactorEnabled        Boolean   @default(false) @map("two_factor_enabled")
+  twoFactorMethod         String    @default("email") @map("two_factor_method")
+  recoveryEmail           String?   @map("recovery_email")
+  recoveryEmailVerifiedAt DateTime? @map("recovery_email_verified_at") @db.Timestamptz(6)
+  readReceipts            Boolean   @default(true) @map("read_receipts")
+  marketingEmail          Boolean   @default(false) @map("marketing_email")
+  marketingSms            Boolean   @default(false) @map("marketing_sms")
+  marketingPush           Boolean   @default(false) @map("marketing_push")
+  marketingUpdatedAt      DateTime? @map("marketing_updated_at") @db.Timestamptz(6)
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("profiles")
+}
+
+model UserBlock {
+  id        String   @id @default(uuid()) @db.Uuid
+  blockerId String   @map("blocker_id") @db.Uuid
+  blockedId String   @map("blocked_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  blocker User @relation("BlocksMade", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId], map: "user_blocks_pair_uidx")
+  @@index([blockedId], map: "user_blocks_blocked_idx")
+  @@map("user_blocks")
+}
+
+model QrToken {
+  id             String    @id @default(uuid()) @db.Uuid
+  kind           String
+  tokenHash      String    @unique(map: "qr_tokens_token_hash_uidx") @map("token_hash")
+  secretHash     String?   @unique(map: "qr_tokens_secret_hash_uidx") @map("secret_hash")
+  userId         String?   @map("user_id") @db.Uuid
+  listingId      String?   @map("listing_id") @db.Uuid
+  status         String    @default("pending")
+  requesterAgent String?   @map("requester_agent")
+  uploads        Int       @default(0)
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz(6)
+  approvedAt     DateTime? @map("approved_at") @db.Timestamptz(6)
+  consumedAt     DateTime? @map("consumed_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user    User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing Listing? @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt], map: "qr_tokens_expires_idx")
+  @@map("qr_tokens")
 }
 
 model SavedSearch {
@@ -208,18 +262,18 @@ model SavedSearch {
 }
 
 model Category {
-  id        String     @id
-  parentId  String?    @map("parent_id")
-  slug      String     @unique
+  id        String   @id
+  parentId  String?  @map("parent_id")
+  slug      String   @unique
   name      String
   icon      String?
-  sortOrder Int        @default(0) @map("sort_order")
-  navHidden Boolean    @default(false) @map("nav_hidden")
-  filterKey String?    @map("filter_key")
-  aliases   String[]   @default([])
-  brands    String[]   @default([])
-  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  sortOrder Int      @default(0) @map("sort_order")
+  navHidden Boolean  @default(false) @map("nav_hidden")
+  filterKey String?  @map("filter_key")
+  aliases   String[] @default([])
+  brands    String[] @default([])
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
   children Category[] @relation("CategoryTree")
@@ -242,6 +296,8 @@ model Listing {
   city           String
   district       String        @default("")
   neighborhood   String        @default("")
+  lat            Float?
+  lng            Float?
   status         ListingStatus @default(draft)
   featured       Boolean       @default(false)
   vip            Boolean       @default(false)
@@ -258,15 +314,16 @@ model Listing {
   updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt      DateTime?     @map("deleted_at") @db.Timestamptz(6)
 
-  seller       User                @relation("ListingSeller", fields: [sellerId], references: [id], onDelete: Restrict)
-  category     Category            @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  images       ListingImage[]
-  favorites    Favorite[]
+  seller        User               @relation("ListingSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+  category      Category           @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  images        ListingImage[]
+  favorites     Favorite[]
   conversations Conversation[]
-  payments     Payment[]
-  promotions   ListingPromotion[]
-  reports      Report[]
+  payments      Payment[]
+  promotions    ListingPromotion[]
+  reports       Report[]
   sellerReviews SellerReview[]
+  qrTokens      QrToken[]
 
   @@index([sellerId, status], map: "listings_seller_status_idx")
   @@index([categoryId, status, postedAt], map: "listings_category_status_posted_idx")
@@ -397,8 +454,8 @@ model Payment {
   createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user          User                @relation(fields: [userId], references: [id], onDelete: Restrict)
-  listing       Listing?            @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  user          User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  listing       Listing?           @relation(fields: [listingId], references: [id], onDelete: SetNull)
   subscriptions Subscription[]
   promotions    ListingPromotion[]
 
@@ -500,4 +557,28 @@ model AuditLog {
   @@index([entityType, entityId, createdAt], map: "audit_logs_entity_idx")
   @@index([actorId, createdAt], map: "audit_logs_actor_idx")
   @@map("audit_logs")
+}
+
+model SpecialDay {
+  id           String   @id @default(uuid()) @db.Uuid
+  slug         String   @unique
+  name         String
+  kind         String
+  month        Int
+  day          Int
+  year         Int?
+  durationDays Int      @default(1) @map("duration_days")
+  active       Boolean  @default(true)
+  sortOrder    Int      @default(0) @map("sort_order")
+  theme        String   @default("milli")
+  eyebrow      String
+  title        String
+  body         String   @db.Text
+  closing      String
+  cta          String   @default("Teşekkürler")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([active, month, day], map: "special_days_active_md_idx")
+  @@map("special_days")
 }

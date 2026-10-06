@@ -7,7 +7,7 @@ import { SITE_SITELINKS } from "@/data/sitelinks";
 export function SiteSitelinksNav() {
   const path = usePathname();
   return (
-    <nav className="header-sitelinks" aria-label="Ana kategoriler">
+    <nav className="header-sitelinks" aria-label="Ana kategori aramaları">
       <div className="header-sitelinks-inner">
         {SITE_SITELINKS.map((item) => {
           const active = path === item.href || path.startsWith(`${item.href}/`);

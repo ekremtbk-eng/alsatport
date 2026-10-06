@@ -12,10 +12,14 @@ export type Listing = {
   city: string;
   district: string;
   neighborhood?: string;
+  lat?: number;
+  lng?: number;
   images: string[];
   description: string;
   sellerId: string;
   sellerName: string;
+  /** Set only when the seller is an admin-verified business; otherwise sellerName is a masked person name. */
+  sellerBusiness?: boolean;
   sellerAvatar: string;
   sellerVerified: boolean;
   createdAt: string;
@@ -42,6 +46,7 @@ export type UserProfile = {
   avatar: string;
   verified: boolean;
   memberSince: string;
+  joinedAt?: number;
   listings: number;
   sales: number;
   stars: number;
@@ -58,14 +63,24 @@ export type UserProfile = {
   email?: string;
   fullName?: string;
   phone?: string;
-  birthDate?: string;
-  nationalId?: string;
   address?: string;
   emailVerified?: boolean;
   phoneVerified?: boolean;
   profileComplete?: boolean;
   authProvider?: "email" | "google" | "apple" | "facebook";
   role?: "member" | "seller" | "admin";
+  businessName?: string;
+  businessVerified?: boolean;
+  hasPassword?: boolean;
+  twoFactorEnabled?: boolean;
+  twoFactorMethod?: "email" | "sms";
+  /** Masked (e***@x.com); the full address never leaves the server. */
+  recoveryEmailMasked?: string;
+  recoveryEmailVerified?: boolean;
+  readReceipts?: boolean;
+  marketingEmail?: boolean;
+  marketingSms?: boolean;
+  marketingPush?: boolean;
 };
 
 export type Conversation = {
@@ -80,7 +95,11 @@ export type Conversation = {
   unread: number;
   favorite: boolean;
   peerVerified?: boolean;
-  messages: { id: string; fromMe: boolean; text: string; time: string }[];
+  blockedByMe?: boolean;
+  blockedMe?: boolean;
+  /** Only set when both sides allow read receipts. */
+  peerReadAt?: number;
+  messages: { id: string; fromMe: boolean; text: string; time: string; at?: number }[];
 };
 
 export function getSellerPhone(sellerId: string, listing?: Pick<Listing, "sellerPhone">) {
@@ -101,7 +120,7 @@ export function getSellerPhone(sellerId: string, listing?: Pick<Listing, "seller
 }
 
 export function maskPhone(phone: string) {
-  if (phone.length < 10) return phone;
+  if (phone.length < 10 || phone.includes("*")) return phone;
   return `${phone.slice(0, 7)} *** ** ${phone.slice(-2)}`;
 }
 
@@ -126,9 +145,7 @@ export const currentUser: UserProfile = {
   email: "ekrem1987@alsatport.com",
   fullName: "Ekrem Yılmaz",
   phone: "05321112233",
-  birthDate: "1987-09-24",
-  nationalId: "10000000146",
-  address: "Esentepe Mahallesi, Büyükdere Caddesi No: 120, 34394 Şişli / İstanbul",
+  address: "",
   emailVerified: true,
   profileComplete: true,
   authProvider: "email",

@@ -87,6 +87,7 @@ export function ListingGallery({
         onPointerCancel={onPointerCancel}
         onContextMenu={(e) => e.preventDefault()}
         onDragStart={(e) => e.preventDefault()}
+        onAuxClick={(e) => e.preventDefault()}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();

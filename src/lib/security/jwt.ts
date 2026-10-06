@@ -54,6 +54,8 @@ export async function verifyAuthToken(token: string, typ: "access" | "refresh"):
   try {
     const { payload } = await jwtVerify(token, secretKey(), { algorithms: ["HS256"] });
     if (payload.typ !== typ || !payload.sub) return null;
+    const role = payload.role;
+    if (role !== "member" && role !== "seller" && role !== "admin") return null;
     return payload as AccessClaims;
   } catch {
     return null;

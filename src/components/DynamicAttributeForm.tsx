@@ -11,8 +11,6 @@ import {
 } from "@/data/listingOptions";
 import type { AttrField, ListingSchema } from "@/data/listingSchema";
 
-const CHILD_KEYS = ["model", "trim", "engine", "body", "range", "gear", "drive", "power"] as const;
-
 function optionsOf(field: AttrField, attrs: Record<string, string>, segment: VehicleSegment) {
   const kind = field.catalogKind ?? segment;
   if (field.optionSource === "vehicleModels") return modelsOfBrand(attrs.brand, kind);
@@ -26,10 +24,19 @@ function optionsOf(field: AttrField, attrs: Record<string, string>, segment: Veh
 function lockHint(dependsOn?: string) {
   if (dependsOn === "brand") return "Önce marka seçin";
   if (dependsOn === "model") return "Önce model seçin";
-  if (dependsOn === "trim") return "Önce seri seçin";
+  if (dependsOn === "trim") return "Önce seri / paket seçin";
   if (dependsOn === "engine") return "Önce motor seçin";
   if (dependsOn === "body") return "Önce kasa tipi seçin";
   return "Önce üst kademeyi seçin";
+}
+
+function emptyHint(field: AttrField) {
+  if (field.key === "model") return "Bu seçim için uygun model bulunamadı.";
+  if (field.key === "trim") return "Bu model için seri / paket bulunamadı.";
+  if (field.key === "engine") return "Bu seçim için motor seçeneği bulunamadı.";
+  if (field.key === "body") return "Bu seçim için kasa tipi bulunamadı.";
+  if (field.key === "range") return "Bu seçim için menzil bilgisi bulunamadı.";
+  return "Bu seçim için uygun seçenek bulunamadı.";
 }
 
 export function DynamicAttributeForm({
@@ -43,23 +50,23 @@ export function DynamicAttributeForm({
 }) {
   const segment = schema.catalogKind ?? "auto";
 
-  function setField(field: AttrField, value: string) {
-    onChange(field.key, value);
-    const idx = CHILD_KEYS.indexOf(field.key as (typeof CHILD_KEYS)[number]);
-    if (idx >= 0) {
-      for (const key of CHILD_KEYS.slice(idx + 1)) onChange(key, "");
-    }
-    if (field.key === "brand") {
-      for (const key of CHILD_KEYS) onChange(key, "");
-    }
-  }
-
   return (
     <div className="dyn-form">
       <div className="dyn-form-grid">
         {schema.fields.map((field) => {
-          const locked = Boolean(field.dependsOn && !attrs[field.dependsOn ?? ""]);
           const options = optionsOf(field, attrs, segment);
+          const parentKey = field.dependsOn;
+          const parentMissing = Boolean(parentKey && !attrs[parentKey]);
+          const parentField = parentKey ? schema.fields.find((item) => item.key === parentKey) : undefined;
+          const parentReady = parentField
+            ? !parentField.dependsOn || Boolean(attrs[parentField.dependsOn])
+            : true;
+          const parentHasNoOptions =
+            parentField != null &&
+            parentReady &&
+            optionsOf(parentField, attrs, segment).length === 0 &&
+            Boolean(parentField.optionSource);
+          const locked = parentMissing && !parentHasNoOptions;
           const placeholder = locked ? lockHint(field.dependsOn) : "Seçiniz";
           if (field.kind === "number" || field.kind === "text") {
             return (
@@ -73,8 +80,8 @@ export function DynamicAttributeForm({
                   inputMode={field.kind === "number" ? "numeric" : undefined}
                   disabled={locked}
                   onChange={(e) =>
-                    setField(
-                      field,
+                    onChange(
+                      field.key,
                       field.kind === "number" ? e.target.value.replace(/\D/g, "") : e.target.value,
                     )
                   }
@@ -92,7 +99,8 @@ export function DynamicAttributeForm({
                 options={options}
                 disabled={locked}
                 placeholder={placeholder}
-                onChange={(v) => setField(field, v)}
+                emptyLabel={!locked && field.dependsOn ? emptyHint(field) : "Sonuç yok"}
+                onChange={(v) => onChange(field.key, v)}
               />
             </div>
           );

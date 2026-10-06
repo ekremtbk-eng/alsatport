@@ -25,7 +25,7 @@ export function listingCategoryChain(categoryId: string) {
 }
 
 function kimdenOf(listing: Listing) {
-  return spec(listing, "Kimden") || (listing.vip ? "Mağazadan" : "Sahibinden");
+  return spec(listing, "Kimden");
 }
 
 function motoClassifiedFactRows(
@@ -53,7 +53,8 @@ function motoClassifiedFactRows(
   if (brand) rows.push({ label: t("list.fact.brand"), value: brand });
   const size = spec(listing, "Ölçü", "Beden");
   if (size) rows.push({ label: t("list.fact.size"), value: size });
-  rows.push({ label: t("list.fact.from"), value: kimdenOf(listing) });
+  const from = kimdenOf(listing);
+  if (from) rows.push({ label: t("list.fact.from"), value: from });
   const swap = spec(listing, "Takas");
   if (swap) rows.push({ label: t("flt.swap"), value: swap });
   const cond = spec(listing, "Durumu", "Durum");
@@ -78,7 +79,8 @@ function seaClassifiedFactRows(
   if (product) rows.push({ label: t("list.fact.product"), value: product });
   const brand = spec(listing, "Marka");
   if (brand) rows.push({ label: t("list.fact.brand"), value: brand });
-  rows.push({ label: t("list.fact.from"), value: kimdenOf(listing) });
+  const from = kimdenOf(listing);
+  if (from) rows.push({ label: t("list.fact.from"), value: from });
   const swap = spec(listing, "Takas");
   if (swap) rows.push({ label: t("flt.swap"), value: swap });
   const cond = spec(listing, "Durumu", "Durum");
@@ -117,7 +119,8 @@ export function classifiedFactRows(
   if (series) rows.push({ label: t("list.fact.vseries"), value: series });
   const partBrand = spec(listing, "Ürün Markası");
   if (partBrand) rows.push({ label: t("list.fact.pbrand"), value: partBrand });
-  rows.push({ label: t("list.fact.from"), value: kimdenOf(listing) });
+  const from = kimdenOf(listing);
+  if (from) rows.push({ label: t("list.fact.from"), value: from });
   const used = spec(listing, "Çıkma Yedek Parça", "Çıkma");
   if (used) rows.push({ label: t("list.fact.used"), value: used });
   const cond = spec(listing, "Durumu", "Durum");

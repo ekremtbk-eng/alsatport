@@ -1,15 +1,11 @@
-import {
-  LEGAL_ADDRESS,
-  LEGAL_COMPANY,
-  LEGAL_EMAIL_DESTEK,
-  LEGAL_PHONE,
-  LEGAL_WEB,
-} from "@/data/legal";
+import { LEGAL_ADDRESS, LEGAL_BRAND, LEGAL_EMAIL_DESTEK, LEGAL_WEB } from "@/data/legal";
 import { escapeHtml, firstNameFrom } from "@/lib/mail/escapeHtml";
 import { sendMail } from "@/lib/mail/send";
 import { appOrigin } from "@/lib/site";
 
 export { appOrigin };
+
+const ADDRESS_HTML = LEGAL_ADDRESS ? `<p style="margin:0 0 8px;">${escapeHtml(LEGAL_ADDRESS)}</p>` : "";
 
 function href(path: string) {
   return `${appOrigin()}${path.startsWith("/") ? path : `/${path}`}`;
@@ -21,7 +17,7 @@ export function welcomeEmailHtml(name: string) {
   const browse = href("/kategoriler");
   const support = href("/kurumsal/iletisim");
   const home = href("/");
-  const kvkk = href("/cerez-aydinlatma");
+  const kvkk = href("/kvkk");
   const year = new Date().getFullYear();
 
   return `<!DOCTYPE html>
@@ -82,16 +78,16 @@ export function welcomeEmailHtml(name: string) {
           </tr>
           <tr>
             <td style="padding:20px 32px 8px;font-size:14px;line-height:1.6;color:#4b5563;">
-              <p style="margin:0 0 8px;font-weight:700;color:#111827;">Bir sorunla mı karşılaştınız? Her zaman yanınızdayız!</p>
+              <p style="margin:0 0 8px;font-weight:700;color:#111827;">Bir sorunla mı karşılaştınız? Bize e-postayla yazın.</p>
               <p style="margin:0;">Destek merkezi: <a href="${support}" style="color:#047857;font-weight:700;text-decoration:none;">${support}</a><br>
-              ${LEGAL_EMAIL_DESTEK} · ${LEGAL_PHONE}</p>
+              ${LEGAL_EMAIL_DESTEK}</p>
             </td>
           </tr>
           <tr>
             <td style="padding:24px 32px 32px;font-size:11px;line-height:1.55;color:#6b7280;border-top:1px solid #eef0f3;">
-              <p style="margin:0 0 8px;">© ${year} ${escapeHtml(LEGAL_COMPANY)}. Tüm hakları saklıdır.</p>
-              <p style="margin:0 0 8px;">${escapeHtml(LEGAL_ADDRESS)}</p>
-              <p style="margin:0;"><a href="${home}" style="color:#6b7280;">${LEGAL_WEB}</a> · <a href="${kvkk}" style="color:#6b7280;">KVKK / Çerez Aydınlatma</a></p>
+              <p style="margin:0 0 8px;">© ${year} ${LEGAL_BRAND}. Tüm hakları saklıdır.</p>
+              ${ADDRESS_HTML}
+              <p style="margin:0;"><a href="${home}" style="color:#6b7280;">${LEGAL_WEB}</a> · <a href="${kvkk}" style="color:#6b7280;">KVKK Aydınlatma Metni</a></p>
             </td>
           </tr>
         </table>
@@ -107,7 +103,7 @@ export function welcomeVerifyEmailHtml(name: string, verifyHref: string) {
   const verify = escapeHtml(verifyHref);
   const home = href("/");
   const support = href("/kurumsal/iletisim");
-  const kvkk = href("/cerez-aydinlatma");
+  const kvkk = href("/kvkk");
   const year = new Date().getFullYear();
 
   return `<!DOCTYPE html>
@@ -162,7 +158,7 @@ export function welcomeVerifyEmailHtml(name: string, verifyHref: string) {
                   <td style="padding:18px 20px;font-size:14px;line-height:1.55;color:#374151;">
                     <p style="margin:0 0 12px;font-weight:800;color:#111827;">Doğruladıktan sonra</p>
                     <p style="margin:0 0 10px;">✔️ İlan verebilir, favorilere ekleyebilir ve güvenle mesajlaşabilirsiniz.</p>
-                    <p style="margin:0;">✔️ Destek ekibimiz ${escapeHtml(LEGAL_EMAIL_DESTEK)} adresinden yanınızdadır.</p>
+                    <p style="margin:0;">✔️ Sorularınız için ${escapeHtml(LEGAL_EMAIL_DESTEK)} adresine yazabilirsiniz.</p>
                   </td>
                 </tr>
               </table>
@@ -170,14 +166,14 @@ export function welcomeVerifyEmailHtml(name: string, verifyHref: string) {
           </tr>
           <tr>
             <td style="padding:20px 32px 8px;font-size:14px;line-height:1.6;color:#4b5563;">
-              <p style="margin:0;">Bu e-postayı siz istemediyseniz yok sayabilirsiniz. Destek: <a href="${support}" style="color:#047857;font-weight:700;text-decoration:none;">${support}</a> · ${LEGAL_PHONE}</p>
+              <p style="margin:0;">Bu e-postayı siz istemediyseniz yok sayabilirsiniz. Destek: <a href="${support}" style="color:#047857;font-weight:700;text-decoration:none;">${support}</a></p>
             </td>
           </tr>
           <tr>
             <td style="padding:24px 32px 32px;font-size:11px;line-height:1.55;color:#6b7280;border-top:1px solid #eef0f3;">
-              <p style="margin:0 0 8px;">© ${year} ${escapeHtml(LEGAL_COMPANY)}. Tüm hakları saklıdır.</p>
-              <p style="margin:0 0 8px;">${escapeHtml(LEGAL_ADDRESS)}</p>
-              <p style="margin:0;"><a href="${home}" style="color:#6b7280;">${LEGAL_WEB}</a> · <a href="${kvkk}" style="color:#6b7280;">KVKK / Çerez Aydınlatma</a></p>
+              <p style="margin:0 0 8px;">© ${year} ${LEGAL_BRAND}. Tüm hakları saklıdır.</p>
+              ${ADDRESS_HTML}
+              <p style="margin:0;"><a href="${home}" style="color:#6b7280;">${LEGAL_WEB}</a> · <a href="${kvkk}" style="color:#6b7280;">KVKK Aydınlatma Metni</a></p>
             </td>
           </tr>
         </table>
@@ -198,10 +194,10 @@ export function welcomeVerifyEmailText(name: string, verifyHref: string) {
     "",
     `E-postamı doğrula (48 saat geçerli): ${verifyHref}`,
     "",
-    `Destek: ${LEGAL_EMAIL_DESTEK} · ${LEGAL_PHONE}`,
+    `Destek: ${LEGAL_EMAIL_DESTEK}`,
     `Bu e-postayı siz istemediyseniz yok sayabilirsiniz.`,
     "",
-    `© ${new Date().getFullYear()} ${LEGAL_COMPANY}`,
+    `© ${new Date().getFullYear()} ${LEGAL_BRAND}`,
     LEGAL_WEB,
   ].join("\n");
 }
@@ -220,11 +216,11 @@ export function welcomeEmailText(name: string) {
     "Favorilerinize kaydedin: İlgilendiğiniz ilanları takibe alın, fiyat değişikliklerinden haberdar olun.",
     "Güvenli İletişim: Diğer kullanıcılarla platform üzerinden güvenle mesajlaşın.",
     "",
-    "Bir sorunla mı karşılaştınız? Her zaman yanınızdayız!",
-    `Destek: ${href("/kurumsal/iletisim")} · ${LEGAL_EMAIL_DESTEK} · ${LEGAL_PHONE}`,
+    "Bir sorunla mı karşılaştınız? Bize e-postayla yazın.",
+    `Destek: ${href("/kurumsal/iletisim")} · ${LEGAL_EMAIL_DESTEK}`,
     "",
-    `© ${new Date().getFullYear()} ${LEGAL_COMPANY}`,
-    LEGAL_ADDRESS,
+    `© ${new Date().getFullYear()} ${LEGAL_BRAND}`,
+    ...(LEGAL_ADDRESS ? [LEGAL_ADDRESS] : []),
     LEGAL_WEB,
   ].join("\n");
 }

@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { prefStorage } from "@/lib/consent";
 
 const KEY = "alsatport-compare-v1";
 export const COMPARE_MAX = 4;
@@ -26,7 +27,7 @@ const Ctx = createContext<CompareState | null>(null);
 
 function readIds() {
   try {
-    const raw = JSON.parse(localStorage.getItem(KEY) || "[]") as unknown;
+    const raw = JSON.parse(prefStorage.get(KEY) || "[]") as unknown;
     if (!Array.isArray(raw)) return [];
     return raw.filter((x): x is string => typeof x === "string").slice(0, COMPARE_MAX);
   } catch {
@@ -37,13 +38,18 @@ function readIds() {
 export function CompareProvider({ children }: { children: ReactNode }) {
   const [ids, setIds] = useState<string[]>([]);
 
+  const [loaded, setLoaded] = useState(false);
+
   useEffect(() => {
     setIds(readIds());
+    setLoaded(true);
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(KEY, JSON.stringify(ids));
-  }, [ids]);
+    if (!loaded) return;
+    if (ids.length) prefStorage.set(KEY, JSON.stringify(ids));
+    else if (prefStorage.get(KEY)) prefStorage.set(KEY, "[]");
+  }, [ids, loaded]);
 
   const add = useCallback((id: string) => {
     if (ids.includes(id)) return "has" as const;

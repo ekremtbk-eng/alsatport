@@ -12,6 +12,7 @@ import { FlashToast } from "@/components/FlashToast";
 import { LegalNoticeModal } from "@/components/LegalNoticeModal";
 import { JsonLd } from "@/components/JsonLd";
 import { LEGAL_BRAND } from "@/data/legal";
+import { REDUCED_MOTION_BOOT } from "@/lib/reducedMotion";
 import {
   SEO_DESCRIPTION,
   SEO_KEYWORDS,
@@ -26,6 +27,7 @@ import {
   websiteJsonLd,
 } from "@/lib/seo";
 import { appOrigin } from "@/lib/site";
+import { brandIcon } from "@/lib/brand";
 
 const origin = appOrigin();
 
@@ -35,24 +37,21 @@ export const metadata: Metadata = {
   description: SEO_DESCRIPTION,
   applicationName: LEGAL_BRAND,
   keywords: SEO_KEYWORDS,
-  authors: [{ name: "AlSatPort Bilgi Teknolojileri A.Ş.", url: origin }],
+  authors: [{ name: "AlSatPort", url: origin }],
   creator: LEGAL_BRAND,
   publisher: LEGAL_BRAND,
   category: "classifieds",
   icons: {
     icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
-      { url: "/favicon-48x48.png", sizes: "48x48", type: "image/png" },
-      { url: "/icon.png", sizes: "192x192", type: "image/png" },
-      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: brandIcon("/favicon.ico"), sizes: "any" },
+      { url: brandIcon("/favicon-16x16.png"), sizes: "16x16", type: "image/png" },
+      { url: brandIcon("/favicon-32x32.png"), sizes: "32x32", type: "image/png" },
+      { url: brandIcon("/favicon-48x48.png"), sizes: "48x48", type: "image/png" },
+      { url: brandIcon("/icon-192.png"), sizes: "192x192", type: "image/png" },
+      { url: brandIcon("/icon-512.png"), sizes: "512x512", type: "image/png" },
     ],
-    shortcut: "/favicon.ico",
-    apple: [
-      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
-      { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
-    ],
+    shortcut: brandIcon("/favicon.ico"),
+    apple: [{ url: brandIcon("/apple-touch-icon.png"), sizes: "180x180", type: "image/png" }],
   },
   appleWebApp: {
     capable: true,
@@ -112,17 +111,9 @@ export default async function RootLayout({
         <script
           nonce={nonce}
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var p=JSON.parse(localStorage.getItem("alsatport-i18n-v1")||"{}");var m={tr:"tr",en:"en",de:"de",ar:"ar",ru:"ru"};if(p.locale&&m[p.locale]){document.documentElement.lang=m[p.locale];document.documentElement.dir=p.locale==="ar"?"rtl":"ltr";}}catch(e){}try{var w=window.innerWidth;var c=window.matchMedia("(pointer: coarse)").matches||(navigator.maxTouchPoints||0)>0;var d=w<768?"phone":(w<1024||(c&&w<1280)?"tablet":"desktop");var h=document.documentElement;h.dataset.device=d;h.classList.add("is-"+d);}catch(e){}})();`,
+            __html: `(function(){try{var p=JSON.parse(localStorage.getItem("alsatport-i18n-v1")||"{}");var m={tr:"tr",en:"en",de:"de",ar:"ar",ru:"ru"};if(p.locale&&m[p.locale]){document.documentElement.lang=m[p.locale];document.documentElement.dir=p.locale==="ar"?"rtl":"ltr";}}catch(e){}try{var w=window.innerWidth;var c=window.matchMedia("(pointer: coarse)").matches||(navigator.maxTouchPoints||0)>0;var d=w<768?"phone":(w<1024||(c&&w<1280)?"tablet":"desktop");var h=document.documentElement;h.dataset.device=d;h.classList.add("is-"+d);}catch(e){}${REDUCED_MOTION_BOOT}})();`,
           }}
         />
-        {process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ? (
-          <script
-            nonce={nonce}
-            src={`https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY)}`}
-            async
-            defer
-          />
-        ) : null}
         <AppProvider>
           <DeviceProvider>
           <I18nProvider>

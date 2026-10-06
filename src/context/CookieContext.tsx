@@ -8,13 +8,18 @@ import {
   useMemo,
   useState,
 } from "react";
+import {
+  ALL_CONSENT,
+  DEFAULT_CONSENT,
+  onConsentChange,
+  purgeWithoutConsent,
+  readConsent,
+  removeObsoleteStorage,
+  writeConsent,
+  type ConsentPrefs,
+} from "@/lib/consent";
 
-export type CookiePrefs = {
-  necessary: true;
-  functional: boolean;
-  analytics: boolean;
-  marketing: boolean;
-};
+export type CookiePrefs = ConsentPrefs;
 
 type CookieState = {
   hydrated: boolean;
@@ -30,59 +35,42 @@ type CookieState = {
   closePrefs: () => void;
 };
 
-const KEY = "alsatport-cookie-consent-v2";
-
-export const defaultPrefs: CookiePrefs = {
-  necessary: true,
-  functional: false,
-  analytics: false,
-  marketing: false,
-};
-
-const allOn: CookiePrefs = {
-  necessary: true,
-  functional: true,
-  analytics: true,
-  marketing: true,
-};
+export const defaultPrefs: CookiePrefs = DEFAULT_CONSENT;
 
 const Ctx = createContext<CookieState | null>(null);
 
 export function CookieProvider({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const [decided, setDecided] = useState(false);
-  const [prefs, setPrefs] = useState<CookiePrefs>(defaultPrefs);
+  const [prefs, setPrefs] = useState<CookiePrefs>(DEFAULT_CONSENT);
   const [bannerOpen, setBannerOpen] = useState(false);
   const [prefsOpen, setPrefsOpen] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as CookiePrefs;
-        setPrefs({ ...defaultPrefs, ...parsed, necessary: true });
-        setDecided(true);
-        setBannerOpen(false);
-      } else {
-        setBannerOpen(true);
-      }
-    } catch {
+    removeObsoleteStorage();
+    const rec = readConsent();
+    if (rec) {
+      setPrefs(rec.prefs);
+      setDecided(true);
+      purgeWithoutConsent(rec.prefs);
+    } else {
+      purgeWithoutConsent(DEFAULT_CONSENT);
       setBannerOpen(true);
     }
     setHydrated(true);
+    return onConsentChange((next) => setPrefs(next.prefs));
   }, []);
 
   const persist = useCallback((next: CookiePrefs) => {
-    const value = { ...next, necessary: true as const };
-    setPrefs(value);
+    const rec = writeConsent(next);
+    setPrefs(rec.prefs);
     setDecided(true);
     setBannerOpen(false);
     setPrefsOpen(false);
-    localStorage.setItem(KEY, JSON.stringify(value));
   }, []);
 
-  const acceptAll = useCallback(() => persist(allOn), [persist]);
-  const rejectAll = useCallback(() => persist(defaultPrefs), [persist]);
+  const acceptAll = useCallback(() => persist(ALL_CONSENT), [persist]);
+  const rejectAll = useCallback(() => persist(DEFAULT_CONSENT), [persist]);
   const savePrefs = useCallback((next: CookiePrefs) => persist(next), [persist]);
   const openBanner = useCallback(() => {
     setBannerOpen(true);
@@ -111,19 +99,7 @@ export function CookieProvider({ children }: { children: React.ReactNode }) {
       openPrefs,
       closePrefs,
     }),
-    [
-      hydrated,
-      decided,
-      prefs,
-      bannerOpen,
-      prefsOpen,
-      acceptAll,
-      rejectAll,
-      savePrefs,
-      openBanner,
-      openPrefs,
-      closePrefs,
-    ],
+    [hydrated, decided, prefs, bannerOpen, prefsOpen, acceptAll, rejectAll, savePrefs, openBanner, openPrefs, closePrefs],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -133,4 +109,10 @@ export function useCookies() {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("useCookies must be used within CookieProvider");
   return ctx;
+}
+
+/** True only after the visitor explicitly allowed this category. */
+export function useConsent(category: "functional" | "analytics" | "marketing") {
+  const { prefs, hydrated } = useCookies();
+  return hydrated && prefs[category] === true;
 }

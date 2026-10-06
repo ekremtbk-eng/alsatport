@@ -4,6 +4,8 @@ import { writeAudit } from "@/lib/admin/audit";
 import { isUuid } from "@/lib/ids";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
 import { sanitizeText } from "@/lib/security/sanitize";
+import { readJson } from "@/lib/security/parseBody";
+import { adminListingActionSchema } from "@/lib/security/schemas";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -14,7 +16,9 @@ export async function POST(req: Request, ctx: Ctx) {
   if ("error" in auth) return auth.error;
   const { id } = await ctx.params;
   if (!isUuid(id)) return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
-  const body = (await req.json().catch(() => null)) as { action?: string; reason?: string } | null;
+  const parsed = await readJson(req, adminListingActionSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   const existing = await prisma.listing.findFirst({ where: { id, deletedAt: null } });
   if (!existing) return NextResponse.json({ ok: false, error: "auth.err.session" }, { status: 404 });
 

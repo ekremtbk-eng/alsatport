@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ChevronLeft,
@@ -30,11 +30,18 @@ import { SafetyNotice } from "@/components/listing/SafetyNotice";
 import { CompareToolbar } from "@/components/listing/CompareToolbar";
 import { ListingGallery } from "@/components/listing/ListingGallery";
 import { ClassifiedListingView } from "@/components/listing/ClassifiedListingView";
-import { ListingSharePanel, ListingShareTrigger } from "@/components/listing/ListingShare";
+import { ListingShareTrigger } from "@/components/listing/ListingShare";
 import { ListingContactBar } from "@/components/listing/ListingContactBar";
 import { ListingRegionPanel } from "@/components/listing/ListingRegionPanel";
+import { ReportListingDialog } from "@/components/listing/ReportListingDialog";
+import { prefetchRegion } from "@/lib/regionClient";
+import { ListingPrintButton, ListingPrintSheet } from "@/components/listing/ListingPrint";
+import { ListingPosterButton, ListingPosterDialog } from "@/components/listing/ListingPoster";
+import { posterSupported } from "@/lib/poster";
+import { listingSellerLabel } from "@/lib/publicName";
+import { ListingDescriptionPanel } from "@/components/listing/ListingDescriptionPanel";
 import { GuestLock } from "@/components/GuestLock";
-import { apiGet, apiPost } from "@/lib/security/client";
+import { apiGet } from "@/lib/security/client";
 import { useSellerReviews } from "@/components/useSellerReviews";
 import { isClassifiedPartsListing, listingCategoryChain } from "@/lib/listingFacts";
 import { BreadcrumbNav } from "@/components/BreadcrumbNav";
@@ -49,26 +56,38 @@ export function ListingDetailClient() {
   const listingId = rawId.replace(/^podium-car-/, "demo-car-");
   const cached = listings.find((l) => l.id === listingId || l.id === rawId);
   const [fetched, setFetched] = useState<Listing | null>(null);
+  const skipRemote = !rawId || rawId.startsWith("podium-") || listingId.startsWith("demo-");
+  const [fetchDone, setFetchDone] = useState(skipRemote);
   const listing = cached ?? fetched;
   const { reviews } = useSellerReviews(listing?.sellerId ?? "");
   const blocked = listing ? isBlockedLiveAnimalListing(listing) : false;
   const [chatOpen, setChatOpen] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
   const [showPhone, setShowPhone] = useState(false);
-  const [detailTab, setDetailTab] = useState<"info" | "region">("info");
+  const [posterOpen, setPosterOpen] = useState(false);
+  const [detailTab, setDetailTab] = useState<"info" | "desc" | "region">("info");
   const [reportHint, setReportHint] = useState("");
+  const [reportOpen, setReportOpen] = useState(false);
+  const closeReport = useCallback(() => setReportOpen(false), []);
   const router = useRouter();
 
   useEffect(() => {
-    if (!rawId || rawId.startsWith("podium-") || listingId.startsWith("demo-")) return;
+    if (skipRemote) return;
     let cancelled = false;
-    void apiGet<{ ok?: boolean; listing?: Listing }>(`/api/listings/${encodeURIComponent(rawId)}`).then((res) => {
-      if (!cancelled && res.listing) setFetched(res.listing);
-    });
+    setFetchDone(false);
+    void apiGet<{ ok?: boolean; listing?: Listing }>(`/api/listings/${encodeURIComponent(rawId)}`)
+      .then((res) => {
+        if (!cancelled) {
+          if (res.listing) setFetched(res.listing);
+          setFetchDone(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setFetchDone(true);
+      });
     return () => {
       cancelled = true;
     };
-  }, [rawId, listingId]);
+  }, [rawId, listingId, skipRemote, user?.id]);
 
   useEffect(() => {
     if (listing && isServiceListing(listing)) {
@@ -76,8 +95,17 @@ export function ListingDetailClient() {
     }
   }, [listing, router]);
 
+  const regionTarget = listing && !skipRemote && !blocked && listing.status === "active" ? listing : null;
+  useEffect(() => {
+    if (!regionTarget) return;
+    const timer = window.setTimeout(() => prefetchRegion(regionTarget), 1500);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regionTarget?.id]);
+
   const liked = listing ? favorites.includes(listing.id) : false;
-  const phone = listing ? getSellerPhone(listing.sellerId, listing) : "";
+  const fullPhone = fetched?.sellerPhone && !fetched.sellerPhone.includes("*") ? fetched.sellerPhone : "";
+  const phone = listing ? fullPhone || getSellerPhone(listing.sellerId, listing) : "";
   const schema = useMemo(
     () => (listing ? schemaForCategoryId(listing.categoryId) : schemaForCategoryId("phones")),
     [listing],
@@ -89,6 +117,10 @@ export function ListingDetailClient() {
     return (
       <div className="p-8 text-center text-sm text-ink">{t("common.loading")}</div>
     );
+  }
+
+  if (!listing && !fetchDone) {
+    return <div className="p-8 text-center text-sm text-ink">{t("common.loading")}</div>;
   }
 
   if (!listing || blocked) {
@@ -118,20 +150,24 @@ export function ListingDetailClient() {
     toggleFavorite(listing.id);
   }
 
-  async function reportListing() {
+  function reportListing() {
     if (!listing) return;
     if (!requireAuth("member")) return;
-    const res = await apiPost<{ ok?: boolean; error?: string }>("/api/reports", {
-      targetType: "listing",
-      listingId: listing.id,
-      reason: "other",
-    });
-    setReportHint(res.ok ? t("admin.report.ok") : t(res.error ?? "auth.err.server"));
+    setReportOpen(true);
   }
+
+  const canPoster = posterSupported(listing) && !isClassifiedPartsListing(listing.categoryId);
 
   const contact = (
     <>
-      <ListingShareTrigger variant="banner" onOpen={() => setShareOpen(true)} />
+      <ListingShareTrigger
+        variant="banner"
+        listingId={listing.id}
+        title={listing.title}
+        priceLabel={formatMoney(listing.price)}
+        imageUrl={listing.images[0]}
+        description={listing.description}
+      />
       <div className="mt-2 flex gap-2">
         <button
           onClick={fav}
@@ -139,12 +175,21 @@ export function ListingDetailClient() {
         >
           <Heart className={liked ? "h-5 w-5 fill-lime text-lime" : "h-5 w-5"} />
         </button>
-        <ListingShareTrigger variant="icon" onOpen={() => setShareOpen(true)} />
+        <ListingPrintButton variant="icon" />
+        <ListingShareTrigger
+          variant="icon"
+          listingId={listing.id}
+          title={listing.title}
+          priceLabel={formatMoney(listing.price)}
+          imageUrl={listing.images[0]}
+          description={listing.description}
+        />
         <button onClick={openChat} className="btn-primary h-12 flex-1">
           <MessageCircle className="relative z-10 h-4 w-4" />
           <span className="relative z-10">{t("list.msg")}</span>
         </button>
       </div>
+      {canPoster ? <ListingPosterButton variant="block" onClick={() => setPosterOpen(true)} /> : null}
       {phone ? (
       <div className="mt-2 grid grid-cols-2 gap-2">
         <a
@@ -208,13 +253,12 @@ export function ListingDetailClient() {
           detailTab={detailTab}
           reportHint={reportHint}
           onFav={fav}
-          onShare={() => setShareOpen(true)}
           onChat={openChat}
           onTogglePhone={() => {
             if (!requireAuth("member")) return;
             setShowPhone((v) => !v);
           }}
-          onReport={() => void reportListing()}
+          onReport={user?.id === listing.sellerId ? undefined : reportListing}
           onTab={(tab) => {
             if (tab === "region" && !requireAuth("member")) return;
             setDetailTab(tab);
@@ -228,15 +272,17 @@ export function ListingDetailClient() {
           onMessage={openChat}
           onRevealPhone={() => requireAuth("member")}
           onCall={() => requireAuth("member")}
+          share={{
+            listingId: listing.id,
+            title: listing.title,
+            priceLabel: formatMoney(listing.price),
+            imageUrl: listing.images[0],
+            description: listing.description,
+          }}
         />
         <SellerChatPopup listing={listing} open={chatOpen} onClose={() => setChatOpen(false)} />
-        <ListingSharePanel
-          listingId={listing.id}
-          title={listing.title}
-          priceLabel={formatMoney(listing.price)}
-          open={shareOpen}
-          onClose={() => setShareOpen(false)}
-        />
+        <ListingPrintSheet listing={listing} mode="classified" formatMoney={formatMoney} />
+        <ReportListingDialog listingId={listing.id} open={reportOpen} onClose={closeReport} onDone={setReportHint} />
       </div>
     );
   }
@@ -266,13 +312,22 @@ export function ListingDetailClient() {
           <ChevronLeft className="h-5 w-5 text-white" />
         </button>
         <div className="absolute end-3 top-3 z-20 flex gap-2">
-          <ListingShareTrigger variant="hero" onOpen={() => setShareOpen(true)} />
+          <ListingShareTrigger
+            variant="hero"
+            listingId={listing.id}
+            title={listing.title}
+            priceLabel={formatMoney(listing.price)}
+            imageUrl={listing.images[0]}
+            description={listing.description}
+          />
           <button
             onClick={fav}
             className="grid h-9 w-9 place-items-center rounded-full bg-black/50"
           >
             <Heart className={`h-5 w-5 ${liked ? "fill-lime text-lime" : "text-white"}`} />
           </button>
+          <ListingPrintButton variant="hero" />
+          {canPoster ? <ListingPosterButton variant="hero" onClick={() => setPosterOpen(true)} /> : null}
         </div>
       </div>
       {user?.id === listing.sellerId ? (
@@ -288,14 +343,25 @@ export function ListingDetailClient() {
           <h1 className="text-xl font-extrabold text-ink md:text-2xl">{listing.title}</h1>
           <p className="text-sm text-muted">{listing.subtitle}</p>
           <p className="price-text mt-2 text-2xl font-extrabold">{formatMoney(listing.price)}</p>
+          <div className="mt-3 lg:hidden">
+            <ListingShareTrigger
+              variant="banner"
+              listingId={listing.id}
+              title={listing.title}
+              priceLabel={formatMoney(listing.price)}
+              imageUrl={listing.images[0]}
+              description={listing.description}
+            />
+            {canPoster ? <ListingPosterButton variant="block" onClick={() => setPosterOpen(true)} /> : null}
+          </div>
           <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted">
             <span>No: {listing.listingNo}</span>
             <span>{listing.createdAt}</span>
             <span>
               {listing.city} / {listing.district}
             </span>
-            {user?.id && user.id !== listing.sellerId ? (
-              <button type="button" className="inline-flex items-center gap-1 font-semibold text-orange" onClick={() => void reportListing()}>
+            {user?.id !== listing.sellerId ? (
+              <button type="button" className="inline-flex items-center gap-1 font-semibold text-orange" onClick={reportListing}>
                 <Flag className="h-3.5 w-3.5" />
                 {t("admin.report")}
               </button>
@@ -313,7 +379,16 @@ export function ListingDetailClient() {
             </button>
             <button
               type="button"
+              className={detailTab === "desc" ? "is-on" : ""}
+              onClick={() => setDetailTab("desc")}
+            >
+              {t("loc.tab.description")}
+            </button>
+            <button
+              type="button"
               className={detailTab === "region" ? "is-on" : ""}
+              onPointerEnter={() => regionTarget && user && prefetchRegion(regionTarget, true)}
+              onFocus={() => regionTarget && user && prefetchRegion(regionTarget, true)}
               onClick={() => {
                 if (!requireAuth("member")) return;
                 setDetailTab("region");
@@ -327,13 +402,16 @@ export function ListingDetailClient() {
             <GuestLock>
               <ListingRegionPanel listing={listing} />
             </GuestLock>
+          ) : detailTab === "desc" ? (
+            <GuestLock>
+              <ListingDescriptionPanel
+                className="mt-5 rounded-xl border border-line bg-card p-4 shadow-sm"
+                description={listing.description}
+              />
+            </GuestLock>
           ) : (
             <GuestLock>
               <ListingSpecTables listing={listing} schema={schema} />
-              <section className="mt-5 rounded-xl border border-line bg-card p-4 shadow-sm">
-                <h2 className="mb-2 font-bold text-ink">{t("list.desc")}</h2>
-                <p className="whitespace-pre-line text-sm leading-relaxed text-ink">{listing.description}</p>
-              </section>
             </GuestLock>
           )}
         </div>
@@ -345,7 +423,7 @@ export function ListingDetailClient() {
               <img src={listing.sellerAvatar} alt="" className="h-12 w-12 rounded-full object-cover" />
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5 font-semibold text-ink">
-                  {listing.sellerName}
+                  {listingSellerLabel(listing)}
                   {listing.sellerVerified && <VerifiedBadge size={18} />}
                 </p>
                 <p className="text-xs text-muted">
@@ -382,16 +460,21 @@ export function ListingDetailClient() {
         onMessage={openChat}
         onRevealPhone={() => requireAuth("member")}
         onCall={() => requireAuth("member")}
+        share={{
+          listingId: listing.id,
+          title: listing.title,
+          priceLabel: formatMoney(listing.price),
+          imageUrl: listing.images[0],
+          description: listing.description,
+        }}
       />
 
       <SellerChatPopup listing={listing} open={chatOpen} onClose={() => setChatOpen(false)} />
-      <ListingSharePanel
-        listingId={listing.id}
-        title={listing.title}
-        priceLabel={formatMoney(listing.price)}
-        open={shareOpen}
-        onClose={() => setShareOpen(false)}
-      />
+      <ListingPrintSheet listing={listing} mode="standard" formatMoney={formatMoney} />
+      {canPoster ? (
+        <ListingPosterDialog listing={listing} phone={user ? phone : ""} open={posterOpen} onOpenChange={setPosterOpen} />
+      ) : null}
+      <ReportListingDialog listingId={listing.id} open={reportOpen} onClose={closeReport} onDone={setReportHint} />
     </div>
   );
 }

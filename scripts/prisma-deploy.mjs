@@ -32,6 +32,16 @@ function deployWithRetry(attempts = 4) {
   throw lastErr;
 }
 
+const onVercel = Boolean(process.env.VERCEL);
+const vercelEnv = process.env.VERCEL_ENV || "";
+
+// Preview/development builds on Vercel share env (incl. DATABASE_URL) with production,
+// so they must never migrate or seed.
+if (onVercel && vercelEnv !== "production") {
+  console.log(`[prisma-deploy] VERCEL_ENV=${vercelEnv || "unknown"}: skipping migrations and seeds.`);
+  process.exit(0);
+}
+
 try {
   deployWithRetry();
 } catch {
@@ -42,4 +52,16 @@ try {
   }
   sleep(5);
   deployWithRetry();
+}
+
+if (onVercel) {
+  console.log("[prisma-deploy] Running base seed (categories, special days; insert-only)…");
+  run("node ./node_modules/tsx/dist/cli.mjs prisma/seed.ts");
+}
+
+if (process.env.SEED_DEMO_LISTINGS === "1") {
+  console.log("[prisma-deploy] SEED_DEMO_LISTINGS=1: running demo seed…");
+  run("node ./node_modules/tsx/dist/cli.mjs prisma/seed-demo.ts");
+} else {
+  console.log("[prisma-deploy] Demo seed skipped (SEED_DEMO_LISTINGS is not 1).");
 }

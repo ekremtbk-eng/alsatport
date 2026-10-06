@@ -19,6 +19,19 @@ export async function POST(req: Request) {
   const parsed = await readJson(req, reportBodySchema);
   if (!parsed.ok) return parsed.response;
   const body = parsed.data;
+  if (body.targetType === "listing") {
+    if (!body.listingId) return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
+    const listing = await prisma.listing.findUnique({ where: { id: body.listingId }, select: { sellerId: true } });
+    if (!listing) return NextResponse.json({ ok: false, error: "list.notfound" }, { status: 404 });
+    if (listing.sellerId === auth.user.id) {
+      return NextResponse.json({ ok: false, error: "report.err.own" }, { status: 400 });
+    }
+    const open = await prisma.report.findFirst({
+      where: { reporterId: auth.user.id, listingId: body.listingId, status: { in: ["open", "reviewing"] } },
+      select: { id: true },
+    });
+    if (open) return NextResponse.json({ ok: true, duplicate: true });
+  }
   await prisma.report.create({
     data: {
       reporterId: auth.user.id,

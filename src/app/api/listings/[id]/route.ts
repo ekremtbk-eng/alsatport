@@ -1,23 +1,29 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { claimsFromCookies, requireMutatingRequest, requireUser } from "@/lib/security/session";
 import { findUserById } from "@/lib/security/userStore";
 import { promoteConfiguredAdmin } from "@/lib/admin/audit";
+import { isUuid } from "@/lib/ids";
 import {
   bumpListingViews,
   deleteListingRecord,
+  fillMissingListingCoords,
   findListingRecord,
+  hideSellerPhone,
   toClientListing,
   updateListingRecord,
 } from "@/lib/listings/store";
+import { listingCreateBodySchema } from "@/lib/security/schemas";
+import { readJson } from "@/lib/security/parseBody";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
+  if (!isUuid(id)) return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
   const row = await findListingRecord(id);
   if (!row) return NextResponse.json({ ok: false, error: "auth.err.session" }, { status: 404 });
+  const claims = await claimsFromCookies();
   if (row.status !== "active") {
-    const claims = await claimsFromCookies();
     if (!claims) return NextResponse.json({ ok: false, error: "auth.err.session" }, { status: 404 });
     let viewer = await findUserById(claims.sub);
     if (viewer) viewer = await promoteConfiguredAdmin(viewer);
@@ -28,7 +34,7 @@ export async function GET(_req: Request, ctx: Ctx) {
   }
   const listing = toClientListing(row);
   if (row.status === "active") listing.views += 1;
-  return NextResponse.json({ ok: true, listing });
+  return NextResponse.json({ ok: true, listing: claims ? listing : hideSellerPhone(listing) });
 }
 
 export async function PUT(req: Request, ctx: Ctx) {
@@ -37,10 +43,15 @@ export async function PUT(req: Request, ctx: Ctx) {
   const auth = await requireUser("seller");
   if ("error" in auth) return auth.error;
   const { id } = await ctx.params;
-  const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
-  const updated = await updateListingRecord(auth.user, id, body ?? {});
+  if (!isUuid(id)) return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
+  const parsed = await readJson(req, listingCreateBodySchema.partial());
+  if (!parsed.ok) return parsed.response;
+  const updated = await updateListingRecord(auth.user, id, parsed.data as Record<string, unknown>);
   if ("error" in updated) {
     return NextResponse.json({ ok: false, error: updated.error }, { status: updated.status });
+  }
+  if (updated.listing.lat == null && typeof (parsed.data as { city?: unknown }).city === "string") {
+    after(() => fillMissingListingCoords(id).catch(() => undefined));
   }
   return NextResponse.json({ ok: true, listing: updated.listing });
 }
@@ -51,6 +62,7 @@ export async function DELETE(req: Request, ctx: Ctx) {
   const auth = await requireUser("seller");
   if ("error" in auth) return auth.error;
   const { id } = await ctx.params;
+  if (!isUuid(id)) return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
   const deleted = await deleteListingRecord(auth.user, id);
   if ("error" in deleted) {
     return NextResponse.json({ ok: false, error: deleted.error }, { status: deleted.status });

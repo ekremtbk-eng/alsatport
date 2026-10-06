@@ -3,8 +3,21 @@ import type { NextRequest } from "next/server";
 import { COOKIE_ACCESS, COOKIE_DEVICE, COOKIE_REFRESH, deviceCookieOptions } from "@/lib/security/cookies";
 import { verifyAuthToken } from "@/lib/security/jwt";
 import { LIMITS, clientRateKey, rateLimit } from "@/lib/security/rateLimit";
+import { hasRole } from "@/lib/security/rbac";
 
-const PROTECTED_PREFIXES = ["/ilan-ver", "/mesajlar", "/hesap-tamamla", "/ilanlarim", "/admin"];
+const PROTECTED_PREFIXES = [
+  "/ilan-ver",
+  "/mesajlar",
+  "/hesap-tamamla",
+  "/ilanlarim",
+  "/admin",
+  "/profil",
+  "/odeme",
+  "/favoriler",
+  "/bildirimler",
+  "/bildirim-ayarlari",
+  "/qr",
+];
 
 const EMAIL_HOLD_ALLOW = [
   "/eposta-dogrula",
@@ -16,8 +29,8 @@ const EMAIL_HOLD_ALLOW = [
   "/cerez-aydinlatma",
   "/gizlilik-politikasi",
   "/kullanim-kosullari",
-  "/mesafeli-satis",
-  "/on-bilgilendirme",
+  "/ilan-kurallari",
+  "/kurumsal/iletisim",
 ];
 
 function isEmailHoldAllowed(path: string) {
@@ -35,8 +48,8 @@ function nonce() {
 
 function csp(n: string, dev: boolean) {
   const script = dev
-    ? `'self' 'nonce-${n}' 'unsafe-eval'`
-    : `'self' 'nonce-${n}' 'strict-dynamic'`;
+    ? `'self' 'nonce-${n}' 'unsafe-eval' 'wasm-unsafe-eval'`
+    : `'self' 'nonce-${n}' 'strict-dynamic' 'wasm-unsafe-eval'`;
   return [
     `default-src 'self'`,
     `script-src ${script} https://www.google.com https://www.gstatic.com https://www.recaptcha.net`,
@@ -44,11 +57,13 @@ function csp(n: string, dev: boolean) {
     `img-src 'self' data: blob: https://images.unsplash.com https://plus.unsplash.com https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.googleusercontent.com https://*.fbcdn.net https://*.public.blob.vercel-storage.com https://www.gstatic.com https://www.google.com https://www.recaptcha.net`,
     `font-src 'self' data:`,
     `connect-src 'self' https://www.google.com https://www.gstatic.com https://www.recaptcha.net`,
-    `frame-src https://www.openstreetmap.org https://www.google.com https://maps.google.com https://www.paytr.com https://www.recaptcha.net https://recaptcha.google.com`,
+    `frame-src https://www.openstreetmap.org https://www.google.com https://maps.google.com https://www.gstatic.com https://www.recaptcha.net https://recaptcha.google.com`,
     `frame-ancestors 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,
     `object-src 'none'`,
+    `worker-src 'self' blob: https://www.gstatic.com https://www.google.com https://www.recaptcha.net`,
+    `manifest-src 'self'`,
     `upgrade-insecure-requests`,
   ].join("; ");
 }
@@ -87,16 +102,27 @@ export async function middleware(request: NextRequest) {
       (access ? await verifyAuthToken(access, "access") : null) ||
       (refresh ? await verifyAuthToken(refresh, "refresh") : null);
     if (!claims) {
+      const next = `${path}${request.nextUrl.search}`;
       const url = request.nextUrl.clone();
       url.pathname = "/giris";
-      url.searchParams.set("next", path);
+      url.search = "";
+      url.searchParams.set("next", next.startsWith("/") && !next.startsWith("//") ? next : path);
       return NextResponse.redirect(url);
     }
+    if (path === "/admin" || path.startsWith("/admin/")) {
+      if (!hasRole(claims.role, "admin")) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/";
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
+    }
     if (path.startsWith("/ilan-ver") && claims.role === "member" && claims.pc !== 1) {
+      const next = `${path}${request.nextUrl.search}`;
       const url = request.nextUrl.clone();
-      url.pathname = "/profil/bilgilerim";
+      url.pathname = "/hesap-tamamla";
       url.search = "";
-      url.searchParams.set("next", path);
+      url.searchParams.set("next", next.startsWith("/") && !next.startsWith("//") ? next : path);
       return NextResponse.redirect(url);
     }
   }
@@ -124,7 +150,7 @@ export async function middleware(request: NextRequest) {
   res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(self), payment=()");
   res.headers.set("X-DNS-Prefetch-Control", "off");
-  res.headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  res.headers.set("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
   res.headers.set("X-Permitted-Cross-Domain-Policies", "none");
   res.headers.set("X-XSS-Protection", "0");
   if (!dev) {

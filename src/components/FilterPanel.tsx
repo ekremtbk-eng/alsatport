@@ -1,17 +1,15 @@
 "use client";
 
-import { X } from "lucide-react";
-import Link from "next/link";
+import { ChevronDown, X } from "lucide-react";
 import { useState } from "react";
+import { CategoryDrill } from "@/components/CategoryDrill";
 import { SearchSelect } from "@/components/SearchSelect";
-import { FilterRenoTree, toggleRenoLeaf } from "@/components/FilterRenoTree";
 import { TutorFilterChips } from "@/components/TutorFilterChips";
 import { StdFilterSidebar } from "@/components/StdFilterSidebar";
 import { catName, useI18n } from "@/context/I18nContext";
-import { hrefForCategory, formatListingCount, type Category } from "@/data/categories";
+import { categoryPath, visibleChildren, type Category } from "@/data/categories";
 import {
   districtOptions,
-  countNavItem,
   filterNavFor,
   HOURS_PRESETS,
   KM_PRESETS,
@@ -19,8 +17,8 @@ import {
   resolvedOptions,
   SQM_PRESETS,
   YEAR_OPTIONS,
+  countFilterOption,
   type FilterField,
-  type FilterNavItem,
   type FilterState,
 } from "@/lib/categoryFilters";
 import type { Listing } from "@/data/store";
@@ -30,7 +28,8 @@ function fieldTitle(t: (key: string, vars?: Record<string, string | number>) => 
   if (label !== key) return label;
   const tail = key.includes(".") ? key.slice(key.lastIndexOf(".") + 1) : key;
   const names: Record<string, string> = {
-    payload: "İstihap Haddi / Taşıma Kapasitesi",
+    price: "Fiyat",
+    priceMin: "Fiyat",
     gvw: "Azami Yüklü Ağırlık",
     jobType: "Çalışma Şekli",
     craft: "Hava Aracı Tipi",
@@ -144,12 +143,14 @@ function FieldControl({
   state,
   onChange,
   hideLabel,
+  listings,
 }: {
   field: FilterField;
   fields: FilterField[];
   state: FilterState;
   onChange: (key: string, value: string) => void;
   hideLabel?: boolean;
+  listings?: Listing[];
 }) {
   const { t } = useI18n();
   if (field.kind === "range" && field.pairKey && field.key.endsWith("Max")) return null;
@@ -214,12 +215,18 @@ function FieldControl({
       />
     );
   }
-  if (field.kind === "multi") {
+  if (field.kind === "multi" || field.key === "kimden") {
     const selected = new Set((state[field.key] ?? "").split(",").filter(Boolean));
+    const options = field.options ?? resolvedOptions(field, state);
     return (
       <ul className="feat-check-list">
-        {(field.options ?? []).map((o) => {
+        {options.map((o) => {
           const on = selected.has(o);
+          const n =
+            listings && listings.length && listings.length <= 800
+              ? countFilterOption(listings, fields, { ...state, [field.key]: "" }, field.key, o)
+              : undefined;
+          if (!on && n === 0) return null;
           return (
             <li key={o}>
               <button
@@ -234,6 +241,7 @@ function FieldControl({
               >
                 <span className="feat-check" aria-hidden />
                 {o}
+                {n != null ? <span className="text-[11px] text-muted"> ({n})</span> : null}
               </button>
             </li>
           );
@@ -244,6 +252,12 @@ function FieldControl({
 
   const locked = Boolean(field.dependsOn && !state[field.dependsOn ?? ""]);
   const options = field.kind === "district" ? districtOptions(state.city) : resolvedOptions(field, state);
+  const optionCounts =
+    !locked && listings && listings.length && listings.length <= 800
+      ? Object.fromEntries(
+          options.map((o) => [o, countFilterOption(listings, fields, state, field.key, o) ?? 0]),
+        )
+      : undefined;
   const placeholder = locked
     ? field.dependsOn === "brand"
       ? t("flt.brandFirst")
@@ -270,10 +284,17 @@ function FieldControl({
         disabled={locked}
         hideLabel={hideLabel}
         anyLabel={t("flt.any")}
+        optionCounts={optionCounts}
         onChange={(v) => onChange(field.key, v)}
       />
     );
   }
+
+  const visible = options.filter((o) => {
+    if (!optionCounts) return true;
+    if (o === (state[field.key] ?? "")) return true;
+    return (optionCounts[o] ?? 0) > 0;
+  });
 
   return (
     <label className={hideLabel ? "block" : "flt-group"}>
@@ -285,52 +306,34 @@ function FieldControl({
         onChange={(e) => onChange(field.key, e.target.value)}
       >
         <option value="">{placeholder}</option>
-        {options.map((o) => (
+        {visible.map((o) => (
           <option key={o} value={o}>
-            {o}
+            {optionCounts ? `${o} (${optionCounts[o]})` : o}
           </option>
         ))}
       </select>
     </label>
   );
 }
-
 const STD_FIELD_KEYS = new Set(["city", "district", "posted", "keyword", "hours24"]);
+const PRIMARY_FIELD_KEYS = new Set(["priceMin", "priceMax", "kimden"]);
 const PLUGIN_FIELD_KEYS = new Set([
   "brand",
   "model",
   "trim",
-  "engine",
-  "body",
-  "product",
-  "cond",
   "rooms",
   "deal",
-  "subject",
-  "jobType",
-  "petKind",
-  "helpType",
-  "kind",
-  "vehicleType",
-  "storage",
+  "product",
+  "cond",
   "kimden",
   "yearMin",
   "kmMin",
   "fuel",
   "gear",
   "sqmMin",
-  "cpu",
-  "ram",
-  "gpu",
-  "storage",
-  "os",
-  "warranty",
-  "heat",
-  "place",
-  "exp",
-  "education",
-  "species",
-  "tvSize",
+  "priceMin",
+  "jobType",
+  "subject",
 ]);
 
 function renderExtraField(
@@ -339,19 +342,20 @@ function renderExtraField(
   state: FilterState,
   onChange: (key: string, value: string) => void,
   t: (key: string, vars?: Record<string, string | number>) => string,
+  listings?: Listing[],
 ) {
   return (
-    <section key={field.key} className="acil-flt">
-      <h2>{fieldTitle(t, field.labelKey)}</h2>
-      <FieldControl field={field} fields={fields} state={state} onChange={onChange} hideLabel />
-    </section>
+    <div key={field.key} className="flt-field-block">
+      <p className="flt-field-label">{fieldTitle(t, field.labelKey)}</p>
+      <FieldControl field={field} fields={fields} state={state} onChange={onChange} hideLabel listings={listings} />
+    </div>
   );
 }
 
 export function FilterPanel({
   fields,
   state,
-  resultCount: _resultCount,
+  resultCount,
   onChange,
   onClear,
   onClose,
@@ -365,6 +369,8 @@ export function FilterPanel({
   wordDraft,
   onWordDraft,
   onSearch,
+  onPickCategory,
+  navRoot,
 }: {
   fields: FilterField[];
   state: FilterState;
@@ -383,108 +389,127 @@ export function FilterPanel({
   wordDraft?: string;
   onWordDraft?: (value: string) => void;
   onSearch?: () => void;
+  onPickCategory?: (cat: Category) => void;
+  navRoot?: Category | null;
 }) {
   const { t } = useI18n();
   const [more, setMore] = useState(false);
+  const [drill, setDrill] = useState(false);
   const [localDraft, setLocalDraft] = useState(state.keyword ?? "");
   const draft = wordDraft ?? localDraft;
   const setDraft = onWordDraft ?? setLocalDraft;
+  const stay = Boolean(onPickCategory);
+  void activeCatId;
+  void renoRoot;
+  void catCounts;
   const nav = currentCat && !renoRoot ? filterNavFor(currentCat, state) : { crumbs: [], items: [], treeKeys: [] as string[] };
+  const treeRoots: Category[] = navRoot
+    ? visibleChildren(navRoot).length
+      ? visibleChildren(navRoot)
+      : [navRoot]
+    : currentCat && visibleChildren(currentCat).length
+      ? visibleChildren(currentCat)
+      : subcats ?? [];
   const extraFields = fields.filter((field) => {
     if (STD_FIELD_KEYS.has(field.key)) return false;
-    if (nav.treeKeys.includes(field.key)) return false;
+    if (nav.treeKeys.includes(field.key) && !field.preferOpen && !PLUGIN_FIELD_KEYS.has(field.key)) return false;
     if (field.kind === "range" && field.key.endsWith("Max")) return false;
     return true;
   });
-  const pluginFields = extraFields.filter((f) => f.preferOpen || PLUGIN_FIELD_KEYS.has(f.key));
+  const primaryFields = extraFields.filter((f) => PRIMARY_FIELD_KEYS.has(f.key));
+  const restFields = extraFields.filter((f) => !PRIMARY_FIELD_KEYS.has(f.key));
+  const pluginFields = restFields.filter((f) => f.preferOpen || PLUGIN_FIELD_KEYS.has(f.key));
   const pluginKeys = new Set(pluginFields.map((f) => f.key));
-  const moreFields = extraFields.filter((f) => !pluginKeys.has(f.key));
+  const moreFields = restFields.filter((f) => !pluginKeys.has(f.key));
+  const path = categoryPath(currentCat);
+  const pathLabel = path.map((c) => catName(t, c.id, c.name)).filter(Boolean).join(" › ") || t("nav.categories");
+  const locSummary = [state.city, state.district].filter(Boolean).join(" / ");
+  const priceSummary = [state.priceMin, state.priceMax].filter(Boolean).join(" – ");
+  const kimdenSummary = state.kimden || "";
 
-  function navLabel(item: FilterNavItem) {
-    return item.id.includes(":") ? item.label : catName(t, item.id, item.label);
-  }
+  const catCard = (
+    <button type="button" className="flt-cat-card" onClick={() => setDrill(true)}>
+      <span className="flt-cat-card-k">{t("flt.cat")}</span>
+      <span className="flt-cat-card-path">{pathLabel}</span>
+      <span className="flt-cat-card-go">{t("flt.cat.change")} ›</span>
+    </button>
+  );
 
-  function navCount(item: FilterNavItem) {
-    if (item.href && catCounts && catCounts[item.id] != null) return catCounts[item.id];
-    if (!listings?.length) return 0;
-    return countNavItem(listings, fields, state, item);
-  }
-
-  function renderNavItem(item: FilterNavItem, withCount = true) {
-    const n = withCount ? navCount(item) : undefined;
-    const label = navLabel(item);
-    const count = n != null ? <span>({formatListingCount(n)})</span> : null;
-    if (item.href && !item.facet) {
-      return (
-        <Link href={item.href} className={item.active ? "is-on" : ""}>
-          {label}
-          {count}
-        </Link>
-      );
-    }
-    if (item.facet) {
-      return (
-        <button type="button" className={item.active ? "is-on" : ""} onClick={() => onChange(item.facet!.key, item.facet!.value)}>
-          {label}
-          {count}
-        </button>
-      );
-    }
+  if (drill) {
     return (
-      <span className={item.active ? "is-on" : ""}>
-        {label}
-        {count}
-      </span>
+      <div className={variant === "sheet" ? "contents" : "filter-aside acil-side"}>
+        {onClose && variant === "sheet" ? (
+          <div className="filter-head">
+            <h2 className="filter-title">{t("flt.cat.pick")}</h2>
+            <button type="button" className="filter-x" onClick={onClose} aria-label={t("common.close")}>
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ) : null}
+        <div data-filter-scroll={variant === "sheet" ? true : undefined} className={variant === "sheet" ? "filter-sheet-body min-h-0 flex-1 overflow-y-auto" : undefined}>
+          <CategoryDrill
+            roots={treeRoots.length ? treeRoots : (subcats ?? [])}
+            selected={currentCat}
+            stay={stay}
+            onPick={(cat) => {
+              onPickCategory?.(cat);
+              setDrill(false);
+            }}
+            onBackOut={() => setDrill(false)}
+          />
+        </div>
+      </div>
     );
   }
 
-  const cats = renoRoot && currentCat ? (
-    <div className="acil-cats is-reno">
-      <FilterRenoTree
-        current={currentCat}
-        root={renoRoot}
-        selectedIds={(state.renoSub ?? "").split(",").filter(Boolean)}
-        onToggleLeaf={(id) => onChange("renoSub", toggleRenoLeaf((state.renoSub ?? "").split(","), id))}
-      />
-    </div>
-  ) : currentCat ? (
-    <ul className="acil-cats">
-      {nav.crumbs.map((item) => (
-        <li key={`c-${item.id}`}>{renderNavItem(item, false)}</li>
-      ))}
-      {nav.items.map((item) => (
-        <li key={item.id}>{renderNavItem(item)}</li>
-      ))}
-    </ul>
-  ) : subcats && subcats.length > 0 ? (
-    <ul className="acil-cats">
-      {subcats.map((ch) => {
-        const on = activeCatId === ch.id;
-        const n = catCounts?.[ch.id] ?? 0;
+  const primary = (
+    <>
+      {primaryFields.map((field) => {
+        const title = fieldTitle(t, field.labelKey);
+        const value =
+          field.key === "priceMin" ? (priceSummary ? `${priceSummary} TL` : undefined)
+          : field.key === "kimden" ? kimdenSummary || undefined
+          : locSummary || undefined;
         return (
-          <li key={ch.id}>
-            <Link href={hrefForCategory(ch)} className={on ? "is-on" : ""}>
-              {catName(t, ch.id, ch.name)}
-              <span>({formatListingCount(n)})</span>
-            </Link>
-          </li>
+          <details key={field.key} className="flt-acc flt-acc-sheet" open={Boolean(value)}>
+            <summary className="flt-acc-sum">
+              <span className="flt-acc-title">{title}</span>
+              {value ? <span className="flt-acc-val">{value}</span> : null}
+              <ChevronDown className="flt-acc-chev h-4 w-4" />
+            </summary>
+            <div className="flt-acc-body">
+              <FieldControl field={field} fields={fields} state={state} onChange={onChange} hideLabel listings={listings} />
+            </div>
+          </details>
         );
       })}
-    </ul>
-  ) : null;
+    </>
+  );
 
   const plugins =
     pluginFields.length > 0 ? (
-      <>{pluginFields.map((field) => renderExtraField(field, fields, state, onChange, t))}</>
+      <>
+        {pluginFields.map((field) => (
+          <details key={field.key} className="flt-acc flt-acc-sheet">
+            <summary className="flt-acc-sum">
+              <span className="flt-acc-title">{fieldTitle(t, field.labelKey)}</span>
+              <ChevronDown className="flt-acc-chev h-4 w-4" />
+            </summary>
+            <div className="flt-acc-body">
+              <FieldControl field={field} fields={fields} state={state} onChange={onChange} hideLabel listings={listings} />
+            </div>
+          </details>
+        ))}
+      </>
     ) : null;
 
   const extra =
     moreFields.length > 0 ? (
-      <>{moreFields.map((field) => renderExtraField(field, fields, state, onChange, t))}</>
+      <>{moreFields.map((field) => renderExtraField(field, fields, state, onChange, t, listings))}</>
     ) : null;
 
   return (
-    <div className={variant === "sheet" ? "filter-sheet-card acil-side" : "filter-aside acil-side"}>
+    <div className={variant === "sheet" ? "contents" : "filter-aside acil-side"}>
       {onClose ? (
         <div className="filter-head">
           <h2 className="filter-title">{t("cat.filter")}</h2>
@@ -492,9 +517,17 @@ export function FilterPanel({
             <X className="h-4 w-4" />
           </button>
         </div>
-      ) : null}
+      ) : (
+        <div className="flt-side-head">
+          <h2>{t("cat.filter")}</h2>
+          <button type="button" className="flt-side-clear" onClick={onClear}>
+            {t("flt.clearShort")}
+          </button>
+        </div>
+      )}
       <StdFilterSidebar
-        cats={cats}
+        cats={catCard}
+        primary={primary}
         extra={extra}
         plugins={plugins}
         city={state.city ?? ""}
@@ -504,7 +537,8 @@ export function FilterPanel({
         draft={draft}
         includeDesc={state.includeDesc === "1"}
         more={more}
-        radioName={`std-date-${variant}`}
+        compact={variant === "sheet"}
+        resultCount={resultCount}
         onCity={(v) => onChange("city", v)}
         onDistrict={(v) => onChange("district", v)}
         onPosted={(v) => onChange("posted", v)}
@@ -512,14 +546,12 @@ export function FilterPanel({
         onDraft={setDraft}
         onIncludeDesc={(v) => onChange("includeDesc", v ? "1" : "")}
         onMore={() => setMore((v) => !v)}
+        onClear={onClear}
         onSearch={() => {
           (onSearch ?? (() => onChange("keyword", draft.trim())))();
           onClose?.();
         }}
       />
-      <button type="button" className="acil-more" onClick={onClear}>
-        {t("flt.clear")}
-      </button>
     </div>
   );
 }

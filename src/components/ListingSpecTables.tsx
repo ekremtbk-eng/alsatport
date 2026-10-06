@@ -28,6 +28,7 @@ const VEHICLE_TABLE = [
   "Ağırlık",
   "Silindir",
   "Soğutma",
+  "Kimden",
 ];
 const SERVICE_TABLE = ["Hizmet yeri", "Çalışma", "Süre", "Garanti", "Deneyim", "Fatura", "Yer"];
 
@@ -59,6 +60,32 @@ function SpecTable({
   );
 }
 
+const FAMILY_TABLE_TITLE: Partial<Record<ListingSchema["family"], string>> = {
+  emlak: "Konut bilgileri",
+  vasita: "Araç teknik bilgileri",
+  hizmet: "Hizmet bilgileri",
+};
+
+export function listingSpecSections(listing: Listing, schema: ListingSchema) {
+  const specs = listing.specs ?? [];
+  const hi = highlightSpecs(specs, schema.family);
+  const estateRows = schema.family === "emlak" ? pickByLabels(specs, ESTATE_TABLE) : [];
+  const vehicleRows = schema.family === "vasita" ? pickByLabels(specs, VEHICLE_TABLE) : [];
+  const serviceRows = schema.family === "hizmet" ? pickByLabels(specs, SERVICE_TABLE) : [];
+  const familyRows =
+    schema.family === "emlak" ? estateRows : schema.family === "vasita" ? vehicleRows : schema.family === "hizmet" ? serviceRows : [];
+  const used = new Set(familyRows.map((r) => r.label));
+  const rest = used.size ? specs.filter((s) => !used.has(s.label)) : specs;
+  return {
+    hi,
+    family: { title: FAMILY_TABLE_TITLE[schema.family] ?? "", rows: familyRows },
+    estateRows,
+    vehicleRows,
+    serviceRows,
+    rest,
+  };
+}
+
 export function ListingSpecTables({
   listing,
   schema,
@@ -66,21 +93,7 @@ export function ListingSpecTables({
   listing: Listing;
   schema: ListingSchema;
 }) {
-  const specs = listing.specs ?? [];
-  const hi = highlightSpecs(specs, schema.family);
-  const estateRows = schema.family === "emlak" ? pickByLabels(specs, ESTATE_TABLE) : [];
-  const vehicleRows = schema.family === "vasita" ? pickByLabels(specs, VEHICLE_TABLE) : [];
-  const serviceRows = schema.family === "hizmet" ? pickByLabels(specs, SERVICE_TABLE) : [];
-  const used = new Set(
-    schema.family === "emlak"
-      ? estateRows.map((r) => r.label)
-      : schema.family === "vasita"
-        ? vehicleRows.map((r) => r.label)
-        : schema.family === "hizmet"
-          ? serviceRows.map((r) => r.label)
-          : [],
-  );
-  const rest = used.size ? specs.filter((s) => !used.has(s.label)) : specs;
+  const { hi, estateRows, vehicleRows, serviceRows, rest } = listingSpecSections(listing, schema);
 
   return (
     <div className="spec-wrap">

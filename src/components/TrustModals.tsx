@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Send, X } from "lucide-react";
-import { LEGAL_EMAIL_DESTEK, LEGAL_PHONE } from "@/data/legal";
+import { LEGAL_EMAIL_DESTEK } from "@/data/legal";
 import { useI18n } from "@/context/I18nContext";
 
 export function InfoModal({
@@ -164,9 +164,6 @@ export function SupportChatModal({ open, onClose }: { open: boolean; onClose: ()
             </button>
           </div>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted">
-            <a className="text-lime hover:underline" href={`tel:${LEGAL_PHONE.replace(/\s/g, "")}`}>
-              {LEGAL_PHONE}
-            </a>
             <a className="text-lime hover:underline" href={`mailto:${LEGAL_EMAIL_DESTEK}`}>
               {LEGAL_EMAIL_DESTEK}
             </a>

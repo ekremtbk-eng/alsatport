@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { categories, hrefForCategory, listingMatchesCategory, type Category } from "@/data/categories";
 import { CategoryIcon } from "@/components/CategoryIcon";
+import { ListingCard } from "@/components/ListingCard";
+import { ListingGrid } from "@/components/ListingGrid";
 import { catName, useI18n } from "@/context/I18nContext";
 import type { Listing } from "@/data/store";
 
@@ -18,7 +20,7 @@ function HubRow({
   listings: Listing[];
 }) {
   const { t } = useI18n();
-  const thumbs = listings.slice(0, 6);
+  const thumbs = listings.slice(0, 4);
   return (
     <section className="home-block">
       <div className="home-block-head">
@@ -34,14 +36,12 @@ function HubRow({
         ))}
       </div>
       {thumbs.length > 0 ? (
-        <div className="hub-thumbs">
-          {thumbs.map((l) => (
-            <Link key={l.id} href={`/ilan/${l.id}`} className="hub-thumb">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={l.images[0]} alt={l.title} />
-              <span className="truncate">{l.title}</span>
-            </Link>
-          ))}
+        <div className="hub-lux">
+          <ListingGrid>
+            {thumbs.map((l) => (
+              <ListingCard key={l.id} listing={l} compact />
+            ))}
+          </ListingGrid>
         </div>
       ) : null}
     </section>

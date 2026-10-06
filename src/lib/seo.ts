@@ -2,11 +2,10 @@ import type { Metadata } from "next";
 import {
   LEGAL_ADDRESS,
   LEGAL_BRAND,
-  LEGAL_COMPANY,
+  LEGAL_DATA_CONTROLLER_NAME,
   LEGAL_EMAIL_DESTEK,
-  LEGAL_PHONE_E164,
+  LEGAL_INSTAGRAM,
   LEGAL_SOCIAL,
-  LEGAL_WEB,
 } from "@/data/legal";
 import { categories, findCategory, hrefForCategory, parentOf, visibleChildren, type Category } from "@/data/categories";
 import { SITE_SITELINKS } from "@/data/sitelinks";
@@ -34,6 +33,13 @@ export function absUrl(path = "/") {
 export const OG_IMAGE_PATH = "/og.png";
 export const LOGO_IMAGE_PATH = "/icon-512.png";
 
+export function absoluteAssetUrl(src: string) {
+  const u = src.trim();
+  if (!u) return absUrl(OG_IMAGE_PATH);
+  if (/^https?:\/\//i.test(u)) return u;
+  return absUrl(u.startsWith("/") ? u : `/${u}`);
+}
+
 export function defaultOgImage() {
   return {
     url: absUrl(OG_IMAGE_PATH),
@@ -49,12 +55,19 @@ export function pageMetadata(input: {
   description: string;
   path: string;
   index?: boolean;
-  images?: { url: string; alt?: string }[];
+  images?: { url: string; alt?: string; width?: number; height?: number }[];
   type?: "website" | "article";
+  priceAmount?: number;
+  priceCurrency?: string;
 }): Metadata {
   const url = absUrl(input.path);
   const images = input.images?.length
-    ? input.images.map((img) => ({ url: img.url, alt: img.alt ?? input.title }))
+    ? input.images.map((img) => ({
+        url: absoluteAssetUrl(img.url),
+        alt: img.alt ?? input.title,
+        width: img.width ?? 1200,
+        height: img.height ?? 630,
+      }))
     : [defaultOgImage()];
   const index = input.index !== false;
   return {
@@ -79,6 +92,12 @@ export function pageMetadata(input: {
     },
     other: {
       "og:image:alt": images[0]?.alt ?? input.title,
+      ...(input.priceAmount != null
+        ? {
+            "product:price:amount": String(input.priceAmount),
+            "product:price:currency": input.priceCurrency ?? "TRY",
+          }
+        : {}),
     },
   };
 }
@@ -110,9 +129,9 @@ export function organizationJsonLd() {
   return {
     "@type": "Organization",
     "@id": `${CANONICAL_ORIGIN}/#organization`,
-    name: LEGAL_COMPANY,
-    legalName: LEGAL_COMPANY,
-    alternateName: [LEGAL_BRAND, "AlsatPort"],
+    name: LEGAL_BRAND,
+    ...(LEGAL_DATA_CONTROLLER_NAME ? { legalName: LEGAL_DATA_CONTROLLER_NAME } : {}),
+    alternateName: ["AlsatPort", "AlSatPort.com"],
     url: CANONICAL_ORIGIN,
     logo: {
       "@type": "ImageObject",
@@ -125,22 +144,17 @@ export function organizationJsonLd() {
     },
     image: absUrl(OG_IMAGE_PATH),
     email: LEGAL_EMAIL_DESTEK,
-    telephone: LEGAL_PHONE_E164,
-    address: {
-      "@type": "PostalAddress",
-      streetAddress: LEGAL_ADDRESS,
-      addressLocality: "İstanbul",
-      addressCountry: "TR",
-    },
+    ...(LEGAL_ADDRESS
+      ? { address: { "@type": "PostalAddress", streetAddress: LEGAL_ADDRESS, addressCountry: "TR" } }
+      : {}),
     contactPoint: {
       "@type": "ContactPoint",
       contactType: "customer support",
       email: LEGAL_EMAIL_DESTEK,
-      telephone: LEGAL_PHONE_E164,
       areaServed: "TR",
       availableLanguage: ["Turkish", "English"],
     },
-    sameAs: [LEGAL_WEB, ...LEGAL_SOCIAL],
+    sameAs: [...new Set([LEGAL_INSTAGRAM, ...LEGAL_SOCIAL])],
     description: SEO_DESCRIPTION,
   };
 }
@@ -314,7 +328,7 @@ export function listingJsonLd(input: {
       "@type": "Product",
       name: input.title,
       description: input.description.slice(0, 5000),
-      image: input.images.slice(0, 8),
+      image: input.images.slice(0, 8).map(absoluteAssetUrl),
       category: input.categoryName,
     },
   };

@@ -1,9 +1,33 @@
 "use client";
 
-import { HelpCircle } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
+import { SearchSelect } from "@/components/SearchSelect";
 import { useI18n } from "@/context/I18nContext";
 import { TURKEY_CITIES, districtsOf } from "@/data/turkey";
+
+function SheetAcc({
+  title,
+  value,
+  open,
+  children,
+}: {
+  title: string;
+  value?: string;
+  open?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details className="flt-acc flt-acc-sheet" open={open}>
+      <summary className="flt-acc-sum">
+        <span className="flt-acc-title">{title}</span>
+        {value ? <span className="flt-acc-val">{value}</span> : null}
+        <ChevronDown className="flt-acc-chev h-4 w-4" />
+      </summary>
+      <div className="flt-acc-body">{children}</div>
+    </details>
+  );
+}
 
 export const STD_DATE_PRESETS = [
   { id: "", labelKey: "acil.date.any" },
@@ -23,6 +47,7 @@ export const STD_FRESH_PRESETS = [
 
 export function StdFilterSidebar({
   cats,
+  primary,
   extra,
   plugins,
   city,
@@ -32,8 +57,9 @@ export function StdFilterSidebar({
   draft,
   includeDesc,
   more,
+  compact,
+  resultCount,
   datePresets = STD_DATE_PRESETS,
-  radioName = "std-date",
   onCity,
   onDistrict,
   onPosted,
@@ -42,8 +68,11 @@ export function StdFilterSidebar({
   onIncludeDesc,
   onMore,
   onSearch,
+  onClear,
+  tail,
 }: {
   cats?: ReactNode;
+  primary?: ReactNode;
   extra?: ReactNode;
   plugins?: ReactNode;
   city: string;
@@ -53,8 +82,9 @@ export function StdFilterSidebar({
   draft: string;
   includeDesc: boolean;
   more: boolean;
+  compact?: boolean;
+  resultCount?: number;
   datePresets?: readonly { id: string; labelKey: string }[];
-  radioName?: string;
   onCity: (value: string) => void;
   onDistrict: (value: string) => void;
   onPosted: (value: string) => void;
@@ -63,109 +93,131 @@ export function StdFilterSidebar({
   onIncludeDesc: (value: boolean) => void;
   onMore: () => void;
   onSearch: () => void;
+  onClear?: () => void;
+  tail?: ReactNode;
 }) {
   const { t } = useI18n();
   const districts = city ? districtsOf(city) : [];
+  const dateLabel = datePresets.find((p) => p.id === posted);
+  const locLabel = [city, district].filter(Boolean).join(" / ") || t("acil.turkey");
+  const searchLabel =
+    resultCount != null ? t("flt.apply", { n: resultCount }) : t("common.search");
+  const hasMore = Boolean(extra || plugins);
 
-  return (
+  const fields = (
     <>
       {cats}
 
-      <section className="acil-flt">
-        <h2>{t("acil.address")}</h2>
-        <label className="acil-field">
-          <span>{t("acil.il")}</span>
-          <select
-            value={city}
-            onChange={(e) => {
-              onCity(e.target.value);
-              onDistrict("");
-            }}
-          >
-            <option value="">{t("acil.turkey")}</option>
-            {TURKEY_CITIES.map((c) => (
-              <option key={c.name} value={c.name}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="acil-field">
-          <span>{t("acil.ilce")}</span>
-          <select value={district} onChange={(e) => onDistrict(e.target.value)} disabled={!city}>
-            <option value="">{t("acil.ilce")}</option>
-            {districts.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
-        </label>
-      </section>
-
-      <section className="acil-flt">
-        <h2>{t("acil.date")}</h2>
-        <div className="acil-radios">
-          {datePresets.map((p) => (
-            <label key={p.id || "any"}>
-              <input
-                type="radio"
-                name={radioName}
-                checked={posted === p.id}
-                onChange={() => onPosted(p.id)}
-              />
-              {t(p.labelKey)}
-            </label>
-          ))}
-        </div>
-      </section>
-
-      <section className="acil-flt">
-        <h2>{t("acil.map")}</h2>
-        <label className="acil-check">
-          <input type="checkbox" checked={mappedOnly} onChange={(e) => onMappedOnly(e.target.checked)} />
-          {t("acil.mapOnly")}
-        </label>
-      </section>
-
-      <section className="acil-flt">
-        <h2>{t("acil.word")}</h2>
-        <input
-          className="acil-input"
-          value={draft}
-          onChange={(e) => onDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onSearch();
+      <SheetAcc title={t("acil.address")} value={locLabel} open={Boolean(city)}>
+        <SearchSelect
+          label={t("acil.il")}
+          value={city}
+          options={TURKEY_CITIES.map((c) => c.name)}
+          placeholder={t("acil.turkey")}
+          anyLabel={t("acil.turkey")}
+          onChange={(v) => {
+            onCity(v);
+            onDistrict("");
           }}
-          placeholder={t("acil.wordPh")}
         />
-        <label className="acil-check">
-          <input type="checkbox" checked={includeDesc} onChange={(e) => onIncludeDesc(e.target.checked)} />
-          {t("acil.inclDesc")}
-        </label>
-      </section>
+        <SearchSelect
+          label={t("acil.ilce")}
+          value={district}
+          options={districts}
+          placeholder={t("acil.ilce")}
+          disabled={!city}
+          anyLabel={t("acil.ilce")}
+          onChange={onDistrict}
+        />
+      </SheetAcc>
 
-      {plugins}
+      {primary}
 
-      {extra ? (
+      <SheetAcc title={t("acil.date")} value={dateLabel ? t(dateLabel.labelKey) : undefined} open={Boolean(posted)}>
+        <div className="acil-date-btns" role="radiogroup" aria-label={t("acil.date")}>
+          {datePresets.map((p) => {
+            const on = posted === p.id;
+            return (
+              <button
+                key={p.id || "any"}
+                type="button"
+                className={on ? "is-on" : ""}
+                aria-pressed={on}
+                onClick={() => onPosted(p.id)}
+              >
+                {t(p.labelKey)}
+              </button>
+            );
+          })}
+        </div>
+      </SheetAcc>
+
+      {more ? (
         <>
-          <button type="button" className="acil-more" onClick={onMore}>
-            {more ? t("acil.moreHide") : t("acil.more")}
-            <HelpCircle className="h-3.5 w-3.5" />
-          </button>
-          {more ? (
-            <div className="acil-extra">
-              <p className="acil-live-hint">{t("acil.picksHint")}</p>
-              {extra}
-            </div>
-          ) : null}
+          <SheetAcc title={t("acil.map")} open={mappedOnly}>
+            <label className="acil-check">
+              <input type="checkbox" checked={mappedOnly} onChange={(e) => onMappedOnly(e.target.checked)} />
+              {t("acil.mapOnly")}
+            </label>
+          </SheetAcc>
+          <SheetAcc title={t("acil.word")} open={Boolean(draft)}>
+            <input
+              className="acil-input"
+              value={draft}
+              onChange={(e) => onDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onSearch();
+              }}
+              placeholder={t("acil.wordPh")}
+            />
+            <label className="acil-check">
+              <input type="checkbox" checked={includeDesc} onChange={(e) => onIncludeDesc(e.target.checked)} />
+              {t("acil.inclDesc")}
+            </label>
+          </SheetAcc>
+          {plugins}
+          {extra}
         </>
       ) : null}
 
-      <p className="acil-live-hint">{t("acil.liveHint")}</p>
+      {hasMore || !more ? (
+        <button type="button" className="flt-more-btn" onClick={onMore}>
+          {more ? t("flt.lessBtn") : `+ ${t("flt.moreBtn")}`}
+        </button>
+      ) : null}
+    </>
+  );
+
+  const actions = (
+    <div className={`flt-apply-row ${compact ? "is-sheet" : ""}`}>
+      {onClear ? (
+        <button type="button" className="flt-clear-btn" onClick={onClear}>
+          {t("flt.clearShort")}
+        </button>
+      ) : null}
       <button type="button" className="acil-search-btn" onClick={onSearch}>
-        {t("common.search")}
+        {searchLabel}
       </button>
+    </div>
+  );
+
+  if (compact) {
+    return (
+      <>
+        <div data-filter-scroll className="filter-sheet-body min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          {fields}
+          {tail}
+        </div>
+        <div className="filter-sheet-foot sticky bottom-0 z-20 mt-auto w-full shrink-0">{actions}</div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {fields}
+      {actions}
+      {tail}
     </>
   );
 }

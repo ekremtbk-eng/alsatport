@@ -1,9 +1,11 @@
-/** Launch window: full VIP-class access, no checkout. Flip PAYMENTS_PAUSED to restore PayTR. */
-export const COMPLIMENTARY_ACCESS_DAYS = 90;
-export const COMPLIMENTARY_LISTING_ALLOWANCE = 10_000;
+/** Platform is permanently free: unlimited listings, no PayTR / paid plans. */
+export const PLATFORM_FREE = true;
 export const PAYMENTS_PAUSED = true;
+export const COMPLIMENTARY_ACCESS_DAYS = 365;
+export const COMPLIMENTARY_LISTING_ALLOWANCE = 1_000_000;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const ACCOUNT_GRANT_DAYS = 3650;
 
 export type OpenAccessUser = {
   plan?: string;
@@ -14,20 +16,27 @@ export type OpenAccessUser = {
 };
 
 export function paymentsPaused() {
-  return PAYMENTS_PAUSED;
+  return PLATFORM_FREE || PAYMENTS_PAUSED;
 }
 
 export function complimentaryUntil(from = Date.now()) {
-  return from + COMPLIMENTARY_ACCESS_DAYS * DAY_MS;
+  return from + ACCOUNT_GRANT_DAYS * DAY_MS;
 }
 
 export function hasOpenAccess(user: OpenAccessUser | null | undefined, now = Date.now()) {
+  if (paymentsPaused()) return true;
   return (user?.openAccessUntil ?? 0) > now;
 }
 
-/** One-time 3-month grant. A past openAccessUntil means the campaign already ran — do not renew. */
+/** Keep VIP-class rights while the platform is free; renew only after expiry. */
 export function grantComplimentaryAccessOnce<T extends OpenAccessUser>(user: T, now = Date.now()): T {
-  if ((user.openAccessUntil ?? 0) > 0) return user;
+  if (paymentsPaused() && (user.openAccessUntil ?? 0) > now) {
+    if (user.plan === "vip" && (user.planListingAllowance ?? 0) >= COMPLIMENTARY_LISTING_ALLOWANCE) {
+      return user;
+    }
+  } else if (!paymentsPaused() && (user.openAccessUntil ?? 0) > 0) {
+    return user;
+  }
   const until = complimentaryUntil(now);
   return {
     ...user,
@@ -35,6 +44,6 @@ export function grantComplimentaryAccessOnce<T extends OpenAccessUser>(user: T, 
     planListingAllowance: Math.max(user.planListingAllowance ?? 0, COMPLIMENTARY_LISTING_ALLOWANCE),
     planUntil: Math.max(user.planUntil ?? 0, until),
     dopingUntil: Math.max(user.dopingUntil ?? 0, until),
-    openAccessUntil: until,
+    openAccessUntil: Math.max(user.openAccessUntil ?? 0, until),
   };
 }

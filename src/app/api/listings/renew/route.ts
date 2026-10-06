@@ -4,6 +4,8 @@ import { expiresAtForUser } from "@/lib/listingQuota";
 import { entitlementsChanged, reconcileEntitlements } from "@/lib/entitlements";
 import { saveUser } from "@/lib/security/userStore";
 import { renewListingRecord } from "@/lib/listings/store";
+import { readJson } from "@/lib/security/parseBody";
+import { idBodySchema } from "@/lib/security/schemas";
 
 export async function POST(req: Request) {
   const blocked = await requireMutatingRequest(req);
@@ -16,20 +18,19 @@ export async function POST(req: Request) {
     await saveUser(auth.user);
   }
 
-  const body = (await req.json().catch(() => null)) as { id?: string } | null;
-  if (!body?.id) {
-    return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
-  }
+  const parsed = await readJson(req, idBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const id = parsed.data.id;
 
   const expiresAt = expiresAtForUser(auth.user.profile);
-  const renewed = await renewListingRecord(auth.user, body.id, expiresAt);
+  const renewed = await renewListingRecord(auth.user, id, expiresAt);
   if ("error" in renewed) {
     return NextResponse.json({ ok: false, error: renewed.error }, { status: renewed.status });
   }
 
   return NextResponse.json({
     ok: true,
-    id: body.id,
+    id,
     expiresAt,
     listingStatus: "active" as const,
     listing: renewed.listing,

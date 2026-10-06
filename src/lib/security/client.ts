@@ -16,11 +16,20 @@ export function resetCsrfToken() {
   csrfToken = "";
 }
 
-export async function apiUpload<T>(url: string, file: File): Promise<T & { status: number }> {
+export async function apiUpload<T>(
+  url: string,
+  file: File,
+  extra?: Record<string, string>,
+): Promise<T & { status: number }> {
   const token = await getCsrfToken();
   const fp = await deviceFingerprint();
   const body = new FormData();
   body.append("file", file);
+  if (extra) {
+    for (const [key, value] of Object.entries(extra)) {
+      if (value) body.append(key, value);
+    }
+  }
   const res = await fetch(url, {
     method: "POST",
     credentials: "include",

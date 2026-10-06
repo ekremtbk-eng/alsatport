@@ -1,44 +1,25 @@
 import type { Category } from "@/data/categories";
-import { categories, walkCategories } from "@/data/categories";
+import { categories, rootOf, walkCategories } from "@/data/categories";
 import { isBannedLiveAnimalCategory } from "@/lib/liveAnimalPolicy";
 import type { Listing } from "@/data/store";
 import { TUTOR_PLACES, tutorLevelsFor, tutorSubjectsFor } from "@/data/tutorOptions";
 import {
   AUTO_PART_PRODUCTS,
-  BATHS,
-  BUILDING_AGES,
   brandNamesForSegment,
-  DEED_STATUS,
-  FLOOR_COUNTS,
-  FURNISHED_YN,
-  HEATING,
-  JOB_EDUCATION,
-  JOB_EXPERIENCE_LEVELS,
-  JOB_WORK_MODES,
-  LISTING_FROM,
   HELMET_BRANDS,
-  HELMET_FEATURES,
-  HELMET_TYPES,
-  MOTO_BOOT_SIZES,
+  JOB_WORK_MODES,
   MOTO_GEAR_BRANDS,
-  MOTO_JACKET_FEATURES,
-  CLASSIFIED_SHOP_OPTS,
-  SWAP_YN,
-  PART_BRANDS,
-  PART_FROM,
-  SEA_EQUIP_BRANDS,
-  SEA_EQUIP_FEATURES,
-  seaEquipProductsFor,
-  seaEquipGroupById,
   ROOMS,
-  USAGE_STATUS,
-  USED_PART,
+  SEA_EQUIP_BRANDS,
+  seaEquipGroupById,
+  seaEquipProductsFor,
 } from "@/data/listingOptions";
-import { motoGearProductFromId, partsVehicleTypeFromId } from "@/data/listingSchema";
-import { isSeaEquipCategoryId } from "@/data/seaEquip";
+import { motoGearProductFromId } from "@/data/listingSchema";
 import { mahalleFor } from "@/data/regionProfiles";
+import { featuresForListing, specsForListing, vehicleTitleBits } from "@/data/demoSpecs";
 
-export const DEMO_PER_CATEGORY = 23;
+export const DEMO_PER_CATEGORY = 8;
+export const DEMO_LISTING_PREFIX = "APD-";
 
 const U = (id: string) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1200&q=80`;
@@ -224,7 +205,7 @@ const PLACES: [string, string][] = [
   ["Tekirdağ", "Çorlu"],
 ];
 
-const SELLERS = [
+export const DEMO_SELLERS = [
   {
     id: "u-selim",
     name: "Selim Demir",
@@ -523,6 +504,10 @@ const OTHER_FIRMS = [
 ];
 
 function titleFor(cat: Category, i: number) {
+  const vasita = vehicleTitleBits(cat, i);
+  if (vasita) {
+    return `${vasita.year} ${vasita.brand} ${vasita.model}${vasita.trim ? ` ${vasita.trim}` : ""}`;
+  }
   const n = cat.name;
   if (cat.id.startsWith("tutors")) {
     const subjects = tutorSubjectsFor(cat.id);
@@ -648,114 +633,13 @@ function pick<T>(arr: T[], n: number, offset: number) {
   return Array.from({ length: Math.min(n, Math.max(arr.length, n)) }, (_, i) => arr[(offset + i) % arr.length]!);
 }
 
-function estateSpecs(cat: Category, i: number, city: string, district: string, hood: string) {
-  const deal = cat.id.includes("gunluk")
-    ? "Turistik Günlük Kiralık"
-    : cat.id.includes("devren")
-      ? "Devren Satılık Konut"
-      : cat.id.includes("kiralik")
-        ? "Kiralık"
-        : "Satılık";
-  return [
-    { label: "Kategori", value: cat.name },
-    { label: "İlan tipi", value: deal },
-    { label: "Emlak tipi", value: cat.name },
-    { label: "Oda", value: ROOMS[i % ROOMS.length] },
-    { label: "m²", value: String(85 + i * 6) },
-    { label: "Net m²", value: String(72 + i * 5) },
-    { label: "Bina yaşı", value: BUILDING_AGES[i % BUILDING_AGES.length] },
-    { label: "Kat sayısı", value: FLOOR_COUNTS[i % FLOOR_COUNTS.length] },
-    { label: "Kat", value: String((i % 9) + 1) },
-    { label: "Isıtma", value: HEATING[i % HEATING.length] },
-    { label: "Banyo", value: BATHS[i % BATHS.length] },
-    { label: "Balkon", value: i % 4 === 0 ? "Yok" : "Var" },
-    { label: "Asansör", value: i % 3 === 0 ? "Yok" : "Var" },
-    { label: "Otopark", value: i % 5 === 0 ? "Yok" : "Kapalı Otopark" },
-    { label: "Eşyalı", value: FURNISHED_YN[i % FURNISHED_YN.length] },
-    { label: "Kullanım durumu", value: USAGE_STATUS[i % USAGE_STATUS.length] },
-    { label: "Site içerisinde", value: i % 2 === 0 ? "Evet" : "Hayır" },
-    { label: "Krediye uygun", value: i % 3 === 0 ? "Hayır" : "Evet" },
-    { label: "Tapu durumu", value: DEED_STATUS[i % DEED_STATUS.length] },
-    { label: "Kimden", value: LISTING_FROM[i % LISTING_FROM.length] },
-    { label: "Mahalle", value: hood },
-    { label: "Konum", value: `${city} / ${district} / ${hood}` },
-  ];
-}
-
-function motoSpecs(cat: Category, i: number) {
-  const product = motoGearProductFromId(cat.id) ?? (cat.parentId === "parts-moto-gear" ? cat.name : undefined);
-  const isHelmet = product === "Kask";
-  const isBoots = product === "Ayakkabı & Bot";
-  const rows = [
-    { label: "Ürün Grubu", value: cat.id.includes("gear") ? "Kask, Kıyafet & Ekipman" : cat.name },
-  ];
-  if (product) rows.push({ label: "Ürün", value: product });
-  if (isHelmet) rows.push({ label: "Türü", value: HELMET_TYPES[i % HELMET_TYPES.length] });
-  rows.push({
-    label: "Marka",
-    value: isHelmet ? HELMET_BRANDS[i % HELMET_BRANDS.length] : MOTO_GEAR_BRANDS[i % MOTO_GEAR_BRANDS.length],
-  });
-  rows.push({
-    label: "Ölçü",
-    value: isBoots ? MOTO_BOOT_SIZES[i % MOTO_BOOT_SIZES.length] : ["XS", "S", "M", "L", "XL", "XXL"][i % 6],
-  });
-  rows.push({ label: "Kimden", value: PART_FROM[i % PART_FROM.length] });
-  rows.push({ label: "Takas", value: SWAP_YN[i % SWAP_YN.length] });
-  rows.push({ label: "Durumu", value: i % 3 === 0 ? "Sıfır" : "İkinci El" });
-  return rows;
-}
-
-function seaSpecs(cat: Category, i: number) {
-  const products = seaEquipProductsFor(cat.id);
-  const product = products[i % Math.max(1, products.length)] ?? cat.name;
-  const group = seaEquipGroupById(cat.id);
-  return [
-    { label: "Ürün Grubu", value: group?.name ?? "Deniz Aracı Ekipmanları" },
-    { label: "Ürün", value: product },
-    { label: "Marka", value: SEA_EQUIP_BRANDS[i % SEA_EQUIP_BRANDS.length] },
-    { label: "Kimden", value: PART_FROM[i % PART_FROM.length] },
-    { label: "Takas", value: SWAP_YN[i % SWAP_YN.length] },
-    { label: "Durumu", value: i % 3 === 0 ? "Sıfır" : "İkinci El" },
-  ];
-}
-
-function seaFeatures(i: number) {
-  const shop = CLASSIFIED_SHOP_OPTS.filter((_, idx) => (i + idx) % 2 === 0);
-  const extras = SEA_EQUIP_FEATURES.filter((_, idx) => (i + idx) % 2 === 0);
-  return [...extras, ...shop, ...(i % 5 === 0 ? ["Video"] : [])];
-}
-
-function motoFeatures(cat: Category, i: number) {
-  const shop = CLASSIFIED_SHOP_OPTS.filter((_, idx) => (i + idx) % 2 === 0);
-  const product = motoGearProductFromId(cat.id);
-  const extras =
-    product === "Kask"
-      ? HELMET_FEATURES.filter((_, idx) => idx < 3 || i % 2 === 0)
-      : product === "Mont" || product === "Tulum"
-        ? MOTO_JACKET_FEATURES.filter((_, idx) => (i + idx) % 2 === 0)
-        : [];
-  return [...extras, ...shop];
-}
-
-function partsSpecs(cat: Category, i: number) {
-  const brands = brandNamesForSegment("auto");
-  const tipi = partsVehicleTypeFromId(cat.id) || cat.name;
-  return [
-    { label: "Tipi", value: tipi },
-    { label: "Ürün", value: AUTO_PART_PRODUCTS[i % AUTO_PART_PRODUCTS.length] },
-    { label: "Araç Markası", value: brands[i % brands.length] },
-    { label: "Araç Serisi", value: ["Civic", "Focus", "Golf", "Corolla", "Megane"][i % 5] },
-    { label: "Ürün Markası", value: PART_BRANDS[i % PART_BRANDS.length] },
-    { label: "Kimden", value: PART_FROM[i % PART_FROM.length] },
-    { label: "Çıkma Yedek Parça", value: USED_PART[i % USED_PART.length] },
-    { label: "Durumu", value: i % 3 === 0 ? "Sıfır" : "İkinci El" },
-  ];
-}
+const AGE_HOURS = [4, 16, 40, 80, 140, 260, 400, 720];
 
 export function buildDemoListings(): Listing[] {
   const nodes: Category[] = [];
   walkCategories(categories, (c) => {
     if (isBannedLiveAnimalCategory(c.id)) return;
+    if (c.children?.length) return;
     nodes.push(c);
   });
 
@@ -764,14 +648,20 @@ export function buildDemoListings(): Listing[] {
 
   for (const cat of nodes) {
     const pool = photosFor(cat.id);
-    for (let i = 0; i < DEMO_PER_CATEGORY; i++) {
-      const seller = SELLERS[(hash(cat.id) + i) % SELLERS.length];
+    const per =
+      cat.id.startsWith("services") || cat.id.startsWith("jobs") || cat.id.startsWith("tutors") || cat.id.startsWith("helpers")
+        ? 5
+        : DEMO_PER_CATEGORY;
+    for (let i = 0; i < per; i++) {
+      const seller = DEMO_SELLERS[(hash(cat.id) + i) % DEMO_SELLERS.length];
       const [city, district] = PLACES[(hash(cat.id) + i * 3) % PLACES.length];
-      const hood = mahalleFor(city, district, `d-${cat.id}-${i + 1}`);
-      const imgs = pick(pool, cat.id.startsWith("parts") ? 7 : 3, hash(cat.id) + i);
-      const postedAt = now - (i % 18) * 2.4 * 3_600_000;
+      const listingKey = `d-${cat.id}-${i + 1}`;
+      const hood = mahalleFor(city, district, listingKey);
+      const imgs = pick(pool, cat.id.startsWith("parts") ? 5 : 3, hash(cat.id) + i);
+      const postedAt = now - AGE_HOURS[i % AGE_HOURS.length]! * 3_600_000;
+      const root = rootOf(cat).id;
       out.push({
-        id: `d-${cat.id}-${i + 1}`,
+        id: listingKey,
         title: titleFor(cat, i),
         subtitle: subtitleFor(cat, i),
         price: priceFor(cat.id, i),
@@ -780,77 +670,22 @@ export function buildDemoListings(): Listing[] {
         district,
         neighborhood: hood,
         images: imgs,
-        description: descFor(cat, city, district, `d-${cat.id}-${i + 1}`),
-        features:
-          isSeaEquipCategoryId(cat.id)
-            ? seaFeatures(i)
-            : cat.id.startsWith("parts-moto")
-            ? motoFeatures(cat, i)
-            : (cat.id.startsWith("services-move") ||
-            cat.id.startsWith("services-auto") ||
-            cat.id.startsWith("services-repair") ||
-            cat.id.startsWith("services-event") ||
-            cat.id.startsWith("services-other")) &&
-          i % 3 === 0
-            ? ["7/24"]
-            : cat.id.startsWith("services-reno") && i % 4 === 0
-              ? ["7/24"]
-              : cat.id.startsWith("emlak") && i % 2 === 0
-                ? ["Site İçerisinde"]
-                : undefined,
+        description: descFor(cat, city, district, listingKey),
+        features: featuresForListing(cat, i),
         sellerId: seller.id,
         sellerName: seller.name,
         sellerAvatar: seller.avatar,
         sellerVerified: seller.verified,
-        createdAt:
-          cat.id.startsWith("parts-auto-spare") || cat.id.startsWith("parts-moto") || isSeaEquipCategoryId(cat.id)
-          ? new Date(postedAt).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })
-          : i < 3
-            ? `${i + 1} saat önce`
-            : `${Math.min(i, 20)} gün önce`,
+        createdAt: new Date(postedAt).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" }),
         views: 40 + ((hash(cat.id) + i * 17) % 900),
         featured: i % 8 === 0,
-        vip: i % 11 === 0,
+        vip: i % 11 === 0 || (seller.verified && i % 5 === 0),
         status: "active",
-        specs: cat.id.startsWith("tutors")
-          ? [
-              { label: "Kategori", value: cat.name },
-              { label: "Ders", value: tutorSubjectsFor(cat.id)[i % tutorSubjectsFor(cat.id).length] },
-              { label: "Seviye", value: tutorLevelsFor(cat.id)[i % tutorLevelsFor(cat.id).length] },
-              { label: "Yer", value: TUTOR_PLACES[i % TUTOR_PLACES.length] },
-              { label: "Konum", value: `${city} / ${district}` },
-            ]
-          : cat.id.startsWith("jobs-beauty")
-            ? [
-                { label: "Kategori", value: cat.name },
-                { label: "Çalışma", value: JOB_WORK_MODES[i % JOB_WORK_MODES.length] },
-                { label: "Eğitim", value: JOB_EDUCATION[i % JOB_EDUCATION.length] },
-                { label: "Deneyim", value: JOB_EXPERIENCE_LEVELS[i % JOB_EXPERIENCE_LEVELS.length] },
-                { label: "Konum", value: `${city} / ${district}` },
-              ]
-            : cat.id.startsWith("emlak")
-              ? estateSpecs(cat, i, city, district, hood)
-              : isSeaEquipCategoryId(cat.id)
-                ? seaSpecs(cat, i)
-              : cat.id.startsWith("parts-moto")
-                ? motoSpecs(cat, i)
-              : cat.id.startsWith("parts-auto-spare")
-                ? partsSpecs(cat, i)
-                : cat.id.startsWith("parts")
-                ? [
-                    { label: "Kategori", value: cat.name },
-                    { label: "Durum", value: i % 3 === 0 ? "Sıfır" : "İkinci El" },
-                    { label: "Konum", value: `${city} / ${district}` },
-                  ]
-                : [
-                  { label: "Kategori", value: cat.name },
-                  { label: "Durum", value: i % 3 === 0 ? "Sıfır" : "İkinci el" },
-                  { label: "Konum", value: `${city} / ${district}` },
-                ],
-        listingNo: `${(hash(cat.id) % 90) + 10}${String(i + 1).padStart(6, "0")}`,
+        specs: specsForListing(cat, i, city, district, hood),
+        listingNo: `${DEMO_LISTING_PREFIX}${hash(listingKey).toString(16).slice(0, 8)}`.slice(0, 20),
         postedAt,
         urgent: i % 3 === 0,
-        refurbished: cat.circular ? i % 4 === 0 : false,
+        refurbished: (cat.circular || root === "shopping") && i % 4 === 0,
       });
     }
   }

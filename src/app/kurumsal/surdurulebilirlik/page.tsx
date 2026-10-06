@@ -1,15 +1,11 @@
 "use client";
 
-import { Leaf, Recycle, Users } from "lucide-react";
+import { Recycle } from "lucide-react";
 import { useI18n } from "@/context/I18nContext";
 
 export default function SustainabilityPage() {
   const { t } = useI18n();
-  const cards = [
-    { icon: Recycle, title: t("corp.sus.h"), text: t("corp.sus.p") },
-    { icon: Leaf, title: t("stat.sup"), text: t("stat.suph") },
-    { icon: Users, title: t("corp.hr.h"), text: t("corp.hr.p") },
-  ];
+  const cards = [{ icon: Recycle, title: t("corp.sus.h"), text: t("corp.sus.p") }];
   return (
     <article className="legal-prose">
       <p className="text-xs font-semibold uppercase tracking-wider text-lime">{t("corp.nav.surdurulebilirlik")}</p>

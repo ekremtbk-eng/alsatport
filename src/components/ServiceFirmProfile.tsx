@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, ChevronLeft, ChevronRight, Home, MapPin, Star } from "lucide-react";
@@ -12,6 +12,8 @@ import { useI18n } from "@/context/I18nContext";
 import { useAuthModal } from "@/context/AuthModalContext";
 import { gatePath } from "@/lib/profile";
 import { SellerChatPopup } from "@/components/SellerChatPopup";
+import { ListingShareTrigger } from "@/components/listing/ListingShare";
+import { ProtectedPhoto } from "@/components/ProtectedPhoto";
 import { StarRating } from "@/components/StarRating";
 import { useSellerReviews } from "@/components/useSellerReviews";
 import { summarizeReviews } from "@/data/reviews";
@@ -19,10 +21,12 @@ import {
   buildFirmProfile,
   syntheticFirmReviews,
 } from "@/lib/serviceFirm";
+import { loadRegionCoords, regionVersion, type RegionCoords } from "@/lib/regionClient";
+import { reviewAuthorLabel } from "@/lib/publicName";
 
 export function ServiceFirmProfile({ listing }: { listing: Listing }) {
   const { user, reviewsFor } = useApp();
-  const { t } = useI18n();
+  const { t, formatMoney } = useI18n();
   const { requireAuth } = useAuthModal();
   const router = useRouter();
   const live = useSellerReviews(listing.sellerId);
@@ -44,6 +48,22 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
   const [hint, setHint] = useState("");
   const [revText, setRevText] = useState("");
   const [revStars, setRevStars] = useState(5);
+  const [mapCoords, setMapCoords] = useState<RegionCoords>(
+    listing.lat != null && listing.lng != null ? { lat: listing.lat, lng: listing.lng } : null,
+  );
+  const regionKey = regionVersion(listing);
+
+  useEffect(() => {
+    if (listing.status !== "active") return;
+    let alive = true;
+    void loadRegionCoords(listing).then((c) => {
+      if (alive && c) setMapCoords(c);
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regionKey]);
 
   const phone = getSellerPhone(listing.sellerId, listing);
   const aboutLimit = 280;
@@ -111,7 +131,10 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
     setHint(t("rev.ok"));
   }
 
-  const mapHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${listing.city} ${listing.district}`)}`;
+  const mapQuery = mapCoords
+    ? `${mapCoords.lat},${mapCoords.lng}`
+    : [listing.neighborhood, listing.district, listing.city].filter(Boolean).join(" ");
+  const mapHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`;
 
   return (
     <div className="firm-page">
@@ -184,11 +207,22 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
         </div>
       </header>
 
+      <div className="mb-4">
+        <ListingShareTrigger
+          variant="banner"
+          listingId={listing.id}
+          title={listing.title}
+          priceLabel={formatMoney(listing.price)}
+          imageUrl={listing.images[0] || listing.sellerAvatar}
+          description={listing.description || profile.about}
+          kind="firm"
+        />
+      </div>
+
       <div className="firm-grid">
         <div className="firm-col">
           <section className="firm-about">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={listing.images[0] || listing.sellerAvatar} alt="" />
+            <ProtectedPhoto src={listing.images[0] || listing.sellerAvatar} alt="" />
             <div>
               <h2>{t("firm.about")}</h2>
               <p>
@@ -311,7 +345,7 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
                   <span className="firm-rev-dot" />
                   <div>
                     <div className="firm-rev-meta">
-                      <strong>{r.authorName}</strong>
+                      <strong>{reviewAuthorLabel(r)}</strong>
                       <span className="svc-stars">
                         {[1, 2, 3, 4, 5].map((n) => (
                           <Star key={n} className={`h-3.5 w-3.5 ${n <= r.rating ? "svc-star-on" : "svc-star-off"}`} />

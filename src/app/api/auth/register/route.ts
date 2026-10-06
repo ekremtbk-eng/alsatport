@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
 import { normalizeUsername } from "@/lib/auth";
 import { hashPassword } from "@/lib/security/password";
 import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
@@ -39,8 +40,6 @@ function blankProfile(partial: Partial<UserProfile>): UserProfile {
     ...standardPackageFields(FREE_LISTING_QUOTA),
     fullName: "",
     phone: "",
-    birthDate: "",
-    nationalId: "",
     address: "",
     emailVerified: false,
     profileComplete: false,
@@ -111,6 +110,13 @@ export async function POST(req: Request) {
     role: "seller",
     profile: stampVerification(profile),
   });
+  if (body.marketing) {
+    await prisma.profile.update({
+      where: { userId: user.id },
+      data: { marketingEmail: true, marketingUpdatedAt: new Date() },
+    });
+    user.profile.marketingEmail = true;
+  }
   await recordAccountSignals(user.id, req);
   await sendSignupVerificationEmail({
     userId: user.id,

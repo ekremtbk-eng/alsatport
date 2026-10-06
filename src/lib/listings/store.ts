@@ -2,14 +2,17 @@ import type { ListingStatus, Prisma } from "@prisma/client";
 import type { Listing } from "@/data/store";
 import { prisma } from "@/lib/db";
 import { isUuid } from "@/lib/ids";
-import { isBlockedLiveAnimalListing } from "@/lib/liveAnimalPolicy";
 import { isAllowedListingImageUrl } from "@/lib/listingMedia";
 import { sanitizeMultiline, sanitizeText } from "@/lib/security/sanitize";
 import { sanitizeSearchQuery } from "@/lib/security/inputGuard";
 import { listingCreateBodySchema } from "@/lib/security/schemas";
-import { categoryQueryIds, findCategory } from "@/data/categories";
+import { isBannedLiveAnimalCategory, isBannedLiveAnimalSlug, isBlockedLiveAnimalListing } from "@/lib/liveAnimalPolicy";
+import { categoryQueryIds, lookupCategory } from "@/data/categories";
+import { postedFilterHours } from "@/lib/listingQuery";
 import type { StoredUser } from "@/lib/security/userStore";
 import { deleteStoredObject, isManagedStorageKey, storageKeyFromUrl } from "@/lib/storage/media";
+import { resolveListingCoords, validListingCoords } from "@/lib/placeGeo";
+import { publicAccountName, verifiedBusinessName } from "@/lib/publicName";
 
 export type ListingWithRelations = Prisma.ListingGetPayload<{
   include: {
@@ -53,10 +56,13 @@ export function toClientListing(row: ListingWithRelations): Listing {
     city: row.city,
     district: row.district,
     neighborhood: row.neighborhood || undefined,
+    lat: row.lat ?? undefined,
+    lng: row.lng ?? undefined,
     images,
     description: row.description,
     sellerId: row.sellerId,
-    sellerName: row.seller.profile?.displayName || row.seller.username,
+    sellerName: publicAccountName({ ...row.seller.profile, username: row.seller.username }),
+    sellerBusiness: !!verifiedBusinessName(row.seller.profile),
     sellerAvatar: row.seller.profile?.avatarUrl || "",
     sellerVerified: !!row.seller.profile?.verified,
     createdAt: row.createdAt.toLocaleDateString("tr-TR"),
@@ -64,7 +70,7 @@ export function toClientListing(row: ListingWithRelations): Listing {
     featured: row.featured,
     vip: row.vip,
     status,
-    specs: Array.isArray(row.specs) ? (row.specs as Listing["specs"]) : [],
+    specs: Array.isArray(row.specs) ? (row.specs as Listing["specs"]).filter(validSpec) : [],
     features: Array.isArray(row.features) ? (row.features as string[]) : [],
     chassis: row.chassis && typeof row.chassis === "object" ? (row.chassis as Listing["chassis"]) : undefined,
     listingNo: row.listingNo,
@@ -75,6 +81,17 @@ export function toClientListing(row: ListingWithRelations): Listing {
     sellerPhone: phone || undefined,
     sellerSince,
   };
+}
+
+/** Signed-out visitors only get a masked seller number; the full number requires a session. */
+export function hideSellerPhone(listing: Listing): Listing {
+  if (!listing.sellerPhone) return listing;
+  const d = listing.sellerPhone.replace(/\D/g, "");
+  return { ...listing, sellerPhone: d.length >= 6 ? `${d.slice(0, 4)} *** ** ${d.slice(-2)}` : "*** ** **" };
+}
+
+function validSpec(spec: { label?: string; value?: string } | null | undefined) {
+  return !!spec?.label && !!spec.value && !/\bNaN\b/.test(spec.value);
 }
 
 function uiStatus(value: ListingStatus | "active" | "passive"): ListingStatus {
@@ -104,7 +121,7 @@ export async function listPublicAndOwnedListings(viewerId?: string) {
     },
     include: listingInclude,
     orderBy: [{ featured: "desc" }, { vip: "desc" }, { postedAt: "desc" }],
-    take: 2000,
+    take: 12000,
   });
   return rows.map(toClientListing);
 }
@@ -116,6 +133,7 @@ export async function queryListings(params: {
   district?: string;
   priceMin?: number;
   priceMax?: number;
+  posted?: string;
   status?: "active" | "passive";
   viewerId?: string;
   mine?: boolean;
@@ -152,6 +170,13 @@ export async function queryListings(params: {
   }
   if (params.priceMin != null && Number.isFinite(params.priceMin)) and.push({ price: { gte: params.priceMin } });
   if (params.priceMax != null && Number.isFinite(params.priceMax)) and.push({ price: { lte: params.priceMax } });
+  const postedHours = postedFilterHours(params.posted);
+  if (postedHours > 0) {
+    const since = new Date(Date.now() - postedHours * 3_600_000);
+    and.push({
+      OR: [{ postedAt: { gte: since } }, { AND: [{ postedAt: null }, { createdAt: { gte: since } }] }],
+    });
+  }
   const q = sanitizeSearchQuery(params.q);
   if (q) {
     and.push({
@@ -168,9 +193,33 @@ export async function queryListings(params: {
     where: { AND: and },
     include: listingInclude,
     orderBy: [{ featured: "desc" }, { postedAt: "desc" }],
-    take: 2000,
+    take: 12000,
   });
   return rows.map(toClientListing);
+}
+
+export async function suggestPublicListings(rawQuery: string, take = 8) {
+  const q = sanitizeSearchQuery(rawQuery);
+  if (q.length < 2) return [];
+  const rows = await prisma.listing.findMany({
+    where: {
+      deletedAt: null,
+      status: "active",
+      OR: [
+        { title: { contains: q, mode: "insensitive" } },
+        { subtitle: { contains: q, mode: "insensitive" } },
+      ],
+    },
+    select: { id: true, title: true, categoryId: true, city: true },
+    orderBy: [{ featured: "desc" }, { postedAt: "desc" }],
+    take,
+  });
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    categoryId: row.categoryId,
+    city: row.city,
+  }));
 }
 
 function parseImages(raw: unknown): string[] {
@@ -179,6 +228,15 @@ function parseImages(raw: unknown): string[] {
     .filter((x): x is string => typeof x === "string" && isAllowedListingImageUrl(x.trim()))
     .slice(0, 16)
     .map((u) => u.trim().slice(0, 2000));
+}
+
+/**
+ * New listing photos must come from /api/uploads (re-encoded, metadata stripped) and belong to
+ * the seller; URLs already attached to the listing are kept so older listings stay editable.
+ */
+function ownedImages(urls: string[], sellerId: string, existing: string[] = []) {
+  const prior = new Set(existing);
+  return urls.filter((url) => prior.has(url) || storageKeyFromUrl(url).startsWith(`listings/${sellerId}/`));
 }
 
 export type ListingInput = {
@@ -190,6 +248,8 @@ export type ListingInput = {
   city: string;
   district?: string;
   neighborhood?: string;
+  /** undefined = not sent; null = sent but rejected */
+  coords?: { lat: number; lng: number } | null;
   price: number;
   images: string[];
   specs?: Listing["specs"];
@@ -210,7 +270,13 @@ export function parseListingInput(body: Record<string, unknown> | null): Listing
   if (!checked.success) return { error: "auth.err.required" };
   const title = sanitizeText(String(body.title ?? ""), 120);
   const description = sanitizeMultiline(String(body.description ?? ""), 8000);
-  const categoryId = sanitizeText(String(body.categoryId ?? ""), 64);
+  const rawCategoryId = sanitizeText(String(body.categoryId ?? ""), 64);
+  if (isBannedLiveAnimalCategory(rawCategoryId) || isBannedLiveAnimalSlug(rawCategoryId)) {
+    return { error: "mod.animal.cat" };
+  }
+  const resolvedCat = lookupCategory(rawCategoryId);
+  if (!resolvedCat || resolvedCat.filter) return { error: "auth.err.required" };
+  const categoryId = resolvedCat.id;
   const city = sanitizeText(String(body.city ?? ""), 40);
   const district = sanitizeText(String(body.district ?? ""), 40);
   const neighborhood = sanitizeText(String(body.neighborhood ?? ""), 40);
@@ -220,6 +286,7 @@ export function parseListingInput(body: Record<string, unknown> | null): Listing
     return { error: "auth.err.required" };
   }
   const images = parseImages(body.images);
+  if (!images.length) return { error: "photo.minN" };
   const draft = {
     title,
     description,
@@ -237,10 +304,18 @@ export function parseListingInput(body: Record<string, unknown> | null): Listing
     city,
     district,
     neighborhood,
+    coords: body.lat == null && body.lng == null ? undefined : validListingCoords(body.lat, body.lng, city),
     price,
     images,
-    specs: Array.isArray(body.specs) ? (body.specs as Listing["specs"]) : [],
-    features: Array.isArray(body.features) ? body.features.map((f) => String(f).slice(0, 80)) : [],
+    specs: Array.isArray(body.specs)
+      ? (body.specs as Listing["specs"]).slice(0, 48).map((s) => ({
+          label: sanitizeText(String(s?.label ?? ""), 80),
+          value: sanitizeText(String(s?.value ?? ""), 120),
+        })).filter(validSpec)
+      : [],
+    features: Array.isArray(body.features)
+      ? body.features.map((f) => sanitizeText(String(f), 80)).filter(Boolean)
+      : [],
     chassis: body.chassis && typeof body.chassis === "object" ? (body.chassis as Listing["chassis"]) : undefined,
     urgent: body.urgent === true,
     refurbished: body.refurbished === true,
@@ -274,7 +349,7 @@ function nestedImages(urls: string[]) {
 async function ensureCategoryRow(categoryId: string) {
   const existing = await prisma.category.findUnique({ where: { id: categoryId } });
   if (existing) return existing;
-  const cat = findCategory(categoryId);
+  const cat = lookupCategory(categoryId);
   if (!cat) return null;
   if (cat.parentId) {
     const parent = await ensureCategoryRow(cat.parentId);
@@ -298,6 +373,8 @@ async function ensureCategoryRow(categoryId: string) {
 }
 
 export async function createListing(user: StoredUser, input: ListingInput) {
+  input.images = ownedImages(input.images, user.id);
+  if (!input.images.length) return { error: "photo.minN" as const };
   const category = await ensureCategoryRow(input.categoryId);
   if (!category) return { error: "auth.err.required" as const };
   const id = input.id && /^[0-9a-f-]{36}$/i.test(input.id) ? input.id : crypto.randomUUID();
@@ -309,7 +386,7 @@ export async function createListing(user: StoredUser, input: ListingInput) {
         id,
         listingNo,
         sellerId: user.id,
-        categoryId: input.categoryId,
+        categoryId: category.id,
         title: input.title,
         subtitle: input.subtitle || "",
         description: input.description,
@@ -317,7 +394,9 @@ export async function createListing(user: StoredUser, input: ListingInput) {
         city: input.city,
         district: input.district || "",
         neighborhood: input.neighborhood || "",
-        status: "pending",
+        lat: input.coords?.lat ?? null,
+        lng: input.coords?.lng ?? null,
+        status: "active",
         featured: !!input.featured,
         vip: !!input.vip,
         urgent: !!input.urgent,
@@ -356,6 +435,8 @@ export async function updateListingRecord(user: StoredUser, id: string, patch: R
     city: patch.city ?? existing.city,
     district: patch.district ?? existing.district,
     neighborhood: patch.neighborhood ?? existing.neighborhood,
+    lat: patch.lat,
+    lng: patch.lng,
     price: patch.price ?? Number(existing.price),
     subtitle: patch.subtitle ?? existing.subtitle,
     images: imagesProvided ? patch.images : existing.images.map((i) => i.url),
@@ -367,11 +448,24 @@ export async function updateListingRecord(user: StoredUser, id: string, patch: R
     status: patch.status ?? (existing.status === "active" ? "active" : "passive"),
   });
   if ("error" in parsed) return { error: parsed.error, status: 400 };
-
-  if (patch.categoryId) {
-    const category = await prisma.category.findUnique({ where: { id: parsed.categoryId } });
-    if (!category) return { error: "auth.err.required" as const, status: 400 };
+  if (imagesProvided) {
+    parsed.images = ownedImages(parsed.images, existing.sellerId, existing.images.map((i) => i.url));
+    if (!parsed.images.length) return { error: "photo.minN" as const, status: 400 };
   }
+
+  const category = await ensureCategoryRow(parsed.categoryId);
+  if (!category) return { error: "auth.err.required" as const, status: 400 };
+
+  const locationChanged =
+    parsed.city !== existing.city ||
+    (parsed.district || "") !== existing.district ||
+    (parsed.neighborhood || "") !== existing.neighborhood;
+  const coordsData =
+    parsed.coords !== undefined
+      ? { lat: parsed.coords?.lat ?? null, lng: parsed.coords?.lng ?? null }
+      : locationChanged
+        ? { lat: null, lng: null }
+        : {};
 
   if (imagesProvided) {
     const keep = new Set(parsed.images);
@@ -399,6 +493,7 @@ export async function updateListingRecord(user: StoredUser, id: string, patch: R
         city: parsed.city,
         district: parsed.district || "",
         neighborhood: parsed.neighborhood || "",
+        ...coordsData,
         price: parsed.price,
         status:
           existing.status === "pending" || existing.status === "rejected" || existing.status === "removed"
@@ -416,6 +511,22 @@ export async function updateListingRecord(user: StoredUser, id: string, patch: R
     });
   });
   return { listing: toClientListing(row) };
+}
+
+/** Server-side safety net for a listing that was just saved without coordinates. */
+export async function fillMissingListingCoords(id: string) {
+  const row = await prisma.listing.findFirst({
+    where: { id, deletedAt: null },
+    select: { lat: true, lng: true, city: true, district: true, neighborhood: true },
+  });
+  if (!row || (row.lat != null && row.lng != null)) return;
+  const point = await resolveListingCoords({ city: row.city, district: row.district, neighborhood: row.neighborhood });
+  const coords = point ? validListingCoords(point.lat, point.lng, row.city) : null;
+  if (!coords) return;
+  await prisma.listing.updateMany({
+    where: { id, lat: null, city: row.city, district: row.district, neighborhood: row.neighborhood },
+    data: coords,
+  });
 }
 
 export async function deleteListingRecord(user: StoredUser, id: string) {

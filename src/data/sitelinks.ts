@@ -1,11 +1,19 @@
-/** Visible, crawlable shortcuts Google may promote as SERP sitelinks. */
-export const SITE_SITELINKS = [
-  { id: "emlak", name: "Emlak", href: "/kategoriler/emlak" },
-  { id: "vasita", name: "Vasıta", href: "/kategoriler/vasita" },
-  { id: "parts", name: "Yedek Parça", href: "/kategoriler/yedek-parca" },
-  { id: "shopping", name: "İkinci El", href: "/kategoriler/ikinci-el" },
-  { id: "machines", name: "İş Makineleri", href: "/kategoriler/is-makineleri-sanayi" },
-  { id: "services", name: "Ustalar ve Hizmetler", href: "/ustalar-hizmetler" },
-  { id: "jobs", name: "İş İlanları", href: "/is-ilanlari" },
-  { id: "pets", name: "Hayvanlar Alemi", href: "/kategoriler/hayvanlar-alemi" },
-] as const;
+import { categories, findCategory, hrefForCategory } from "@/data/categories";
+
+function portalHref(id: string, fallback: string) {
+  if (id === "jobs") return "/is-ilanlari";
+  if (id === "services") return "/ustalar-hizmetler";
+  const cat = findCategory(id);
+  return cat ? hrefForCategory(cat) : fallback;
+}
+
+export function categoryBarHref(id: string, slugHref: string) {
+  return portalHref(id, slugHref);
+}
+
+/** Header category strip — real catalog roots, not mock labels. */
+export const SITE_SITELINKS = categories.map((cat) => ({
+  id: cat.id,
+  name: cat.name,
+  href: portalHref(cat.id, hrefForCategory(cat)),
+}));

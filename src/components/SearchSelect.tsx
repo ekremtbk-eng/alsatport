@@ -11,6 +11,8 @@ export function SearchSelect({
   disabled,
   hideLabel,
   anyLabel,
+  emptyLabel,
+  optionCounts,
   onChange,
 }: {
   label: string;
@@ -20,15 +22,21 @@ export function SearchSelect({
   disabled?: boolean;
   hideLabel?: boolean;
   anyLabel?: string;
+  emptyLabel?: string;
+  optionCounts?: Record<string, number>;
   onChange: (v: string) => void;
 }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const list = useMemo(() => {
     const s = q.trim().toLocaleLowerCase("tr");
-    if (!s) return options;
-    return options.filter((o) => o.toLocaleLowerCase("tr").includes(s));
-  }, [options, q]);
+    return options.filter((o) => {
+      if (s && !o.toLocaleLowerCase("tr").includes(s)) return false;
+      if (!optionCounts) return true;
+      if (o === value) return true;
+      return (optionCounts[o] ?? 0) > 0;
+    });
+  }, [options, q, optionCounts, value]);
 
   return (
     <label className={hideLabel ? "block" : "flt-group"}>
@@ -71,7 +79,7 @@ export function SearchSelect({
               </li>
             ) : null}
             {list.length === 0 && (
-              <li className="px-3 py-2 text-xs text-ink">Sonuç yok</li>
+              <li className="px-3 py-2 text-xs text-ink">{emptyLabel ?? "Sonuç yok"}</li>
             )}
             {list.map((o) => (
               <li key={o}>
@@ -88,6 +96,9 @@ export function SearchSelect({
                   }}
                 >
                   {o}
+                  {optionCounts && optionCounts[o] != null ? (
+                    <span className="float-right text-[11px] text-muted">({optionCounts[o]})</span>
+                  ) : null}
                 </button>
               </li>
             ))}

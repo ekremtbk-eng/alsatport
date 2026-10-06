@@ -4,7 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
+  Accessibility,
   BadgeInfo,
+  Ban,
+  QrCode,
+  ShieldCheck,
+  ShieldEllipsis,
   Bell,
   BellRing,
   Bookmark,
@@ -71,12 +76,17 @@ const DASH_ICONS: Record<string, LucideIcon> = {
   hareketler: Receipt,
   iptal: UserX,
   sec: Lock,
+  guvenlik: ShieldCheck,
   sifre: KeyRound,
+  "iki-asama": ShieldEllipsis,
+  engellenenler: Ban,
   cihazlar: Smartphone,
   app: Settings,
   "bildirim-ayarlari": BellRing,
   okundu: Eye,
   pazarlama: Mail,
+  hareket: Accessibility,
+  qr: QrCode,
 };
 
 function DashIcon({ id }: { id: string }) {

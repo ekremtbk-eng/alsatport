@@ -6,6 +6,8 @@ import { createPendingPayment } from "@/lib/payments/store";
 import { createPaytrToken, paytrConfigured } from "@/lib/payments/paytr";
 import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
+import { readJson } from "@/lib/security/parseBody";
+import { checkoutBodySchema } from "@/lib/security/schemas";
 
 export async function POST(req: Request) {
   const blocked = await requireMutatingRequest(req);
@@ -28,11 +30,9 @@ export async function POST(req: Request) {
     );
   }
 
-  const body = (await req.json().catch(() => null)) as { product?: string; legalAccepted?: boolean } | null;
-  if (body?.legalAccepted !== true) {
-    return NextResponse.json({ ok: false, error: "pay.needLegal" }, { status: 400 });
-  }
-  const product = body?.product ?? "";
+  const parsed = await readJson(req, checkoutBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const product = parsed.data.product;
   if (!isPaidShopProduct(product)) {
     return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
   }

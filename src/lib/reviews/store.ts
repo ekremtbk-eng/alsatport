@@ -3,6 +3,7 @@ import type { SellerReview } from "@/data/reviews";
 import { prisma } from "@/lib/db";
 import { isUuid } from "@/lib/ids";
 import { sanitizeMultiline } from "@/lib/security/sanitize";
+import { publicAccountName, verifiedBusinessName } from "@/lib/publicName";
 
 function toClient(row: {
   id: string;
@@ -12,14 +13,23 @@ function toClient(row: {
   rating: number;
   text: string;
   createdAt: Date;
-  author: { username: string; profile: { displayName: string | null; avatarUrl: string | null } | null };
+  author: {
+    username: string;
+    profile: {
+      displayName: string | null;
+      avatarUrl: string | null;
+      businessName: string | null;
+      businessVerifiedAt: Date | null;
+    } | null;
+  };
 }): SellerReview {
   return {
     id: row.id,
     sellerId: row.sellerId,
     listingId: row.listingId ?? undefined,
     authorId: row.authorId,
-    authorName: row.author.profile?.displayName || row.author.username,
+    authorName: publicAccountName({ ...row.author.profile, username: row.author.username }),
+    authorBusiness: !!verifiedBusinessName(row.author.profile),
     authorAvatar: row.author.profile?.avatarUrl || "",
     rating: row.rating,
     text: row.text,

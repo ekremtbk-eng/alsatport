@@ -1,71 +1,177 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import { Check, Link2, Share2, X } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Check, Copy, Share2, X } from "lucide-react";
 import { useI18n } from "@/context/I18nContext";
-import { copyText, listingPublicUrl, listingShareText, socialShareHrefs } from "@/lib/shareListing";
+import { BRAND_MARK_SRC, BRAND_NAME } from "@/lib/brand";
+import { ProtectedPhoto } from "@/components/ProtectedPhoto";
+import {
+  canUseWebShare,
+  copyText,
+  facebookShareHref,
+  listingPublicUrl,
+  listingShareBlurb,
+  listingTelegramText,
+  listingTweetText,
+  listingWebShareData,
+  listingWhatsAppMessage,
+  listingWhatsAppStatusText,
+  telegramShareHref,
+  twitterShareHref,
+  whatsappShareHref,
+} from "@/lib/shareListing";
+
+type ShareVariant = "hero" | "banner" | "icon" | "toolbar" | "dock";
+type ShareKind = "listing" | "firm";
 
 export function ListingShareTrigger({
   variant,
-  onOpen,
+  listingId,
+  title,
+  priceLabel,
+  imageUrl,
+  description,
+  kind = "listing",
 }: {
-  variant: "hero" | "banner" | "icon";
-  onOpen: () => void;
+  variant: ShareVariant;
+  listingId: string;
+  title: string;
+  priceLabel: string;
+  imageUrl?: string;
+  description?: string;
+  kind?: ShareKind;
 }) {
   const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const [toast, setToast] = useState<"copied" | "status" | "failed" | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = window.setTimeout(() => setToast(null), 2400);
+    return () => window.clearTimeout(id);
+  }, [toast]);
+
+  async function startShare() {
+    const url = listingPublicUrl(listingId, kind);
+    const data = listingWebShareData({ title, priceLabel, url });
+    if (canUseWebShare(data)) {
+      try {
+        await navigator.share(data);
+        return;
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+      }
+    }
+    setOpen(true);
+  }
+
+  const toastEl = toast ? (
+    <p className="share-toast" role="status">
+      <Check className="h-4 w-4 shrink-0 text-lime" aria-hidden />
+      {toast === "copied" ? t("share.copied") : toast === "status" ? t("share.statusCopied") : t("share.failed")}
+    </p>
+  ) : null;
+
+  return (
+    <>
+      {toastEl}
+      <ShareOpenButton variant={variant} label={t("share.title")} onClick={() => void startShare()} />
+      <ShareModal
+        open={open}
+        onClose={() => setOpen(false)}
+        listingId={listingId}
+        title={title}
+        priceLabel={priceLabel}
+        imageUrl={imageUrl}
+        description={description}
+        kind={kind}
+        onToast={setToast}
+      />
+    </>
+  );
+}
+
+function ShareOpenButton({
+  variant,
+  label,
+  onClick,
+}: {
+  variant: ShareVariant;
+  label: string;
+  onClick: () => void;
+}) {
   if (variant === "hero") {
     return (
       <button
         type="button"
-        className="grid h-9 w-9 place-items-center rounded-full bg-black/50 text-white"
-        aria-label={t("share.title")}
-        onClick={onOpen}
+        className="relative z-30 grid h-9 w-9 place-items-center rounded-full bg-black/55 text-white shadow-md"
+        aria-label={label}
+        onClick={onClick}
       >
         <Share2 className="h-5 w-5" />
       </button>
     );
   }
-  if (variant === "icon") {
+  if (variant === "icon" || variant === "toolbar") {
     return (
       <button
         type="button"
-        className="hidden h-12 w-12 shrink-0 place-items-center rounded-xl border border-line md:grid"
-        aria-label={t("share.title")}
-        onClick={onOpen}
+        className={
+          variant === "toolbar"
+            ? "classified-icon-btn"
+            : "grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-line"
+        }
+        aria-label={label}
+        onClick={onClick}
       >
         <Share2 className="h-5 w-5" />
+      </button>
+    );
+  }
+  if (variant === "dock") {
+    return (
+      <button type="button" className="lc-btn lc-btn-share" onClick={onClick}>
+        <Share2 className="h-4 w-4" aria-hidden />
+        <span>{label}</span>
       </button>
     );
   }
   return (
-    <button type="button" className="share-banner" onClick={onOpen}>
+    <button type="button" className="share-banner" onClick={onClick}>
       <Share2 className="h-4 w-4" aria-hidden />
-      {t("share.title")}
+      {label}
     </button>
   );
 }
 
-export function ListingSharePanel({
+function ShareModal({
+  open,
+  onClose,
   listingId,
   title,
   priceLabel,
-  open,
-  onClose,
+  imageUrl,
+  description,
+  kind,
+  onToast,
 }: {
+  open: boolean;
+  onClose: () => void;
   listingId: string;
   title: string;
   priceLabel: string;
-  open: boolean;
-  onClose: () => void;
+  imageUrl?: string;
+  description?: string;
+  kind: ShareKind;
+  onToast: (kind: "copied" | "status" | "failed") => void;
 }) {
   const { t } = useI18n();
   const titleId = useId();
-  const [canNative, setCanNative] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const blurb = listingShareBlurb(description, 180);
 
-  useEffect(() => {
-    setCanNative(typeof navigator !== "undefined" && typeof navigator.share === "function");
-  }, []);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     if (!open) return;
@@ -81,139 +187,161 @@ export function ListingSharePanel({
     };
   }, [open, onClose]);
 
-  useEffect(() => {
-    if (!copied) return;
-    const id = window.setTimeout(() => setCopied(false), 2200);
-    return () => window.clearTimeout(id);
-  }, [copied]);
+  if (!open || !mounted) return null;
 
-  const url = listingPublicUrl(listingId);
-  const text = listingShareText(title, priceLabel, url);
-  const hrefs = socialShareHrefs(url, text);
+  const url = listingPublicUrl(listingId, kind);
+  const waText = listingWhatsAppMessage({ title, priceLabel, url, description });
+  const waStatus = listingWhatsAppStatusText({ title, priceLabel, url });
+  const telegramText = listingTelegramText({ title, priceLabel, description });
+  const tweet = listingTweetText({ title, priceLabel });
 
   async function copyLink() {
     const ok = await copyText(url);
-    if (ok) setCopied(true);
+    onToast(ok ? "copied" : "failed");
+    if (ok) onClose();
   }
 
-  async function nativeShare() {
-    try {
-      await navigator.share({ title, text, url });
-      onClose();
-    } catch {
-      /* dismissed */
-    }
+  async function shareWhatsAppStatus() {
+    const ok = await copyText(waStatus);
+    onToast(ok ? "status" : "failed");
   }
 
-  return (
-    <>
-      {copied ? (
-        <p className="share-toast" role="status">
-          <Check className="h-4 w-4 shrink-0 text-lime" aria-hidden />
-          {t("share.copied")}
-        </p>
-      ) : null}
-      {open ? (
-        <div className="legal-modal-overlay" onClick={onClose} role="presentation">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            className="legal-modal max-w-md"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-line px-4 py-3">
-              <h2 id={titleId} className="text-base font-extrabold text-ink">
-                {t("share.title")}
-              </h2>
-              <button
-                type="button"
-                onClick={onClose}
-                className="grid h-9 w-9 place-items-center rounded-xl hover:bg-elev"
-                aria-label={t("common.close")}
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="legal-modal-scroll space-y-2 p-4">
-              <p className="truncate text-sm text-muted">{title}</p>
-              <button type="button" className="share-row" onClick={() => void copyLink()}>
-                <span className="share-ico bg-elev text-ink">
-                  {copied ? <Check className="h-4 w-4 text-lime" /> : <Link2 className="h-4 w-4" />}
-                </span>
-                <span>
-                  <span className="block font-bold">{t("share.copy")}</span>
-                  <span className="block text-xs text-muted">{t("share.copy.hint")}</span>
-                </span>
-              </button>
-              {canNative ? (
-                <button type="button" className="share-row" onClick={() => void nativeShare()}>
-                  <span className="share-ico bg-ink text-white">
-                    <Share2 className="h-4 w-4" />
-                  </span>
-                  <span className="font-bold">{t("share.native")}</span>
-                </button>
-              ) : null}
-              <a className="share-row" href={hrefs.whatsapp} target="_blank" rel="noopener noreferrer">
-                <span className="share-ico bg-[#25D366] text-white">
-                  <WhatsAppMark />
-                </span>
-                <span className="font-bold">WhatsApp</span>
-              </a>
-              <a className="share-row" href={hrefs.telegram} target="_blank" rel="noopener noreferrer">
-                <span className="share-ico bg-[#229ED9] text-white">
-                  <TelegramMark />
-                </span>
-                <span className="font-bold">Telegram</span>
-              </a>
-              <a className="share-row" href={hrefs.x} target="_blank" rel="noopener noreferrer">
-                <span className="share-ico bg-ink text-white">
-                  <XMark />
-                </span>
-                <span className="font-bold">X</span>
-              </a>
-              <a className="share-row" href={hrefs.facebook} target="_blank" rel="noopener noreferrer">
-                <span className="share-ico bg-[#1877F2] text-white">
-                  <FacebookMark />
-                </span>
-                <span className="font-bold">Facebook</span>
-              </a>
+  const dialog = (
+    <div className="share-modal-overlay" onClick={onClose} role="presentation">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="share-modal"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="share-modal-head">
+          <div className="share-modal-brand">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={BRAND_MARK_SRC} alt="" className="share-modal-logo" width={44} height={44} />
+            <div>
+              <p className="share-modal-brand-name">{BRAND_NAME}</p>
+              <p className="share-modal-kicker">{t("share.kicker")}</p>
             </div>
           </div>
+          <button type="button" className="share-modal-x" onClick={onClose} aria-label={t("common.close")}>
+            <X className="h-4 w-4" />
+          </button>
+        </header>
+
+        <h2 id={titleId} className="share-modal-title">
+          {t("share.title")}
+        </h2>
+
+        <div className="share-modal-card">
+          {imageUrl ? (
+            <ProtectedPhoto src={imageUrl} alt="" imgClassName="share-modal-thumb" />
+          ) : (
+            <ProtectedPhoto src={BRAND_MARK_SRC} alt="" imgClassName="share-modal-thumb" />
+          )}
+          <div className="share-modal-meta">
+            <p className="share-modal-listing">{title}</p>
+            <p className="share-modal-price">{priceLabel}</p>
+            {blurb ? <p className="share-modal-desc">{blurb}</p> : null}
+          </div>
         </div>
-      ) : null}
-    </>
+
+        <div className="share-modal-grid">
+          <button type="button" className="share-modal-btn" onClick={() => void copyLink()}>
+            <span className="share-modal-ico is-copy">
+              <Copy className="h-4 w-4" />
+            </span>
+            {t("share.copy")}
+          </button>
+          <a className="share-modal-btn" href={whatsappShareHref(waText)} target="_blank" rel="noopener noreferrer">
+            <span className="share-modal-ico is-wa">
+              <WhatsAppMark />
+            </span>
+            {t("share.wa")}
+          </a>
+          <a
+            className="share-modal-btn"
+            href={whatsappShareHref(waStatus)}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => void shareWhatsAppStatus()}
+          >
+            <span className="share-modal-ico is-wa">
+              <WhatsAppMark />
+            </span>
+            {t("share.waStatus")}
+          </a>
+          <a
+            className="share-modal-btn"
+            href={telegramShareHref(url, telegramText)}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <span className="share-modal-ico is-tg">
+              <TelegramMark />
+            </span>
+            {t("share.telegram")}
+          </a>
+          <a className="share-modal-btn" href={twitterShareHref(url, tweet)} target="_blank" rel="noopener noreferrer">
+            <span className="share-modal-ico is-x">
+              <XMark />
+            </span>
+            {t("share.x")}
+          </a>
+          <a className="share-modal-btn" href={facebookShareHref(url)} target="_blank" rel="noopener noreferrer">
+            <span className="share-modal-ico is-fb">
+              <FacebookMark />
+            </span>
+            {t("share.facebook")}
+          </a>
+        </div>
+      </div>
+    </div>
   );
+
+  return createPortal(dialog, document.body);
 }
 
 function WhatsAppMark() {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden fill="currentColor">
-      <path d="M12.04 2C6.58 2 2.15 6.4 2.15 11.83c0 1.94.51 3.82 1.48 5.49L2 22l4.85-1.57a10.1 10.1 0 0 0 5.19 1.45h.01c5.46 0 9.89-4.4 9.89-9.83C21.94 6.4 17.5 2 12.04 2zm5.76 13.95c-.24.68-1.4 1.25-1.94 1.33-.5.07-1.13.1-1.83-.11-.42-.13-.97-.32-1.67-.63-2.94-1.27-4.85-4.22-5-4.41-.14-.2-1.18-1.57-1.18-3 0-1.42.74-2.12 1-2.41.24-.27.64-.4.86-.4h.62c.2 0 .47-.08.73.56.27.67.91 2.31.99 2.48.08.16.13.36.02.58-.1.2-.16.33-.32.51-.16.18-.33.4-.47.54-.16.16-.32.33-.14.64.18.32.8 1.32 1.72 2.14 1.18 1.05 2.14 1.38 2.47 1.54.32.16.51.13.7-.08.2-.2.8-.93 1.02-1.25.21-.32.43-.27.73-.16.3.1 1.9.9 2.23 1.06.32.16.54.24.62.38.08.13.08.77-.16 1.45z" />
+    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+      <path
+        fill="currentColor"
+        d="M12.04 2C6.58 2 2.15 6.4 2.15 11.84c0 1.74.46 3.44 1.34 4.94L2 22l5.37-1.41a10 10 0 0 0 4.67 1.19h.01c5.46 0 9.89-4.4 9.89-9.84C21.94 6.4 17.5 2 12.04 2zm5.76 14.15c-.24.68-1.4 1.3-1.94 1.38-.5.07-1.13.1-1.82-.11-.42-.13-.96-.31-1.65-.61-2.9-1.26-4.79-4.18-4.94-4.38-.14-.2-1.18-1.57-1.18-3 0-1.42.74-2.12 1.01-2.41.26-.28.7-.41 1.12-.41.14 0 .26 0 .37.01.32.01.49.03.7.54.24.58.83 2.02.9 2.17.08.15.13.32.02.52-.1.2-.16.32-.31.5-.16.17-.33.38-.47.51-.16.15-.32.31-.14.6.18.3.8 1.32 1.72 2.14 1.18 1.05 2.14 1.38 2.47 1.54.32.15.51.13.7-.08.19-.2.8-.93 1.02-1.25.21-.32.43-.27.72-.16.3.1 1.88.89 2.2 1.05.32.16.53.24.61.38.08.15.08.84-.16 1.52z"
+      />
     </svg>
   );
 }
 
 function TelegramMark() {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden fill="currentColor">
-      <path d="M21.9 4.3 18.7 20c-.24 1.07-.87 1.33-1.76.83l-4.86-3.58-2.34 2.25c-.26.26-.48.48-.98.48l.35-4.94L17.9 6.4c.37-.33-.08-.51-.57-.19L7.2 13.17l-4.78-1.5c-1.04-.32-1.06-1.04.22-1.54L20.55 3.5c.87-.33 1.63.2 1.35.8z" />
+    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+      <path
+        fill="currentColor"
+        d="M21.95 4.3 18.7 19.6c-.24 1.07-.88 1.33-1.78.83l-4.92-3.63-2.37 2.28c-.26.26-.48.48-.99.48l.35-5.02 9.13-8.25c.4-.35-.09-.55-.61-.2L6.3 12.8 1.44 11.3c-1.05-.33-1.07-1.05.23-1.56L20.6 3.08c.88-.33 1.64.2 1.35 1.22z"
+      />
     </svg>
   );
 }
 
 function XMark() {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden fill="currentColor">
-      <path d="M18.9 2H22l-6.8 7.77L23 22h-6.5l-5.1-6.66L5.7 22H2.6l7.27-8.3L1 2h6.66l4.6 6.1L18.9 2zm-1.14 18h1.8L6.35 3.9H4.42L17.76 20z" />
+    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+      <path
+        fill="currentColor"
+        d="M18.24 2H21l-6.52 7.45L22 22h-6.17l-4.82-6.3L5.4 22H2.63l6.97-7.97L2 2h6.31l4.36 5.77L18.24 2zm-1.08 18.02h1.7L7 3.88H5.18l11.98 16.14z"
+      />
     </svg>
   );
 }
 
 function FacebookMark() {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden fill="currentColor">
-      <path d="M13.5 21v-7.2h2.42l.36-2.8H13.5V9.2c0-.81.22-1.36 1.39-1.36H16.5V5.33A18.7 18.7 0 0 0 14.2 5C11.9 5 10.3 6.4 10.3 9v1.99H8v2.8h2.3V21h3.2z" />
+    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+      <path
+        fill="currentColor"
+        d="M24 12.07C24 5.41 18.63 0 12 0S0 5.41 0 12.07C0 18.1 4.39 23.09 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.7 4.54-4.7 1.31 0 2.69.24 2.69.24v2.97h-1.52c-1.5 0-1.96.93-1.96 1.89v2.26h3.34l-.53 3.49h-2.81V24C19.61 23.09 24 18.1 24 12.07z"
+      />
     </svg>
   );
 }

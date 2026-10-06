@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { Check, ChevronRight, Flag, Heart, MessageCircle } from "lucide-react";
 import { maskPhone, phoneToTel, type Listing } from "@/data/store";
@@ -10,9 +9,12 @@ import { SafetyNotice } from "@/components/listing/SafetyNotice";
 import { ListingGallery } from "@/components/listing/ListingGallery";
 import { ListingShareTrigger } from "@/components/listing/ListingShare";
 import { ListingRegionPanel } from "@/components/listing/ListingRegionPanel";
+import { ListingDescriptionPanel } from "@/components/listing/ListingDescriptionPanel";
 import { GuestLock } from "@/components/GuestLock";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { classifiedFactRows, classifiedFeatureItems, listingCategoryChain } from "@/lib/listingFacts";
+import { listingSellerLabel } from "@/lib/publicName";
+import { ListingPrintButton } from "@/components/listing/ListingPrint";
 
 export function ClassifiedListingView({
   listing,
@@ -22,7 +24,6 @@ export function ClassifiedListingView({
   detailTab,
   reportHint,
   onFav,
-  onShare,
   onChat,
   onTogglePhone,
   onReport,
@@ -33,23 +34,20 @@ export function ClassifiedListingView({
   liked: boolean;
   showPhone: boolean;
   phone: string;
-  detailTab: "info" | "region";
+  detailTab: "info" | "desc" | "region";
   reportHint: string;
   onFav: () => void;
-  onShare: () => void;
   onChat: () => void;
   onTogglePhone: () => void;
-  onReport: () => void;
-  onTab: (tab: "info" | "region") => void;
+  onReport?: () => void;
+  onTab: (tab: "info" | "desc" | "region") => void;
   formatMoney: (n: number) => string;
 }) {
   const { t } = useI18n();
-  const [descOpen, setDescOpen] = useState(false);
   const facts = classifiedFactRows(listing, t);
   const crumbs = listingCategoryChain(listing.categoryId);
   const extras = classifiedFeatureItems(listing);
-  const shop = listing.vip || listing.sellerVerified;
-  const longDesc = (listing.description ?? "").length > 280;
+  const shop = !!listing.sellerBusiness;
 
   return (
     <div className="classified-page">
@@ -73,7 +71,15 @@ export function ClassifiedListingView({
           <button type="button" className="classified-icon-btn" onClick={onFav} aria-label={t("nav.favorites")}>
             <Heart className={liked ? "h-4 w-4 fill-lime text-lime" : "h-4 w-4"} />
           </button>
-          <ListingShareTrigger variant="icon" onOpen={onShare} />
+          <ListingShareTrigger
+            variant="toolbar"
+            listingId={listing.id}
+            title={listing.title}
+            priceLabel={formatMoney(listing.price)}
+            imageUrl={listing.images[0]}
+            description={listing.description}
+          />
+          <ListingPrintButton variant="toolbar" />
         </div>
       </header>
 
@@ -82,6 +88,16 @@ export function ClassifiedListingView({
 
         <div className="classified-mid">
           <p className="classified-price">{formatMoney(listing.price)}</p>
+          <div className="mt-3">
+            <ListingShareTrigger
+              variant="banner"
+              listingId={listing.id}
+              title={listing.title}
+              priceLabel={formatMoney(listing.price)}
+              imageUrl={listing.images[0]}
+              description={listing.description}
+            />
+          </div>
           {listing.city ? (
             <p className="classified-loc">
               {[listing.city, listing.district, listing.neighborhood].filter(Boolean).join(" / ")}
@@ -100,7 +116,7 @@ export function ClassifiedListingView({
         <aside className="classified-seller">
           <p className="classified-seller-kicker">{shop ? t("seller.store") : t("list.seller.v")}</p>
           <p className="classified-seller-name">
-            {listing.sellerName}
+            {listingSellerLabel(listing)}
             {listing.sellerVerified ? <VerifiedBadge size={16} /> : null}
           </p>
           <div className="classified-seller-links">
@@ -137,6 +153,9 @@ export function ClassifiedListingView({
         <button type="button" className={detailTab === "info" ? "is-on" : ""} onClick={() => onTab("info")}>
           {t("loc.tab.details")}
         </button>
+        <button type="button" className={detailTab === "desc" ? "is-on" : ""} onClick={() => onTab("desc")}>
+          {t("loc.tab.description")}
+        </button>
         <button type="button" className={detailTab === "region" ? "is-on" : ""} onClick={() => onTab("region")}>
           {t("loc.tab.location")}
         </button>
@@ -146,17 +165,10 @@ export function ClassifiedListingView({
         <GuestLock>
           <ListingRegionPanel listing={listing} />
         </GuestLock>
+      ) : detailTab === "desc" ? (
+        <ListingDescriptionPanel className="classified-desc" description={listing.description} />
       ) : (
         <>
-          <section className="classified-desc">
-            <h2>{t("list.desc")}</h2>
-            <p className={descOpen || !longDesc ? "" : "is-clamp"}>{listing.description}</p>
-            {longDesc ? (
-              <button type="button" className="classified-more" onClick={() => setDescOpen((v) => !v)}>
-                {descOpen ? t("list.less") : t("list.more")}
-              </button>
-            ) : null}
-          </section>
           {extras.length ? (
             <section className="classified-feats">
               <h2>{t("list.feat")}</h2>
@@ -178,10 +190,12 @@ export function ClassifiedListingView({
       )}
 
       {reportHint ? <p className="mt-2 text-xs font-semibold text-lime">{reportHint}</p> : null}
-      <button type="button" className="classified-report" onClick={onReport}>
-        <Flag className="h-3.5 w-3.5" />
-        {t("admin.report")}
-      </button>
+      {onReport ? (
+        <button type="button" className="classified-report" onClick={onReport}>
+          <Flag className="h-3.5 w-3.5" />
+          {t("admin.report")}
+        </button>
+      ) : null}
     </div>
   );
 }

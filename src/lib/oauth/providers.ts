@@ -18,12 +18,20 @@ import { getAuthSecret } from "@/lib/security/secret";
 
 export type OAuthProvider = "google" | "apple" | "facebook";
 
+/**
+ * Facebook login has no UI and is not covered by the privacy notice; keep it off until both
+ * exist, even if FACEBOOK_APP_* happens to be set.
+ */
+export const FACEBOOK_OAUTH_ENABLED = false;
+
 export function parseOAuthProvider(value: string): OAuthProvider | null {
-  if (value === "google" || value === "apple" || value === "facebook") return value;
+  if (value === "google" || value === "apple") return value;
+  if (value === "facebook" && FACEBOOK_OAUTH_ENABLED) return value;
   return null;
 }
 
 export function oauthConfigured(provider: OAuthProvider) {
+  if (provider === "facebook" && !FACEBOOK_OAUTH_ENABLED) return false;
   if (provider === "google") {
     const id = googleClientId();
     const secret = googleClientSecret();

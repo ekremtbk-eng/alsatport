@@ -32,6 +32,14 @@ export default function CareersPage() {
       <h2 className="!mt-1 text-2xl font-extrabold">{t("corp.hr.h")}</h2>
       <p>{t("corp.hr.p")}</p>
       <h3>{t("corp.hr.open")}</h3>
+      {JOBS.length === 0 ? (
+        <p>
+          {t("corp.hr.none")}{" "}
+          <a href={`mailto:${LEGAL_EMAIL_DESTEK}`} className="font-semibold text-lime">
+            {LEGAL_EMAIL_DESTEK}
+          </a>
+        </p>
+      ) : null}
       <div className="mt-3 space-y-2">
         {JOBS.map((j) => {
           const title = t(JOB_TITLE[j.id] ?? "job.fe");

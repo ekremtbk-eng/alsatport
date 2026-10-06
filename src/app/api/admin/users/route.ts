@@ -29,6 +29,8 @@ export async function GET(req: Request) {
       role: u.role,
       bannedAt: u.bannedAt?.toISOString() ?? null,
       displayName: u.profile?.displayName ?? u.username,
+      businessName: u.profile?.businessName ?? null,
+      businessVerifiedAt: u.profile?.businessVerifiedAt?.toISOString() ?? null,
     })),
   });
 }

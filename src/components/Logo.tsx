@@ -1,35 +1,43 @@
 "use client";
 
 import Link from "next/link";
-import { useI18n } from "@/context/I18nContext";
+import { BRAND_LOGO_DARK, BRAND_LOGO_LIGHT, BRAND_MARK_SRC, BRAND_NAME } from "@/lib/brand";
 
-export function Logo({ compact = false, linked = true }: { compact?: boolean; linked?: boolean }) {
-  const { t } = useI18n();
-  const inner = (
-    <>
-      <img
-        src="/icon.png"
-        alt="AlSatPort"
-        width={36}
-        height={36}
-        className="h-9 w-9 shrink-0 rounded-xl object-cover"
-        decoding="async"
-      />
-      {!compact && (
-        <span className="logo-wordmark leading-tight">
-          <span className="logo-brand block text-[17px] font-extrabold tracking-tight text-ink sm:text-[18px]">
-            Al<span className="text-lime">Sat</span>Port
-          </span>
-          <span className="logo-slogan mt-0.5 block text-[10px] font-semibold text-ink">{t("home.tag")}</span>
-        </span>
-      )}
-    </>
+export function Logo({
+  compact = false,
+  linked = true,
+  tone = "light",
+}: {
+  compact?: boolean;
+  linked?: boolean;
+  /** Surface the logo sits on: "dark" uses the white wordmark. */
+  tone?: "light" | "dark";
+}) {
+  const logo = tone === "dark" ? BRAND_LOGO_DARK : BRAND_LOGO_LIGHT;
+  const inner = compact ? (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img src={BRAND_MARK_SRC} alt="" width={44} height={44} className="brand-mark" decoding="async" />
+  ) : (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      src={logo.src}
+      alt={BRAND_NAME}
+      width={logo.width}
+      height={logo.height}
+      className={`brand-logo-img brand-logo-${tone}`}
+      decoding="async"
+      fetchPriority="high"
+    />
   );
   if (!linked) {
-    return <div className="flex shrink-0 items-center justify-center gap-2">{inner}</div>;
+    return (
+      <div className="brand-lockup" aria-label={BRAND_NAME}>
+        {inner}
+      </div>
+    );
   }
   return (
-    <Link href="/" className="flex shrink-0 items-center gap-2" aria-label="AlSatPort">
+    <Link href="/" className="brand-lockup" aria-label={BRAND_NAME}>
       {inner}
     </Link>
   );

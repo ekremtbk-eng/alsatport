@@ -49,6 +49,8 @@ import {
   SWAP_YN,
   PART_BRANDS,
   PART_FROM,
+  VEHICLE_FROM,
+  kimdenOptionsForRoot,
   USED_PART,
   JOB_PLACES,
   JOB_WORK_MODES,
@@ -150,6 +152,7 @@ const CITIES = TURKEY_CITIES.map((c) => c.name);
 const SERVICE_TYPES = ["Keşif", "Montaj", "Tamir", "Nakliye", "Bakım"];
 const HELP_TYPES = ["Gündüzlü", "Yatılı", "Tam Zamanlı", "Yarı Zamanlı"];
 const PET_KINDS = ["Yem & Mama", "Kafes & Kulübe", "Tasma & Gezdirme", "Akvaryum", "Bakım & Hijyen", "Aksesuar"];
+const PET_QTY = ["0-1 kg", "1-5 kg", "5-10 kg", "10-20 kg", "20+ kg"];
 
 function sel(
   key: string,
@@ -261,6 +264,7 @@ function vehicleCore(segment: VehicleSegment): FilterField[] {
           ? []
           : [sel("drive", "flt.drive", DRIVES, ["Çekiş", "Drive"], { preferOpen: true })]),
     sel("color", "post.color", COLORS, ["Renk", "Color"]),
+    sel("kimden", "flt.kimden", VEHICLE_FROM, ["Kimden"]),
     sel("damage", "flt.damage", DAMAGE_RECORDS, ["Hasar kaydı", "Hasar", "Tramer"]),
     {
       key: "equip",
@@ -285,6 +289,7 @@ function classifiedShopFilters(): FilterField[] {
     { key: "district", kind: "district", labelKey: "post.district", dependsOn: "city", searchable: true },
     ...range("priceMin", "priceMax", "flt.price", [], "₺", true).map((f, i) => (i === 0 ? { ...f, currencyTabs: true } : f)),
     sel("swap", "flt.swap", SWAP_YN, ["Takas"], { preferOpen: true }),
+    sel("kimden", "flt.kimden", PART_FROM, ["Kimden"]),
     { key: "keyword", kind: "text", labelKey: "flt.keyword", preferOpen: true },
   ];
 }
@@ -304,6 +309,7 @@ function fieldsForCategoryNode(cat: Category): FilterField[] {
       return [
         sel("craft", "flt.craft", AIRCRAFT_TYPES, ["Tip", "Hava aracı"], { preferOpen: true }),
         ...range("yearMin", "yearMax", "post.year", ["Yıl", "Year"]),
+        sel("kimden", "flt.kimden", VEHICLE_FROM, ["Kimden"]),
       ];
     }
     const extra: FilterField[] = [];
@@ -435,7 +441,12 @@ function fieldsForCategoryNode(cat: Category): FilterField[] {
       searchable: true,
       preferOpen: true,
     };
-    const core = [...(brand ? [brand, model] : []), cond];
+    const core = [
+      ...(brand ? [brand, model] : []),
+      cond,
+      sel("swap", "flt.swap", SWAP_YN, ["Takas"]),
+      sel("kimden", "flt.kimden", kimdenOptionsForRoot("shopping"), ["Kimden"]),
+    ];
     if (hid(id, "phone") || id === "phones") {
       return [
         ...core,
@@ -533,6 +544,7 @@ function fieldsForCategoryNode(cat: Category): FilterField[] {
       ...range("hoursMin", "hoursMax", "post.hours", ["Çalışma saati", "Saat", "Hours"]),
       sel("fuel", "post.fuel", MACHINE_FUEL, ["Yakıt", "Fuel"], { preferOpen: true }),
       sel("cond", "post.cond", PRODUCT_CONDITIONS, ["Durum", "Condition"]),
+      sel("kimden", "flt.kimden", kimdenOptionsForRoot("machines"), ["Kimden"]),
     ];
     if (hid(id, "farm") || hid(id, "traktor") || hid(id, "tractor")) {
       return [...base, sel("tractor", "flt.tractor", TRACTOR_TYPES, ["Tür", "Tip"])];
@@ -708,14 +720,16 @@ function fieldsForCategoryNode(cat: Category): FilterField[] {
       );
       return spareFields;
     }
-    return [cond];
+    return [cond, sel("kimden", "flt.kimden", PART_FROM, ["Kimden"])];
   }
   if (root === "services") {
     const pack: FilterField[] = [
+      ...range("priceMin", "priceMax", "flt.price", [], "₺", true),
       sel("place", "flt.servicePlace", SERVICE_PLACE, ["Hizmet yeri", "Yer"], { preferOpen: true }),
       sel("exp", "flt.serviceExp", SERVICE_EXP, ["Deneyim", "Experience"]),
       sel("warranty", "flt.warranty", WARRANTY_OPTS, ["Garanti"]),
       { key: "keyword", kind: "text", labelKey: "flt.inResults", preferOpen: true },
+      sel("kimden", "flt.kimden", kimdenOptionsForRoot("services"), ["Kimden"]),
     ];
     if (isRenoCategory(cat)) {
       return [sel("service", "flt.service", SERVICE_TYPES, ["Hizmet", "Tür", "Service"], { preferOpen: true }), ...pack];
@@ -741,6 +755,7 @@ function fieldsForCategoryNode(cat: Category): FilterField[] {
         ui: "chips",
         chipKind: "tutorPlace",
       }),
+      sel("kimden", "flt.kimden", kimdenOptionsForRoot("tutors"), ["Kimden"]),
     ];
   }
   if (root === "jobs") {
@@ -753,21 +768,36 @@ function fieldsForCategoryNode(cat: Category): FilterField[] {
       sel("exp", "flt.exp", [...JOB_EXPERIENCE_LEVELS], ["Deneyim", "Experience"]),
       sel("place", "flt.place", JOB_PLACES, ["Lokasyon", "Çalışma yeri"]),
       sel("posted", "flt.posted", [...JOB_POSTED_WITHIN], []),
+      sel("kimden", "flt.kimden", kimdenOptionsForRoot("jobs"), ["Kimden"]),
       { key: "keyword", kind: "text", labelKey: "flt.keyword", preferOpen: true },
     ];
   }
   if (root === "pets") {
     const brands = extraBrandsFor(cat);
-    return [
-      sel("petKind", "flt.petKind", PET_KINDS, ["Tür", "Ürün"], { preferOpen: true }),
-      sel("species", "flt.petSpecies", extraModelsFor(cat, "marka"), ["Hayvan", "Tür"], { preferOpen: true }),
+    const species = extraModelsFor(cat, "marka");
+    const food = cat.id === "pets-food" || cat.id.startsWith("pets-food-");
+    const leaf = !visibleChildren(cat).length;
+    const out: FilterField[] = [];
+    if (!leaf) {
+      out.push(sel("petKind", "flt.petKind", PET_KINDS, ["Tür", "Ürün"], { preferOpen: true }));
+    }
+    out.push(
+      sel("species", "flt.petSpecies", species.length ? species : ["Kedi", "Köpek", "Kuş", "Balık", "Kemirgen"], ["Tür", "Hayvan"], {
+        preferOpen: true,
+      }),
       sel("brand", "post.brand", brands.length ? brands : PET_FOOD_BRANDS, ["Marka", "Brand"], {
         searchable: true,
         preferOpen: true,
         catalogId: cat.id,
       }),
-      sel("cond", "post.cond", PRODUCT_CONDITIONS, ["Durum", "Condition"]),
-    ];
+    );
+    if (food) {
+      out.push(sel("qty", "flt.qty", PET_QTY, ["Miktar", "Kg", "Ağırlık", "Paket"], { preferOpen: true }));
+    } else {
+      out.push(sel("cond", "post.cond", PRODUCT_CONDITIONS, ["Durum", "Condition"], { preferOpen: true }));
+    }
+    out.push(sel("kimden", "flt.kimden", kimdenOptionsForRoot("pets"), ["Kimden"]));
+    return out;
   }
   if (root === "helpers") {
     return [
@@ -775,6 +805,7 @@ function fieldsForCategoryNode(cat: Category): FilterField[] {
       sel("helpGender", "flt.helpGender", HELP_GENDER, ["Cinsiyet"]),
       sel("helpLang", "flt.helpLang", HELP_LANG, ["Dil"]),
       sel("exp", "flt.exp", HELP_EXP, ["Deneyim"]),
+      sel("kimden", "flt.kimden", kimdenOptionsForRoot("helpers"), ["Kimden"]),
       { key: "keyword", kind: "text", labelKey: "flt.keyword", preferOpen: true },
     ];
   }
@@ -784,6 +815,7 @@ function fieldsForCategoryNode(cat: Category): FilterField[] {
       preferOpen: true,
     }),
     sel("cond", "post.cond", PRODUCT_CONDITIONS, ["Durum", "Condition"], { preferOpen: true }),
+    sel("kimden", "flt.kimden", kimdenOptionsForRoot(rootOf(cat).id), ["Kimden"]),
   ];
 }
 
@@ -1002,6 +1034,20 @@ export function countActiveFilters(state: FilterState) {
   return Object.values(state).filter((v) => v && v !== "all").length;
 }
 
+const FACET_CAP = 800;
+
+export function countFilterOption(
+  listings: Listing[],
+  fields: FilterField[],
+  state: FilterState,
+  key: string,
+  value: string,
+) {
+  if (listings.length > FACET_CAP) return undefined;
+  const next = applyFilterChange(state, key, value);
+  return listings.filter((l) => listingMatchesDynamicFilters(l, next, fields)).length;
+}
+
 function norm(s: string) {
   return s.toLocaleLowerCase("tr").replace(/\s+/g, "").replace("m²", "m2");
 }
@@ -1123,8 +1169,8 @@ export function listingMatchesDynamicFilters(listing: Listing, state: FilterStat
   }
   if (!inRange(listing.price, state.priceMin, state.priceMax)) return false;
   if (state.urgent === "1" && !listing.urgent) return false;
-  if (state.seller === "Bireysel" && listing.vip) return false;
-  if (state.seller === "Kurumsal" && !listing.vip && !listing.sellerVerified) return false;
+  if (state.seller === "Bireysel" && listing.sellerBusiness) return false;
+  if (state.seller === "Kurumsal" && !listing.sellerBusiness) return false;
   if (state.renoSub) {
     const ids = state.renoSub.split(",").filter(Boolean);
     if (ids.length && !ids.includes(listing.categoryId)) return false;
@@ -1165,7 +1211,7 @@ export function listingMatchesDynamicFilters(listing: Listing, state: FilterStat
         if (!evet && !hayir && textMatch(blob, wanted)) continue;
         return false;
       }
-      if (!textMatch(blob, wanted)) return false;
+      if (!wanted.split(",").filter(Boolean).some((w) => textMatch(blob, w))) return false;
     }
     if (field.kind === "multi") {
       const wanted = (state[field.key] ?? "").split(",").filter(Boolean);

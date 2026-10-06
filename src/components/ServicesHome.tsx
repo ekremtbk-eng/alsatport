@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { findCategory, hrefForCategory } from "@/data/categories";
 import { TURKEY_CITIES, districtsOf } from "@/data/turkey";
 import { useI18n } from "@/context/I18nContext";
-import { servicesSearchHref } from "@/components/ServicesPortalNav";
+import { servicesSearchHref, SERVICE_PORTAL_TABS } from "@/components/ServicesPortalNav";
 
 const POPULAR = [
   {
@@ -121,6 +121,21 @@ export function ServicesHome() {
               {t("svc.search")}
             </button>
           </form>
+        </div>
+      </section>
+
+      <section className="svc-home-branches">
+        <h2>{t("nav.categories")}</h2>
+        <div className="svc-home-branch-grid">
+          {SERVICE_PORTAL_TABS.map((tab) => {
+            const cat = findCategory(tab.id);
+            const href = cat ? hrefForCategory(cat) : "/kategoriler/ustalar-hizmetler";
+            return (
+              <Link key={tab.id} href={href} className="svc-home-branch">
+                {tab.label}
+              </Link>
+            );
+          })}
         </div>
       </section>
 

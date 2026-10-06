@@ -1,37 +1,30 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { ListingBrowse } from "@/components/ListingBrowse";
 import { useApp } from "@/context/AppContext";
 import { catName, useI18n } from "@/context/I18nContext";
 import {
   findCategoryFromRenoPath,
-  hrefForCategory,
   isServiceTreeLanding,
   listingMatchesCategory,
   renoBranchOf,
 } from "@/data/categories";
 import { isPublicListing } from "@/lib/categoryCounts";
 import { ServicesHome } from "@/components/ServicesHome";
+import { CategoryHub } from "@/components/CategoryHub";
 import { apiGet } from "@/lib/security/client";
 import type { Listing } from "@/data/store";
 import Link from "next/link";
 
 export function ServicesBrowseClient() {
   const params = useParams<{ slug?: string[] }>();
-  const router = useRouter();
   const segments = Array.isArray(params.slug) ? params.slug.map((s) => decodeURIComponent(s)) : [];
   const cat = findCategoryFromRenoPath(segments);
   const { listings } = useApp();
   const { t } = useI18n();
   const [remote, setRemote] = useState<Listing[] | null>(null);
-
-  useEffect(() => {
-    if (cat && isServiceTreeLanding(cat)) {
-      router.replace(hrefForCategory(cat));
-    }
-  }, [cat, router]);
 
   useEffect(() => {
     if (!cat || cat.id === "services" || isServiceTreeLanding(cat)) return;
@@ -69,7 +62,7 @@ export function ServicesBrowseClient() {
   }
 
   if (isServiceTreeLanding(cat)) {
-    return <p className="p-8 text-center text-sm text-ink">Yönlendiriliyor…</p>;
+    return <CategoryHub cat={cat} />;
   }
 
   return (

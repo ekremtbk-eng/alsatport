@@ -13,8 +13,8 @@ export function VerifiedBadge({
   return (
     <span
       className={`verified-badge ${className}`}
-      title="Kimliği doğrulanmış güvenilir satıcı"
-      aria-label="Kimliği doğrulanmış"
+      title="Doğrulanmış hesap"
+      aria-label="Doğrulanmış hesap"
     >
       <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
         <circle cx="12" cy="12" r="11" fill={`url(#${gid})`} />

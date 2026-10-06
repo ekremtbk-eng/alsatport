@@ -37,6 +37,9 @@ export default function robots(): MetadataRoute.Robots {
           "/odeme",
           "/favoriler",
           "/bildirimler",
+          "/ara?*marka=",
+          "/ara?*priceMin=",
+          "/ara?*kimden=",
         ],
       },
       {

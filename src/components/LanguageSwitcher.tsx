@@ -5,7 +5,13 @@ import { ChevronDown } from "lucide-react";
 import { CURRENCIES, LOCALES } from "@/i18n/config";
 import { useI18n } from "@/context/I18nContext";
 
-export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
+export function LanguageSwitcher({
+  compact = false,
+  bar = false,
+}: {
+  compact?: boolean;
+  bar?: boolean;
+}) {
   const { locale, currency, setLocale, setCurrency, t } = useI18n();
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -21,20 +27,34 @@ export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
 
   return (
     <div ref={box} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="lang-switch"
-        aria-label={t("lang.label")}
-        aria-expanded={open}
-      >
-        <span className="text-base leading-none">{current.flag}</span>
-        {!compact && (
-          <span className="hidden text-xs font-bold uppercase sm:inline">{locale}</span>
-        )}
-        <span className="hidden text-[10px] font-semibold text-lime sm:inline">{currency}</span>
-        <ChevronDown className="h-3.5 w-3.5 text-muted" />
-      </button>
+      {bar ? (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="hdr-lang-pair"
+          aria-label={t("lang.label")}
+          aria-expanded={open}
+        >
+          <span>{locale.toUpperCase()}</span>
+          <i />
+          <span>{currency}</span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="lang-switch"
+          aria-label={t("lang.label")}
+          aria-expanded={open}
+        >
+          <span className="text-base leading-none">{current.flag}</span>
+          {!compact && (
+            <span className="lang-switch-meta hidden text-xs font-bold uppercase sm:inline">{locale}</span>
+          )}
+          <span className="lang-switch-meta hidden text-[10px] font-semibold text-lime sm:inline">{currency}</span>
+          <ChevronDown className="lang-switch-chevron h-3.5 w-3.5 text-muted" />
+        </button>
+      )}
       {open && (
         <div className="lang-menu">
           <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted">

@@ -52,12 +52,14 @@ async function heuristicNudity(bytes: Buffer) {
   return { blocked, ratio, lowerRatio };
 }
 
-async function sightengineNudity(bytes: Buffer, filename: string) {
+async function sightengineNudity(bytes: Buffer) {
   const user = process.env.SIGHTENGINE_API_USER?.trim();
   const secret = process.env.SIGHTENGINE_API_SECRET?.trim();
   if (!user || !secret) return null;
+  // Only decoded pixels leave the server; EXIF/GPS from the original file is not forwarded.
+  const clean = await sharp(bytes).rotate().jpeg({ quality: 85 }).toBuffer();
   const body = new FormData();
-  body.set("media", new Blob([new Uint8Array(bytes)]), filename);
+  body.set("media", new Blob([new Uint8Array(clean)]), "photo.jpg");
   body.set("models", "nudity-2.0");
   body.set("api_user", user);
   body.set("api_secret", secret);
@@ -90,7 +92,7 @@ export async function moderateAvatarImage(bytes: Buffer, filename = "photo.jpg")
     return { blocked: true as const, reason: "photo.only" as const };
   }
 
-  const remote = await sightengineNudity(bytes, filename).catch(() => null);
+  const remote = await sightengineNudity(bytes).catch(() => null);
   if (remote?.blocked) {
     return { blocked: true as const, reason: "photo.nsfw" as const };
   }

@@ -1,128 +1,171 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { findCategory, hrefForCategory } from "@/data/categories";
-import { CategoryIcon } from "@/components/CategoryIcon";
+import { FileText, Headphones, MapPin, Search, ShieldCheck } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { SearchSuggest } from "@/components/SearchSuggest";
-import { LiveVisitorsBadge } from "@/components/home/LiveVisitorsBadge";
 import { useI18n } from "@/context/I18nContext";
+import { TURKEY_CITIES } from "@/data/turkey";
+import { HOME_HERO_CATEGORIES, HOME_POPULAR_SEARCHES } from "@/data/homeHubs";
+import { findCategory } from "@/data/categories";
 
-const HERO_SCENES = [
-  {
-    src: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1600&q=80",
-    className: "is-car",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1200&q=80",
-    className: "is-home",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1200&q=80",
-    className: "is-shop",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80",
-    className: "is-living",
-  },
-] as const;
-
-const QUICK = [
-  { catId: "emlak", labelKey: "home.quick.sale", icon: "home" },
-  { catId: "emlak", labelKey: "home.quick.rent", icon: "key" },
-  { catId: "vasita", labelKey: "home.quick.auto", icon: "car" },
-  { catId: "shopping", labelKey: "home.quick.shop", icon: "bag" },
-  { catId: "parts", labelKey: "home.quick.parts", icon: "cog" },
-  { catId: "jobs", labelKey: "home.quick.jobs", icon: "briefcase" },
-  { catId: "machines", labelKey: "home.quick.machines", icon: "truck" },
-  { catId: "services", labelKey: "home.quick.services", icon: "hammer" },
-] as const;
-
-const DISCOVER = [
-  { href: "/ara?filter=picks", labelKey: "home.disc.drop" },
-  { href: "/kategoriler/emlak", labelKey: "home.disc.invest" },
-  { href: "/son-48-saat", labelKey: "home.disc.fast", fresh: true },
-  { href: "/acil", labelKey: "home.disc.urgent", urgent: true },
-] as const;
+function readUrlState() {
+  if (typeof window === "undefined") return { q: "", city: "", catId: "" };
+  const sp = new URLSearchParams(window.location.search);
+  const q = (sp.get("q") ?? "").trim();
+  const city = (sp.get("city") ?? "").trim();
+  const slug = (sp.get("kategori") ?? sp.get("cat") ?? "").trim();
+  const path = window.location.pathname;
+  if (path.startsWith("/is-ilanlari")) return { q, city, catId: "jobs" };
+  if (path.startsWith("/ustalar-hizmetler")) return { q, city, catId: "services" };
+  const cat = slug ? findCategory(slug) : undefined;
+  return { q, city, catId: cat?.id ?? "" };
+}
 
 export function HomeHero() {
   const { t } = useI18n();
   const router = useRouter();
-  const [q, setQ] = useState("");
+  const pathname = usePathname();
+  const initial = readUrlState();
+  const [q, setQ] = useState(initial.q);
+  const [city, setCity] = useState(initial.city);
+  const [catId, setCatId] = useState(initial.catId);
+  const [suggestOn, setSuggestOn] = useState(false);
+
+  useEffect(() => {
+    const next = readUrlState();
+    setQ(next.q);
+    setCity(next.city);
+    setCatId(next.catId);
+  }, [pathname]);
+
+  function goSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const params = new URLSearchParams();
+    if (q.trim()) params.set("q", q.trim());
+    if (city) params.set("city", city);
+    if (catId === "jobs") {
+      router.push(params.toString() ? `/is-ilanlari?${params}` : "/is-ilanlari");
+      return;
+    }
+    if (catId === "services") {
+      router.push(params.toString() ? `/ustalar-hizmetler?${params}` : "/ustalar-hizmetler");
+      return;
+    }
+    if (catId) {
+      const cat = findCategory(catId);
+      if (cat) params.set("kategori", cat.slug);
+    }
+    const qs = params.toString();
+    router.push(qs ? `/ara?${qs}` : "/ara");
+  }
 
   return (
-    <div className="home-hero-wrap">
-      <section className="home-hero">
-        <div className="home-hero-bg" aria-hidden>
-          <div className="home-hero-mosaic">
-            {HERO_SCENES.map((scene) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={scene.className} className={scene.className} src={scene.src} alt="" />
-            ))}
+    <section className="hp-hero">
+      <div className="hp-hero-inner">
+        <div className="hp-hero-top">
+          <div className="hp-hero-copy">
+            <p className="hp-hero-kicker">{t("auth.gate.platform")}</p>
+            <h1 className="hp-hero-title">
+              <span className="hp-hero-title-a">{t("home.h1a")}</span>
+              <span className="hp-hero-title-b">{t("home.h1b")}</span>
+            </h1>
+            <p className="hp-hero-sub">{t("home.hero.lead")}</p>
           </div>
-          <div className="home-hero-veil" />
+          <ul className="hp-hero-trust">
+            <li>
+              <FileText className="h-5 w-5" aria-hidden />
+              <span>
+                <b>{t("home.trust.pay")}</b>
+                <small>{t("home.trust.pay.s")}</small>
+              </span>
+            </li>
+            <li>
+              <ShieldCheck className="h-5 w-5" aria-hidden />
+              <span>
+                <b>{t("home.trust.ver")}</b>
+                <small>{t("home.trust.ver.s")}</small>
+              </span>
+            </li>
+            <li>
+              <MapPin className="h-5 w-5" aria-hidden />
+              <span>
+                <b>{t("home.why.tr")}</b>
+                <small>{t("home.why.p5")}</small>
+              </span>
+            </li>
+            <li>
+              <Headphones className="h-5 w-5" aria-hidden />
+              <span>
+                <b>{t("home.trust.sup")}</b>
+                <small>{t("home.trust.sup.s")}</small>
+              </span>
+            </li>
+          </ul>
         </div>
-        <LiveVisitorsBadge />
-        <div className="home-hero-inner">
-          <p className="home-hero-tag">{t("home.tag")}</p>
-          <h1 className="home-hero-title">
-            {t("home.h1a")} <span>{t("home.h1b")}</span>
-          </h1>
-          <p className="home-hero-sub">{t("home.hero.sub")}</p>
-
-          <form
-            className="home-hero-search"
-            onSubmit={(e) => {
-              e.preventDefault();
-              router.push(`/ara?q=${encodeURIComponent(q)}`);
-            }}
-          >
-            <Search className="pointer-events-none absolute start-5 top-1/2 h-5 w-5 -translate-y-1/2 text-ink" />
+        <form className="hp-hero-search" onSubmit={goSearch}>
+          <label className="hp-hero-cat">
+            <span className="sr-only">{t("nav.categories")}</span>
+            <select value={catId} onChange={(e) => setCatId(e.target.value)}>
+              {HOME_HERO_CATEGORIES.map((c) => (
+                <option key={c.id || "all"} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="hp-hero-q">
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder={t("nav.search")}
-              className="home-hero-input rounded-2xl shadow-2xl"
+              onFocus={() => setSuggestOn(true)}
+              onBlur={() => window.setTimeout(() => setSuggestOn(false), 180)}
+              placeholder={t("home.hero.ph")}
               autoComplete="off"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={q.trim().length > 1 && suggestOn}
             />
-            <button type="submit" className="home-hero-go">
-              {t("common.search")}
-            </button>
-            <SearchSuggest query={q} onPick={() => setQ("")} />
-          </form>
-        </div>
-      </section>
-
-      <div className="home-hero-dock">
-        <div className="home-quick">
-          {QUICK.map((item) => {
-            const cat = findCategory(item.catId);
-            const href = cat ? hrefForCategory(cat) : "/kategoriler";
-            return (
-              <Link key={item.labelKey} href={href} className="home-quick-card">
-                <span className="home-quick-icon">
-                  <CategoryIcon name={item.icon} className="h-6 w-6" />
-                </span>
-                <span className="home-quick-label">{t(item.labelKey)}</span>
+            <SearchSuggest
+              query={q}
+              active={suggestOn}
+              extraParams={{
+                ...(city ? { city } : {}),
+                ...(catId && catId !== "jobs" && catId !== "services"
+                  ? { kategori: findCategory(catId)?.slug ?? "" }
+                  : {}),
+              }}
+              onPick={() => setQ("")}
+            />
+          </div>
+          <label className="hp-hero-city">
+            <MapPin className="h-4 w-4" aria-hidden />
+            <select value={city} onChange={(e) => setCity(e.target.value)}>
+              <option value="">{t("acil.turkey")}</option>
+              {TURKEY_CITIES.map((c) => (
+                <option key={c.name} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="submit" className="hp-hero-go">
+            <Search className="h-4 w-4" aria-hidden />
+            {t("home.ara")}
+          </button>
+        </form>
+        {HOME_POPULAR_SEARCHES.length ? (
+          <p className="hp-hero-pops">
+            <span>{t("home.popular.searches")}:</span>
+            {HOME_POPULAR_SEARCHES.map((item) => (
+              <Link key={item.id} href={item.href}>
+                {item.label}
               </Link>
-            );
-          })}
-        </div>
-
-        <div className="home-discover">
-          {DISCOVER.map((item) => (
-            <Link
-              key={item.labelKey}
-              href={item.href}
-              className={`home-discover-pill ${"urgent" in item && item.urgent ? "is-urgent" : ""} ${"fresh" in item && item.fresh ? "is-fresh" : ""}`}
-            >
-              {t(item.labelKey)}
-            </Link>
-          ))}
-        </div>
+            ))}
+          </p>
+        ) : null}
       </div>
-    </div>
+    </section>
   );
 }

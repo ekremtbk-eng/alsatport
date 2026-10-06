@@ -1,3 +1,5 @@
+import { paymentsPaused } from "@/lib/campaign";
+
 export const DASH_PANELS = [
   "ozet",
   "ilanlarim",
@@ -15,11 +17,16 @@ export const DASH_PANELS = [
   "odeme",
   "hareketler",
   "iptal",
+  "guvenlik",
   "sifre",
+  "iki-asama",
+  "engellenenler",
   "cihazlar",
   "bildirim-ayarlari",
   "okundu",
   "pazarlama",
+  "hareket",
+  "qr",
 ] as const;
 
 export type DashPanelId = (typeof DASH_PANELS)[number];
@@ -28,7 +35,22 @@ export type DashNode =
   | { kind: "item"; id: DashPanelId; labelKey: string }
   | { kind: "group"; id: string; labelKey: string; children: DashNode[] };
 
-export const DASH_NAV: DashNode[] = [
+/** Wallet / escrow / payment panels: kept in code for PayTR, hidden while payments are paused. */
+const PAYMENT_PANELS: readonly DashPanelId[] = ["sparam", "eticaret", "guvenli", "odeme", "hareketler"];
+
+export function isPanelHidden(id: DashPanelId) {
+  return paymentsPaused() && PAYMENT_PANELS.includes(id);
+}
+
+function pruneHidden(nodes: DashNode[]): DashNode[] {
+  return nodes.flatMap((n): DashNode[] => {
+    if (n.kind === "item") return isPanelHidden(n.id) ? [] : [n];
+    const children = pruneHidden(n.children);
+    return children.length ? [{ ...n, children }] : [];
+  });
+}
+
+const FULL_DASH_NAV: DashNode[] = [
   { kind: "item", id: "ozet", labelKey: "dash.ozet" },
   {
     kind: "group",
@@ -88,7 +110,10 @@ export const DASH_NAV: DashNode[] = [
         id: "sec",
         labelKey: "dash.g.sec",
         children: [
+          { kind: "item", id: "guvenlik", labelKey: "acct.sec.overview" },
           { kind: "item", id: "sifre", labelKey: "dash.sec.pass" },
+          { kind: "item", id: "iki-asama", labelKey: "acct.2fa.h" },
+          { kind: "item", id: "engellenenler", labelKey: "acct.blocks.h" },
           { kind: "item", id: "cihazlar", labelKey: "dash.sec.devices" },
         ],
       },
@@ -100,14 +125,18 @@ export const DASH_NAV: DashNode[] = [
           { kind: "item", id: "bildirim-ayarlari", labelKey: "dash.app.notif" },
           { kind: "item", id: "okundu", labelKey: "dash.app.read" },
           { kind: "item", id: "pazarlama", labelKey: "dash.app.mkt" },
+          { kind: "item", id: "hareket", labelKey: "acct.motion.h" },
         ],
       },
+      { kind: "item", id: "qr", labelKey: "acct.qr.h" },
     ],
   },
 ];
 
+export const DASH_NAV: DashNode[] = pruneHidden(FULL_DASH_NAV);
+
 export function isDashPanel(value: string | null | undefined): value is DashPanelId {
-  return !!value && (DASH_PANELS as readonly string[]).includes(value);
+  return !!value && (DASH_PANELS as readonly string[]).includes(value) && !isPanelHidden(value as DashPanelId);
 }
 
 export function panelFromSearch(raw: string | null, fallback: DashPanelId = "ozet"): DashPanelId {

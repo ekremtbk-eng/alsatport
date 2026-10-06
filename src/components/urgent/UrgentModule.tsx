@@ -9,12 +9,14 @@ import {
   BookmarkCheck,
   Camera,
   ChevronRight,
+  Filter,
   LayoutGrid,
   List,
+  X,
 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { useAuthModal } from "@/context/AuthModalContext";
-import { catName, useI18n } from "@/context/I18nContext";
+import { useI18n } from "@/context/I18nContext";
 import {
   categories,
   findCategory,
@@ -26,6 +28,8 @@ import type { Listing } from "@/data/store";
 import { isPublicListing } from "@/lib/categoryCounts";
 import { listingMatchesFilter, listingMatchesTextQuery, listingMatchesTitleQuery, listingPostedAt, postedFilterHours } from "@/lib/listingQuery";
 import { StdFilterSidebar, STD_DATE_PRESETS, STD_FRESH_PRESETS } from "@/components/StdFilterSidebar";
+import { FilterCategoryTree } from "@/components/FilterCategoryTree";
+import { FilterSheet } from "@/components/FilterSheet";
 
 export type SpecialMode = "urgent" | "h48";
 type ViewMode = "split" | "grid" | "list";
@@ -112,6 +116,7 @@ export function SpecialListingsModule({ mode }: { mode: SpecialMode }) {
   const [priceMax, setPriceMax] = useState("");
   const [hint, setHint] = useState("");
   const [draft, setDraft] = useState(initialQ);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const pickedCat = catId ? findCategory(catId) : undefined;
   const saved = isSearchSaved(word, city || undefined, mode);
@@ -126,14 +131,6 @@ export function SpecialListingsModule({ mode }: { mode: SpecialMode }) {
     () => listings.filter((l) => isPublicListing(l) && listingMatchesFilter(l, mode)),
     [listings, mode],
   );
-
-  const catCounts = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const root of categories) {
-      map[root.id] = pool.filter((l) => listingMatchesCategory(l, root)).length;
-    }
-    return map;
-  }, [pool]);
 
   const datePresets = mode === "h48" ? STD_FRESH_PRESETS : STD_DATE_PRESETS;
 
@@ -177,6 +174,77 @@ export function SpecialListingsModule({ mode }: { mode: SpecialMode }) {
     setCatId(cat?.slug ?? cat?.id ?? "");
   }
 
+  const filterBody = (compact = false) => (
+    <StdFilterSidebar
+      cats={
+        compact ? (
+          <details className="flt-acc" open>
+            <summary className="flt-acc-sum">
+              <span className="flt-acc-title">{t("nav.categories")}</span>
+            </summary>
+            <div className="flt-acc-body">
+              <FilterCategoryTree
+                roots={categories}
+                selectedId={pickedCat?.id}
+                stay
+                onPick={(c) => pickCat(pickedCat?.id === c.id ? undefined : c)}
+              />
+            </div>
+          </details>
+        ) : (
+          <FilterCategoryTree
+            roots={categories}
+            selectedId={pickedCat?.id}
+            stay
+            onPick={(c) => pickCat(pickedCat?.id === c.id ? undefined : c)}
+          />
+        )
+      }
+      extra={
+        <label className="acil-field">
+          <span>{t("flt.price")}</span>
+          <div className="acil-price-row">
+            <input
+              className="acil-input"
+              inputMode="numeric"
+              value={priceMin}
+              onChange={(e) => setPriceMin(e.target.value.replace(/\D/g, ""))}
+              placeholder={t("flt.min")}
+            />
+            <input
+              className="acil-input"
+              inputMode="numeric"
+              value={priceMax}
+              onChange={(e) => setPriceMax(e.target.value.replace(/\D/g, ""))}
+              placeholder={t("flt.max")}
+            />
+          </div>
+        </label>
+      }
+      city={city}
+      district={district}
+      posted={posted}
+      mappedOnly={mappedOnly}
+      draft={draft}
+      includeDesc={includeDesc}
+      more={more}
+      compact={compact}
+      resultCount={items.length}
+      datePresets={datePresets}
+      onCity={setCity}
+      onDistrict={setDistrict}
+      onPosted={setPosted}
+      onMappedOnly={setMappedOnly}
+      onDraft={setDraft}
+      onIncludeDesc={setIncludeDesc}
+      onMore={() => setMore((v) => !v)}
+      onSearch={() => {
+        setWord(draft.trim());
+        setSheetOpen(false);
+      }}
+    />
+  );
+
   return (
     <div className={`acil-page is-${mode}`}>
       <nav className="acil-bc" aria-label={t("acil.bc")}>
@@ -195,62 +263,7 @@ export function SpecialListingsModule({ mode }: { mode: SpecialMode }) {
 
       <div className="acil-layout">
         <aside className="acil-side">
-          <StdFilterSidebar
-            cats={
-              <ul className="acil-cats">
-                {categories.map((c) => {
-                  const n = catCounts[c.id] ?? 0;
-                  const on = pickedCat?.id === c.id;
-                  return (
-                    <li key={c.id}>
-                      <button type="button" className={on ? "is-on" : ""} onClick={() => pickCat(on ? undefined : c)}>
-                        {catName(t, c.id, c.name)}
-                        <span>({formatListingCount(n)})</span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            }
-            extra={
-              <label className="acil-field">
-                <span>{t("flt.price")}</span>
-                <div className="acil-price-row">
-                  <input
-                    className="acil-input"
-                    inputMode="numeric"
-                    value={priceMin}
-                    onChange={(e) => setPriceMin(e.target.value.replace(/\D/g, ""))}
-                    placeholder={t("flt.min")}
-                  />
-                  <input
-                    className="acil-input"
-                    inputMode="numeric"
-                    value={priceMax}
-                    onChange={(e) => setPriceMax(e.target.value.replace(/\D/g, ""))}
-                    placeholder={t("flt.max")}
-                  />
-                </div>
-              </label>
-            }
-            city={city}
-            district={district}
-            posted={posted}
-            mappedOnly={mappedOnly}
-            draft={draft}
-            includeDesc={includeDesc}
-            more={more}
-            datePresets={datePresets}
-            radioName={`spec-date-${mode}`}
-            onCity={setCity}
-            onDistrict={setDistrict}
-            onPosted={setPosted}
-            onMappedOnly={setMappedOnly}
-            onDraft={setDraft}
-            onIncludeDesc={setIncludeDesc}
-            onMore={() => setMore((v) => !v)}
-            onSearch={() => setWord(draft.trim())}
-          />
+          {filterBody()}
         </aside>
 
         <div className="acil-main">
@@ -261,6 +274,12 @@ export function SpecialListingsModule({ mode }: { mode: SpecialMode }) {
             <button type="button" className={`acil-save ${saved ? "is-on" : ""}`} onClick={onSave}>
               {saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
               {saved ? t("common.saved") : t("common.saveSearch")}
+            </button>
+          </div>
+          <div className="browse-mobile-tools">
+            <button type="button" className="browse-filter-btn" onClick={() => setSheetOpen(true)}>
+              <Filter className="h-4 w-4" />
+              {t("cat.filter")}
             </button>
           </div>
           {hint ? <p className="acil-hint">{hint}</p> : null}
@@ -313,6 +332,16 @@ export function SpecialListingsModule({ mode }: { mode: SpecialMode }) {
           )}
         </div>
       </div>
+
+      <FilterSheet open={sheetOpen} onClose={() => setSheetOpen(false)} label={t("cat.filter")}>
+        <div className="filter-head">
+          <h2 className="filter-title">{t("cat.filter")}</h2>
+          <button type="button" className="filter-x" onClick={() => setSheetOpen(false)} aria-label={t("common.close")}>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        {filterBody(true)}
+      </FilterSheet>
     </div>
   );
 }

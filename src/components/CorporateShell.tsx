@@ -13,7 +13,7 @@ export function CorporateShell({ children }: { children: React.ReactNode }) {
     <div className="corp-shell mx-auto max-w-[1400px] px-3 py-6 lg:px-5 lg:py-8">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-lime">{t("corp.kicker")}</p>
       <h1 className="mt-1 text-2xl font-extrabold md:text-3xl">
-        AlsatPort Bilgi Teknolojileri A.Ş.
+        AlSatPort
       </h1>
       <p className="mt-2 max-w-2xl text-sm text-muted">{t("corp.intro")}</p>
 

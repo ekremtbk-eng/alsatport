@@ -3,6 +3,7 @@ import type { Conversation as ClientConversation } from "@/data/store";
 import { prisma } from "@/lib/db";
 import { isUuid } from "@/lib/ids";
 import { sanitizeText } from "@/lib/security/sanitize";
+import { publicAccountName } from "@/lib/publicName";
 import type { Prisma } from "@prisma/client";
 
 const convoInclude = {
@@ -35,7 +36,7 @@ export function toClientConversation(
     listingId: row.listingId ?? "",
     listingTitle: row.listing?.title ?? "",
     listingImage: cover,
-    peerName: other.profile?.displayName || other.username,
+    peerName: publicAccountName({ ...other.profile, username: other.username }),
     peerAvatar: other.profile?.avatarUrl || "",
     lastMessage: row.lastMessage ?? "",
     time: row.lastMessageAt ? clock(row.lastMessageAt) : clock(row.createdAt),
@@ -43,6 +44,22 @@ export function toClientConversation(
     favorite: false,
     peerVerified: !!other.profile?.verified,
     messages,
+  };
+}
+
+export async function blockState(userId: string, otherId: string) {
+  const rows = await prisma.userBlock.findMany({
+    where: {
+      OR: [
+        { blockerId: userId, blockedId: otherId },
+        { blockerId: otherId, blockedId: userId },
+      ],
+    },
+    select: { blockerId: true },
+  });
+  return {
+    blockedByMe: rows.some((r) => r.blockerId === userId),
+    blockedMe: rows.some((r) => r.blockerId === otherId),
   };
 }
 
@@ -82,6 +99,8 @@ export async function startConversation(userId: string, listingId: string) {
   });
   if (!listing) return { error: "auth.err.session" as const, status: 404 };
   if (listing.sellerId === userId) return { error: "auth.err.forbidden" as const, status: 403 };
+  const blocks = await blockState(userId, listing.sellerId);
+  if (blocks.blockedByMe || blocks.blockedMe) return { error: "msg.blocked" as const, status: 403 };
 
   const existing = await prisma.conversation.findFirst({
     where: { listingId, buyerId: userId, sellerId: listing.sellerId },
@@ -129,17 +148,28 @@ export async function getConversation(userId: string, id: string) {
     update: { lastReadAt: new Date() },
   });
 
+  const me = row.buyerId === userId ? row.buyer : row.seller;
+  const other = row.buyerId === userId ? row.seller : row.buyer;
+  const receipts = (me.profile?.readReceipts ?? true) && (other.profile?.readReceipts ?? true);
+  const peerRead = receipts ? row.reads.find((r) => r.userId === other.id)?.lastReadAt : undefined;
+  const blocks = await blockState(userId, other.id);
+
   return {
-    conversation: toClientConversation(
-      row,
-      userId,
-      messages.map((m) => ({
-        id: m.id,
-        fromMe: m.senderId === userId,
-        text: m.body,
-        time: clock(m.createdAt),
-      })),
-    ),
+    conversation: {
+      ...toClientConversation(
+        row,
+        userId,
+        messages.map((m) => ({
+          id: m.id,
+          fromMe: m.senderId === userId,
+          text: m.body,
+          time: clock(m.createdAt),
+          at: m.createdAt.getTime(),
+        })),
+      ),
+      ...blocks,
+      ...(peerRead ? { peerReadAt: peerRead.getTime() } : {}),
+    },
   };
 }
 
@@ -151,6 +181,8 @@ export async function postMessage(userId: string, conversationId: string, rawTex
     where: { id: conversationId, OR: [{ buyerId: userId }, { sellerId: userId }] },
   });
   if (!convo) return { error: "auth.err.session" as const, status: 404 };
+  const blocks = await blockState(userId, convo.buyerId === userId ? convo.sellerId : convo.buyerId);
+  if (blocks.blockedByMe || blocks.blockedMe) return { error: "msg.blocked" as const, status: 403 };
 
   const now = new Date();
   const [message] = await prisma.$transaction([

@@ -5,10 +5,8 @@ import { NEWS } from "@/data/corporate";
 import { useI18n } from "@/context/I18nContext";
 
 const NEWS_I18N: Record<string, { t: string; s: string; tag: string }> = {
-  "vip-vitrin-yenilendi": { t: "news.1.t", s: "news.1.s", tag: "news.tag.p" },
   "81-il-ilan-sihirbazi": { t: "news.2.t", s: "news.2.s", tag: "news.tag.pl" },
   "kvkk-cerez-aydinlatma": { t: "news.3.t", s: "news.3.s", tag: "news.tag.c" },
-  "mobil-uygulama-yol-haritasi": { t: "news.4.t", s: "news.4.s", tag: "news.tag.m" },
 };
 
 export default function NewsPage() {
@@ -31,7 +29,6 @@ export default function NewsPage() {
                   <span className="rounded-full bg-lime/15 px-2 py-0.5 font-bold text-lime">
                     {keys ? t(keys.tag) : n.tag}
                   </span>
-                  <span className="text-muted">{n.date}</span>
                 </div>
                 <p className="mt-2 text-base font-extrabold">{keys ? t(keys.t) : n.title}</p>
                 <p className="mt-1 text-sm text-muted">{keys ? t(keys.s) : n.summary}</p>

@@ -2,15 +2,14 @@ import { NextResponse } from "next/server";
 import { verifyPasswordHash } from "@/lib/security/password";
 import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
 import { sanitizeText } from "@/lib/security/sanitize";
-import { prisma } from "@/lib/db";
-import { findUserByIdentifier, saveUser } from "@/lib/security/userStore";
-import { attachSession, requireMutatingRequest } from "@/lib/security/session";
+import { findUserByIdentifier } from "@/lib/security/userStore";
+import { requireMutatingRequest } from "@/lib/security/session";
 import { promoteConfiguredAdmin } from "@/lib/admin/audit";
-import { isProfileComplete, stampVerification } from "@/lib/profile";
-import { entitlementsChanged, reconcileEntitlements } from "@/lib/entitlements";
 import { readJson } from "@/lib/security/parseBody";
 import { loginBodySchema } from "@/lib/security/schemas";
 import { isStrongPassword } from "@/lib/security/passwordPolicy";
+import { completeLogin, sendLoginCode } from "@/lib/security/loginFlow";
+import { isTrustedDevice, setLoginChallenge } from "@/lib/security/twoFactor";
 
 export async function POST(req: Request) {
   const blocked = await requireMutatingRequest(req);
@@ -48,19 +47,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "auth.err.wrong" }, { status: 401 });
   }
 
-  const stamped = reconcileEntitlements(stampVerification(user.profile));
-  if (entitlementsChanged(user.profile, stamped) || stamped.verified !== user.profile.verified || stamped.profileComplete !== user.profile.profileComplete) {
-    user = await saveUser({ ...user, profile: stamped });
-  } else {
-    user = { ...user, profile: stamped };
+  if (user.profile.twoFactorEnabled && !(await isTrustedDevice(user.id))) {
+    const sent = await sendLoginCode(user);
+    if (!sent.ok) return NextResponse.json({ ok: false, error: "auth.err.mail" }, { status: 503 });
+    const res = NextResponse.json({ ...sent, twoFactor: true });
+    await setLoginChallenge(res, user.id);
+    return res;
   }
-  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
 
-  const res = NextResponse.json({
-    ok: true,
-    needsProfile: !isProfileComplete(user.profile),
-    needsEmailVerify: user.profile.emailVerified !== true,
-    user: user.profile,
-  });
-  return attachSession(res, user);
+  return completeLogin(user);
 }

@@ -1,16 +1,6 @@
 import { isValidEmail } from "@/lib/auth";
 import type { UserProfile } from "@/data/store";
 
-export function isAdult(isoDate: string) {
-  const born = new Date(isoDate);
-  if (Number.isNaN(born.getTime())) return false;
-  const now = new Date();
-  let age = now.getFullYear() - born.getFullYear();
-  const m = now.getMonth() - born.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < born.getDate())) age -= 1;
-  return age >= 18;
-}
-
 /** TR cep (10 hane, isteğe bağlı baştaki 0). 50/51/53–56 operatör aralığı; TCKN ve vergi no ile karışmaz. */
 export function nationalPhoneDigits(value: string) {
   const d = value.replace(/\D/g, "");
@@ -21,38 +11,6 @@ export function nationalPhoneDigits(value: string) {
 export function isValidPhone(value: string) {
   const n = nationalPhoneDigits(value);
   return /^5(0[1-9]|[13-6]\d)\d{7}$/.test(n);
-}
-
-export function isValidTckn(value: string) {
-  const n = value.replace(/\D/g, "");
-  if (!/^[1-9]\d{10}$/.test(n)) return false;
-  const d = n.split("").map(Number);
-  const odd = d[0] + d[2] + d[4] + d[6] + d[8];
-  const even = d[1] + d[3] + d[5] + d[7];
-  const d10 = ((odd * 7 - even) % 10 + 10) % 10;
-  const d11 = d.slice(0, 10).reduce((a, b) => a + b, 0) % 10;
-  return d[9] === d10 && d[10] === d11;
-}
-
-export function isValidVkn(value: string) {
-  const n = value.replace(/\D/g, "");
-  if (!/^\d{10}$/.test(n)) return false;
-  const d = n.split("").map(Number);
-  let sum = 0;
-  for (let i = 0; i < 9; i++) {
-    const tmp = (d[i] + 10 - (i + 1)) % 10;
-    let result = (tmp * 2 ** (9 - i)) % 9;
-    if (tmp !== 0 && result === 0) result = 9;
-    sum += result;
-  }
-  return d[9] === (10 - (sum % 10)) % 10;
-}
-
-export function isValidIdentityNo(value: string) {
-  const n = value.replace(/\D/g, "");
-  if (n.length === 11) return isValidTckn(n);
-  if (n.length === 10) return isValidVkn(n);
-  return false;
 }
 
 export function isValidFullName(value: string) {
@@ -71,13 +29,13 @@ export function isEmailVerified(user: UserProfile | null | undefined) {
   return user.emailVerified === true;
 }
 
-export type ProfileGap = "name" | "identity" | "phone" | "email" | "address";
+export type ProfileGap = "name" | "phone" | "email" | "address";
 
+/** National ID is intentionally not part of the profile: it is never collected, stored or shown. */
 export function profileGaps(user: UserProfile | null | undefined): ProfileGap[] {
-  if (!user) return ["name", "identity", "phone", "email", "address"];
+  if (!user) return ["name", "phone", "email", "address"];
   const gaps: ProfileGap[] = [];
   if (!isValidFullName(user.fullName ?? "")) gaps.push("name");
-  if (!isValidIdentityNo(user.nationalId ?? "")) gaps.push("identity");
   if (!isValidPhone(user.phone ?? "")) gaps.push("phone");
   if (!isEmailVerified(user)) gaps.push("email");
   if (!isValidOpenAddress(user.address ?? "")) gaps.push("address");
@@ -157,6 +115,7 @@ export const OPEN_PATHS = [
   "/kvkk",
   "/gizlilik-politikasi",
   "/kullanim-kosullari",
+  "/ilan-kurallari",
   "/kurumsal",
   "/sifre-unuttum",
   "/sifre-sifirla",

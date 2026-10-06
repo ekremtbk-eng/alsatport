@@ -30,8 +30,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       { path: "/gizlilik-politikasi", priority: 0.4, changeFrequency: "yearly" },
       { path: "/kullanim-kosullari", priority: 0.4, changeFrequency: "yearly" },
       { path: "/cerez-aydinlatma", priority: 0.3, changeFrequency: "yearly" },
-      { path: "/mesafeli-satis", priority: 0.3, changeFrequency: "yearly" },
-      { path: "/on-bilgilendirme", priority: 0.3, changeFrequency: "yearly" },
+      { path: "/ilan-kurallari", priority: 0.4, changeFrequency: "yearly" },
     ];
   const staticSet = new Set(staticPaths.map((r) => r.path));
   const uniqueCats = [

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, Minus, Plus, X } from "lucide-react";
 import { useI18n } from "@/context/I18nContext";
+import { ProtectedPhoto } from "@/components/ProtectedPhoto";
 
 const MIN = 1;
 const MAX = 4.5;
@@ -195,6 +196,7 @@ export function ListingLightbox({
         }}
         onContextMenu={(e) => e.preventDefault()}
         onDragStart={(e) => e.preventDefault()}
+        onAuxClick={(e) => e.preventDefault()}
         onDoubleClick={(e) => {
           e.preventDefault();
           if (view.current.scale > 1.02) resetView();
@@ -205,9 +207,7 @@ export function ListingLightbox({
           className="lb-frame"
           style={{ transform: `translate(${pos.x}px, ${pos.y}px) scale(${scale})` }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={src} alt={alt} draggable={false} className="lb-img" onContextMenu={(e) => e.preventDefault()} />
-          <span className="media-guard-film" aria-hidden />
+          <ProtectedPhoto src={src} alt={alt} imgClassName="lb-img" />
         </div>
         {n > 1 ? (
           <>
@@ -254,9 +254,7 @@ export function ListingLightbox({
               onClick={() => onIndex(i)}
               onContextMenu={(e) => e.preventDefault()}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={thumb} alt="" draggable={false} onContextMenu={(e) => e.preventDefault()} />
-              <span className="media-guard-film" aria-hidden />
+              <ProtectedPhoto src={thumb} alt="" imgClassName="h-full w-full object-cover" />
             </button>
           ))}
         </div>

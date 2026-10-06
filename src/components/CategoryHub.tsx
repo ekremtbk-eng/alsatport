@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Filter, X } from "lucide-react";
 import {
   catalogCount,
   findCategory,
@@ -15,12 +16,13 @@ import {
   visibleChildren,
   type Category,
 } from "@/data/categories";
-import { CategoryIcon } from "@/components/CategoryIcon";
 import { HomePromoBanner } from "@/components/home/HomePromoBanner";
 import { liveCount, isPublicListing } from "@/lib/categoryCounts";
 import { catName, useI18n } from "@/context/I18nContext";
 import { useApp } from "@/context/AppContext";
 import { BreadcrumbNav } from "@/components/BreadcrumbNav";
+import { FilterSheet } from "@/components/FilterSheet";
+import { FilterCategoryTree } from "@/components/FilterCategoryTree";
 import { ServicesHome } from "@/components/ServicesHome";
 import { StdFilterSidebar } from "@/components/StdFilterSidebar";
 import { listingMatchesDynamicFilters } from "@/lib/categoryFilters";
@@ -131,6 +133,7 @@ function ServiceHubShowcase({ cat, kids }: { cat: Category; kids: Category[] }) 
 export function CategoryHub({ cat }: { cat: Category }) {
   const { t, locale, formatMoney } = useI18n();
   const { listings } = useApp();
+  const router = useRouter();
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
   const [posted, setPosted] = useState("");
@@ -139,6 +142,8 @@ export function CategoryHub({ cat }: { cat: Category }) {
   const [word, setWord] = useState("");
   const [includeDesc, setIncludeDesc] = useState(false);
   const [more, setMore] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetCat, setSheetCat] = useState<Category>(cat);
   const parent = parentOf(cat);
   const kids = visibleChildren(cat);
   const related = relatedCategories(cat);
@@ -172,6 +177,51 @@ export function CategoryHub({ cat }: { cat: Category }) {
   const classifiedHub = isSeaEquipCategoryId(cat.id) && cat.id === "parts-sea";
   if (cat.id === "services") return <ServicesHome />;
 
+  const filterBody = (compact = false) => (
+    <StdFilterSidebar
+      cats={
+        compact ? (
+          <details className="flt-acc" open>
+            <summary className="flt-acc-sum">
+              <span className="flt-acc-title">{t("nav.categories")}</span>
+            </summary>
+            <div className="flt-acc-body">
+              <FilterCategoryTree
+                roots={kids.length ? kids : [cat]}
+                selectedId={sheetCat.id}
+                stay
+                onPick={setSheetCat}
+              />
+            </div>
+          </details>
+        ) : undefined
+      }
+      city={city}
+      district={district}
+      posted={posted}
+      mappedOnly={mappedOnly}
+      draft={draft}
+      includeDesc={includeDesc}
+      more={more}
+      compact={compact}
+      resultCount={vitrine.length}
+      onCity={setCity}
+      onDistrict={setDistrict}
+      onPosted={setPosted}
+      onMappedOnly={setMappedOnly}
+      onDraft={setDraft}
+      onIncludeDesc={setIncludeDesc}
+      onMore={() => setMore((v) => !v)}
+      onSearch={() => {
+        setWord(draft.trim());
+        if (compact && sheetCat.id !== cat.id) {
+          router.push(hrefForCategoryListings(sheetCat));
+        }
+        setSheetOpen(false);
+      }}
+    />
+  );
+
   return (
     <div className="hub-page">
       <BreadcrumbNav
@@ -184,34 +234,17 @@ export function CategoryHub({ cat }: { cat: Category }) {
       />
 
       <div className={`hub-layout ${showcase ? "is-showcase" : ""} ${classifiedHub ? "is-classified" : ""}`}>
-        {showcase ? null : (
         <aside className="acil-side hub-aside">
           <h1 className="hub-title">{name}</h1>
-          <ul className="acil-cats" aria-label={name}>
-            {kids.map((ch) => (
-              <li key={ch.id}>
-                <HubNavLink cat={ch} />
-              </li>
-            ))}
-          </ul>
-          <StdFilterSidebar
-            city={city}
-            district={district}
-            posted={posted}
-            mappedOnly={mappedOnly}
-            draft={draft}
-            includeDesc={includeDesc}
-            more={more}
-            radioName={`hub-date-${cat.id}`}
-            onCity={setCity}
-            onDistrict={setDistrict}
-            onPosted={setPosted}
-            onMappedOnly={setMappedOnly}
-            onDraft={setDraft}
-            onIncludeDesc={setIncludeDesc}
-            onMore={() => setMore((v) => !v)}
-            onSearch={() => setWord(draft.trim())}
-          />
+          <details className="flt-acc" open>
+            <summary className="flt-acc-sum">
+              <span className="flt-acc-title">{t("nav.categories")}</span>
+            </summary>
+            <div className="flt-acc-body flt-acc-cats">
+              <FilterCategoryTree roots={kids.length ? kids : [cat]} selectedId={cat.id} onPick={(c) => router.push(hrefForCategory(c))} />
+            </div>
+          </details>
+          {filterBody()}
           <Link href={hrefForCategoryListings(cat)} className="hub-all-cats">
             {t("cat.hub.allCats", { name })}
           </Link>
@@ -228,28 +261,26 @@ export function CategoryHub({ cat }: { cat: Category }) {
             </div>
           ) : null}
         </aside>
-        )}
 
         <div className="hub-main">
+          <h1 className="hub-title hub-title-mobile">{name}</h1>
+          <div className="browse-mobile-tools">
+            <button
+              type="button"
+              className="browse-filter-btn"
+              onClick={() => {
+                setSheetCat(cat);
+                setSheetOpen(true);
+              }}
+            >
+              <Filter className="h-4 w-4" />
+              {t("cat.filter")}
+            </button>
+          </div>
           {showcase ? (
             <ServiceHubShowcase cat={cat} kids={kids} />
           ) : (
             <>
-          <div className="hub-mobile-cards">
-            {kids.map((ch) => (
-              <Link key={ch.id} href={hrefForCategory(ch)} className="hub-box">
-                <span className="icon-tile grid h-10 w-10 place-items-center rounded-xl text-lime">
-                  <CategoryIcon name={ch.icon} className="h-5 w-5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-ink">{catName(t, ch.id, ch.name)}</span>
-                  <HubCount cat={ch} />
-                </span>
-                <ChevronRight className="h-4 w-4 text-muted" />
-              </Link>
-            ))}
-          </div>
-
           <div className="hub-vitrine-head">
             <h2>{t("acil.found", { n: formatListingCount(vitrine.length) })}</h2>
             <Link href={hrefForCategoryListings(cat)}>{t("cat.hub.allVitrine")}</Link>
@@ -297,6 +328,16 @@ export function CategoryHub({ cat }: { cat: Category }) {
         <p>{t(hubCopyKeys(cat).seo, { name })}</p>
         <p className="hub-updated">{t("cat.hub.updated", { date: updated })}</p>
       </article>
+
+      <FilterSheet open={sheetOpen} onClose={() => setSheetOpen(false)} label={t("cat.filter")}>
+        <div className="filter-head">
+          <h2 className="filter-title">{t("cat.filter")}</h2>
+          <button type="button" className="filter-x" onClick={() => setSheetOpen(false)} aria-label={t("common.close")}>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        {filterBody(true)}
+      </FilterSheet>
     </div>
   );
 }

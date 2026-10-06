@@ -5,8 +5,14 @@ import {
   walkCategories,
   type Category,
 } from "../src/data/categories";
+import { SPECIAL_DAY_SEEDS } from "../src/data/specialDays";
 
+/**
+ * Base reference data only (categories, special days). Insert-only and idempotent:
+ * existing rows are never updated or deleted. Demo sellers/listings live in seed-demo.ts.
+ */
 const prisma = new PrismaClient();
+console.log("prisma seed: start");
 
 type SeedRow = {
   id: string;
@@ -92,9 +98,38 @@ async function seedCategories() {
   return inserted.size;
 }
 
+async function seedSpecialDays() {
+  for (const row of SPECIAL_DAY_SEEDS) {
+    await prisma.specialDay.upsert({
+      where: { slug: row.slug },
+      create: {
+        slug: row.slug,
+        name: row.name,
+        kind: row.kind,
+        month: row.month,
+        day: row.day,
+        year: row.year ?? null,
+        durationDays: row.durationDays,
+        active: row.active,
+        sortOrder: row.sortOrder,
+        theme: row.theme,
+        eyebrow: row.eyebrow,
+        title: row.title,
+        body: row.body,
+        closing: row.closing,
+        cta: row.cta,
+      },
+      update: {},
+    });
+  }
+  return SPECIAL_DAY_SEEDS.length;
+}
+
 async function main() {
   const count = await seedCategories();
-  console.log(`Seeded ${count} categories.`);
+  console.log(`Seeded ${count} categories (insert-only).`);
+  const days = await seedSpecialDays();
+  console.log(`Seeded ${days} special days (insert-only).`);
 }
 
 main()

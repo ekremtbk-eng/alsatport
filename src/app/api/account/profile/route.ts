@@ -31,11 +31,9 @@ export async function POST(req: Request) {
   const fullName = sanitizeText(body.fullName, 80);
   const displayName = sanitizeText(body.displayName, 40);
   const phone = digitsOnly(body.phone, 11);
-  const birthDate = sanitizeText(body.birthDate, 10);
-  const nationalId = digitsOnly(body.nationalId, 11);
   const address = sanitizeMultiline(body.address, 400).replace(/\s+/g, " ").trim();
 
-  const fieldErr = profileFieldErrors({ fullName, phone, birthDate, nationalId, address });
+  const fieldErr = profileFieldErrors({ fullName, phone, address });
   if (fieldErr) {
     return NextResponse.json({ ok: false, error: fieldErr }, { status: 400 });
   }
@@ -45,8 +43,6 @@ export async function POST(req: Request) {
     ...auth.user.profile,
     fullName: fullName || auth.user.profile.fullName,
     phone: phone || auth.user.profile.phone,
-    birthDate: birthDate || auth.user.profile.birthDate,
-    nationalId: nationalId || auth.user.profile.nationalId,
     address: address || auth.user.profile.address,
     displayName: displayName || fullName || auth.user.profile.displayName,
   });

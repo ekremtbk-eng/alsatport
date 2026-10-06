@@ -7,6 +7,7 @@ import { useCompare } from "@/context/CompareContext";
 import { useI18n } from "@/context/I18nContext";
 import { isPublicListing } from "@/lib/categoryCounts";
 import type { Listing } from "@/data/store";
+import { listingSellerLabel } from "@/lib/publicName";
 
 export default function ComparePage() {
   const { listings } = useApp();
@@ -85,7 +86,7 @@ export default function ComparePage() {
             <tr>
               <th>{t("cmp.seller")}</th>
               {items.map((l) => (
-                <td key={l.id}>{l.sellerName}</td>
+                <td key={l.id}>{listingSellerLabel(l)}</td>
               ))}
             </tr>
             {specKeys.map((key) => (

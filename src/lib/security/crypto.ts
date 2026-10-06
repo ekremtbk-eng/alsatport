@@ -10,7 +10,7 @@ function piiKey() {
   return createHash("sha256").update(material).digest();
 }
 
-/** AES-256-GCM for at-rest PII (TCKN / VKN). Legacy plaintext is left readable until next save. */
+/** AES-256-GCM for at-rest PII (profile address). Legacy plaintext is left readable until next save. */
 export function encryptPii(plain: string) {
   const value = plain.trim();
   if (!value) return "";

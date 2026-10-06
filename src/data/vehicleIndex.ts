@@ -28,10 +28,6 @@ export type VehicleProfile =
   | "air"
   | "disabled";
 
-const GENERIC_ENGINES = ["1.0", "1.2", "1.4", "1.5", "1.6", "1.8", "2.0", "2.5", "3.0", "Hibrit", "Elektrik"];
-const GENERIC_BODIES = ["Sedan", "Hatchback", "Station Wagon", "Coupe", "Cabrio", "SUV", "Pickup", "MPV"];
-const GENERIC_BATTERIES = ["40 kWh", "55 kWh", "62 kWh", "75 kWh", "82 kWh", "100 kWh"];
-const GENERIC_RANGES = ["250 km", "320 km", "400 km", "480 km", "550 km", "650 km"];
 
 function unique(items: string[]) {
   const seen = new Set<string>();
@@ -68,14 +64,13 @@ function subset(catalog: VehicleBrand[], pred: (m: VehicleModelLine) => boolean)
 function enhanceEv(catalog: VehicleBrand[]): VehicleBrand[] {
   return catalog.map((b) => ({
     ...b,
-    models: b.models.map((m) => {
-      const hasKwh = m.engines.some((e) => /kwh/i.test(e));
-      return {
-        ...m,
-        engines: hasKwh ? unique(m.engines.filter((e) => /kwh|elektrik/i.test(e))) : GENERIC_BATTERIES,
-        ranges: m.ranges?.length ? unique(m.ranges) : GENERIC_RANGES,
-      };
-    }),
+    models: b.models.map((m) => ({
+      ...m,
+      engines: unique(m.engines.filter((e) => /kwh|elektrik/i.test(e))).length
+        ? unique(m.engines.filter((e) => /kwh|elektrik/i.test(e)))
+        : unique(m.engines),
+      ranges: m.ranges?.length ? unique(m.ranges) : [],
+    })),
   }));
 }
 
@@ -215,39 +210,22 @@ export function modelsOfBrand(brandName?: string, segment: VehicleSegment = "aut
 
 export function packagesOfModel(brandName?: string, modelName?: string, segment: VehicleSegment = "auto") {
   if (!modelName) return [];
-  const found = findLine(brandName, modelName, segment)?.packages ?? [];
-  if (found.length) return found;
-  return unique([modelName, `${modelName} Standart`, `${modelName} Plus`, `${modelName} Premium`]);
+  return findLine(brandName, modelName, segment)?.packages ?? [];
 }
 
 export function enginesOfModel(brandName?: string, modelName?: string, segment: VehicleSegment = "auto") {
   if (!modelName) return [];
-  const found = findLine(brandName, modelName, segment)?.engines ?? [];
-  if (found.length) return found;
-  if (segment === "ev") return GENERIC_BATTERIES;
-  if (segment === "moto") return ["125 cc", "250 cc", "400 cc", "600 cc", "1000 cc"];
-  if (segment === "atv") return ["250 cc", "400 cc", "500 cc", "700 cc", "1000 cc"];
-  if (segment === "van" || segment === "ticari" || segment === "deniz") return ["110 hp", "150 hp", "180 hp", "250 hp", "350 hp"];
-  return GENERIC_ENGINES;
+  return findLine(brandName, modelName, segment)?.engines ?? [];
 }
 
 export function bodiesOfModel(brandName?: string, modelName?: string, segment: VehicleSegment = "auto") {
   if (!modelName) return [];
-  const found = findLine(brandName, modelName, segment)?.bodies ?? [];
-  if (found.length) return found;
-  if (segment === "moto") return ["Naked", "Sport", "Scooter", "Adventure", "Cruiser"];
-  if (segment === "atv") return ["ATV", "Quad", "4x4", "Side by Side"];
-  if (segment === "deniz") return ["Motoryat", "Yelkenli", "Sürat Teknesi", "Şişme Bot", "Katamaran"];
-  if (segment === "van") return ["Minivan", "Panelvan", "Camlı Van", "Kombi"];
-  if (segment === "ticari") return ["Kamyonet", "Kamyon", "Çekici", "Pickup"];
-  if (segment === "suv") return ["SUV", "Pickup"];
-  return GENERIC_BODIES;
+  return findLine(brandName, modelName, segment)?.bodies ?? [];
 }
 
 export function rangesOfModel(brandName?: string, modelName?: string, segment: VehicleSegment = "auto") {
   if (!modelName) return [];
-  const found = findLine(brandName, modelName, segment)?.ranges ?? [];
-  return found.length ? found : segment === "ev" ? GENERIC_RANGES : [];
+  return findLine(brandName, modelName, segment)?.ranges ?? [];
 }
 
 export function seriesOfBrand(brandName?: string, segment: VehicleSegment = "auto") {
@@ -256,4 +234,20 @@ export function seriesOfBrand(brandName?: string, segment: VehicleSegment = "aut
 
 export function modelsOfSeries(brandName?: string, seriesName?: string, segment: VehicleSegment = "auto") {
   return packagesOfModel(brandName, seriesName, segment);
+}
+
+/**
+ * Per trim-level equipment is not stored in the static vehicle catalog.
+ * Returns null so callers never guess ABS/ESP/etc. from brand/model alone.
+ */
+export function equipmentForVehicleCombo(_input: {
+  brand?: string;
+  model?: string;
+  trim?: string;
+  engine?: string;
+  body?: string;
+  year?: string;
+  segment?: VehicleSegment;
+}): string[] | null {
+  return null;
 }

@@ -8,7 +8,7 @@ import { useApp } from "@/context/AppContext";
 import { SERVICE_OFFER_PATH } from "@/lib/serviceOffer";
 import { ServicesLogo } from "@/components/ServicesLogo";
 
-const TABS = [
+export const SERVICE_PORTAL_TABS = [
   { id: "services-reno", label: "Ev Tadilat & Dekorasyon" },
   { id: "services-move", label: "Nakliye" },
   { id: "services-auto", label: "Araç Servis & Bakım" },
@@ -49,7 +49,7 @@ export function ServicesPortalNav() {
         </div>
       </div>
       <nav className="svc-portal-tabs" aria-label={t("cat.services")}>
-        {TABS.map((tab) => {
+        {SERVICE_PORTAL_TABS.map((tab) => {
           const cat = findCategory(tab.id);
           const href = cat ? hrefForCategory(cat) : "/kategoriler/ustalar-hizmetler";
           const on = isTabActive(path, href, tab.id);

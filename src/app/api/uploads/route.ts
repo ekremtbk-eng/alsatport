@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { moderateListingMaterial } from "@/lib/liveAnimalPolicy";
 import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
+import { applyListingWatermark } from "@/lib/storage/listingWatermark";
 import {
   MAX_UPLOAD_BYTES,
   deleteStoredObject,
@@ -29,10 +30,11 @@ export async function POST(req: Request) {
 
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
+  const categoryId = typeof form?.get("categoryId") === "string" ? String(form.get("categoryId")) : "";
   if (!(file instanceof File)) {
     return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
   }
-  const banned = moderateListingMaterial(file);
+  const banned = moderateListingMaterial(file, categoryId);
   if (banned.blocked) {
     return NextResponse.json({ ok: false, error: banned.reason ?? "mod.animal" }, { status: 400 });
   }
@@ -46,7 +48,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "photo.only" }, { status: 400 });
   }
 
-  const stored = await putListingImage(auth.user.id, buf, sniff.mime, sniff.ext);
+  let processed: Awaited<ReturnType<typeof applyListingWatermark>>;
+  try {
+    processed = await applyListingWatermark(buf, sniff.mime);
+  } catch {
+    return NextResponse.json({ ok: false, error: "photo.only" }, { status: 400 });
+  }
+  const stored = await putListingImage(auth.user.id, Buffer.from(processed.bytes), processed.mime, processed.ext);
   return NextResponse.json({ ok: true, ...stored });
 }
 

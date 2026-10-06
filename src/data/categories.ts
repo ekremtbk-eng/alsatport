@@ -1,6 +1,8 @@
 import { isBannedLiveAnimalCategory, isBannedLiveAnimalSlug } from "@/lib/liveAnimalPolicy";
 import { otherCategories, shoppingCategories } from "@/data/shoppingCatalog";
 import { SEA_EQUIP_GROUPS } from "@/data/seaEquip";
+import { VEHICLE_BRANDS } from "@/data/vehicleCatalog";
+import { isListingFilterEnabled } from "@/lib/listingQuery";
 
 export type ListingFilter =
   | "urgent"
@@ -272,7 +274,7 @@ export const categoryShortcuts: Category[] = [
   node("hub-story", "hikayeni-paylas", "Hikayeni Paylaş", "megaphone", { filter: "story" }),
   node("hub-legend", "efsane-ilanlar", "Efsane İlanlar", "star", { filter: "legend" }),
   node("hub-odd", "ilginc-ilanlar", "İlginç İlanlar", "flame", { filter: "odd" }),
-];
+].filter((c) => isListingFilterEnabled(c.filter));
 
 export const categories: Category[] = [
   node("emlak", "emlak", "Emlak", "building", {
@@ -1553,16 +1555,23 @@ export function allCategoryNodes(): Category[] {
   return out;
 }
 
-export function findCategory(idOrSlug: string): Category | undefined {
-  if (isBannedLiveAnimalSlug(idOrSlug) || isBannedLiveAnimalCategory(idOrSlug)) {
-    return findCategory("pets");
-  }
+/** Exact id/slug/alias lookup. Does not remap banned live-animal nodes. */
+export function lookupCategory(idOrSlug: string): Category | undefined {
+  const raw = idOrSlug.trim();
+  if (!raw) return undefined;
   let found: Category | undefined;
   walkCategories([...categoryShortcuts, ...categories], (c) => {
     if (found) return;
-    if (c.id === idOrSlug || c.slug === idOrSlug || c.aliases?.includes(idOrSlug)) found = c;
+    if (c.id === raw || c.slug === raw || c.aliases?.includes(raw)) found = c;
   });
   return found;
+}
+
+export function findCategory(idOrSlug: string): Category | undefined {
+  if (isBannedLiveAnimalSlug(idOrSlug) || isBannedLiveAnimalCategory(idOrSlug)) {
+    return lookupCategory("pets");
+  }
+  return lookupCategory(idOrSlug);
 }
 
 export function flattenCategories(): Category[] {
@@ -1576,6 +1585,18 @@ export function parentOf(cat: Category): Category | undefined {
   return findCategory(cat.parentId);
 }
 
+export function categoryPath(cat?: Category | null): Category[] {
+  const path: Category[] = [];
+  let cur = cat ?? undefined;
+  const seen = new Set<string>();
+  while (cur && !seen.has(cur.id)) {
+    seen.add(cur.id);
+    path.unshift(cur);
+    cur = parentOf(cur);
+  }
+  return path;
+}
+
 function collectIds(cat: Category): string[] {
   const ids = [cat.id, ...(cat.aliases ?? [])];
   for (const ch of cat.children ?? []) ids.push(...collectIds(ch));
@@ -1586,7 +1607,7 @@ function collectIds(cat: Category): string[] {
 export function categoryQueryIds(idOrSlug: string): string[] {
   const raw = idOrSlug.trim();
   if (!raw) return [];
-  const cat = findCategory(raw);
+  const cat = lookupCategory(raw);
   if (!cat) return [raw];
   if (cat.filter) return [];
   return [...new Set(collectIds(cat))];
@@ -1627,6 +1648,34 @@ export function searchCategories(query: string): Category[] {
     const hay = [c.name, c.slug, c.id, ...(c.aliases ?? [])].join(" ").toLocaleLowerCase("tr");
     return hay.includes(q) || c.slug.includes(q.replaceAll(" ", "-"));
   });
+}
+
+export function searchBrands(query: string): string[] {
+  const q = query.trim().toLocaleLowerCase("tr");
+  if (q.length < 2) return [];
+  const hits: string[] = [];
+  const seen = new Set<string>();
+  const push = (label: string) => {
+    const key = label.toLocaleLowerCase("tr");
+    if (seen.has(key) || !label.toLocaleLowerCase("tr").includes(q)) return;
+    seen.add(key);
+    hits.push(label);
+  };
+  for (const c of allCategoryNodes()) {
+    for (const brand of c.brands ?? []) push(brand);
+    if (hits.length >= 6) return hits;
+  }
+  for (const brand of VEHICLE_BRANDS) {
+    push(brand.name);
+    for (const model of brand.models) {
+      push(model.name);
+      if (q.length >= 3 && model.name.toLocaleLowerCase("tr").includes(q)) {
+        push(`${brand.name} ${model.name}`);
+      }
+    }
+    if (hits.length >= 6) return hits;
+  }
+  return hits.slice(0, 6);
 }
 
 export function inferCategoryFromQuery(query: string): Category | undefined {

@@ -4,6 +4,8 @@ export type SellerReview = {
   listingId?: string;
   authorId: string;
   authorName: string;
+  /** Set only for admin-verified business authors; otherwise authorName is masked for display. */
+  authorBusiness?: boolean;
   authorAvatar: string;
   rating: number;
   text: string;

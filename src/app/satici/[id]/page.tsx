@@ -18,6 +18,7 @@ import { useI18n } from "@/context/I18nContext";
 import { apiGet } from "@/lib/security/client";
 import { useSellerReviews } from "@/components/useSellerReviews";
 import type { Listing } from "@/data/store";
+import { listingSellerLabel } from "@/lib/publicName";
 
 export default function SellerProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -81,7 +82,7 @@ export default function SellerProfilePage() {
           />
             <div className="flex-1 text-center sm:text-start">
             <h1 className="inline-flex items-center gap-1.5 text-xl font-extrabold">
-              {seller.sellerName}
+              {listingSellerLabel(seller)}
               {seller.sellerVerified && <VerifiedBadge size={22} />}
             </h1>
             <p className="mt-1 text-sm text-blue">

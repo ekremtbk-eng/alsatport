@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { LIMITS, clientIp, clientRateKey, rateLimit } from "@/lib/security/rateLimit";
 import { sanitizeSearchQuery, sanitizeSlug } from "@/lib/security/inputGuard";
 import { sanitizeText } from "@/lib/security/sanitize";
@@ -7,8 +7,8 @@ import { isProfileComplete } from "@/lib/profile";
 import { canPublishListing, expiresAtForUser, listingIsPromoted, remainingListingSlots } from "@/lib/listingQuota";
 import { entitlementsChanged, reconcileEntitlements } from "@/lib/entitlements";
 import { saveUser } from "@/lib/security/userStore";
-import { createListing, parseListingInput, queryListings } from "@/lib/listings/store";
-import { verifyRecaptchaToken } from "@/lib/security/recaptcha";
+import { lookupCategory } from "@/data/categories";
+import { createListing, fillMissingListingCoords, hideSellerPhone, parseListingInput, queryListings } from "@/lib/listings/store";
 import { parseSearch, readJson } from "@/lib/security/parseBody";
 import { listingCreateBodySchema, listingQuerySchema } from "@/lib/security/schemas";
 
@@ -29,19 +29,22 @@ export async function GET(req: Request) {
   const mine = query.mine === "1";
   const priceMin = Number(query.priceMin);
   const priceMax = Number(query.priceMax);
+  const catRaw = query.categoryId || query.kategori;
+  const catHit = catRaw ? lookupCategory(catRaw) : undefined;
   const listings = await queryListings({
     q: sanitizeSearchQuery(query.q),
-    categoryId: sanitizeSlug(query.categoryId || query.kategori) || undefined,
+    categoryId: catHit?.id || sanitizeSlug(catRaw) || undefined,
     city: sanitizeText(query.city, 40) || undefined,
     district: sanitizeText(query.district, 40) || undefined,
     priceMin: Number.isFinite(priceMin) ? priceMin : undefined,
     priceMax: Number.isFinite(priceMax) ? priceMax : undefined,
+    posted: query.posted,
     status: query.status,
     viewerId: claims?.sub,
     sellerId: query.sellerId,
     mine: mine && !!claims?.sub,
   });
-  return NextResponse.json({ ok: true, listings });
+  return NextResponse.json({ ok: true, listings: claims ? listings : listings.map(hideSellerPhone) });
 }
 
 export async function POST(req: Request) {
@@ -74,14 +77,6 @@ export async function POST(req: Request) {
   const parsedBody = await readJson(req, listingCreateBodySchema);
   if (!parsedBody.ok) return parsedBody.response;
   const body = parsedBody.data as Record<string, unknown>;
-  const captcha = await verifyRecaptchaToken(
-    typeof parsedBody.data.recaptchaToken === "string" ? parsedBody.data.recaptchaToken : undefined,
-    "listing",
-    ip,
-  );
-  if (!captcha.ok) {
-    return NextResponse.json({ ok: false, error: captcha.error }, { status: 400 });
-  }
   const parsed = parseListingInput(body);
   if ("error" in parsed) {
     return NextResponse.json({ ok: false, error: parsed.error }, { status: 400 });
@@ -95,6 +90,10 @@ export async function POST(req: Request) {
   const created = await createListing(auth.user, parsed);
   if ("error" in created) {
     return NextResponse.json({ ok: false, error: created.error }, { status: 400 });
+  }
+  if (created.listing.lat == null) {
+    const listingId = created.listing.id;
+    after(() => fillMissingListingCoords(listingId).catch(() => undefined));
   }
 
   const posted = (auth.user.profile.listingsPosted ?? 0) + 1;

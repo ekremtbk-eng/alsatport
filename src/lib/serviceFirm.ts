@@ -11,6 +11,7 @@ import type { SellerReview } from "@/data/reviews";
 import { summarizeReviews } from "@/data/reviews";
 import type { Listing } from "@/data/store";
 import { districtsOf } from "@/data/turkey";
+import { listingSellerLabel } from "@/lib/publicName";
 
 export const SERVICE_FIRM_PATH = "/ustalar-hizmetler/firma";
 
@@ -168,7 +169,6 @@ export function buildFirmProfile(listing: Listing, reviews: SellerReview[]): Fir
   const allChecks: FirmCheck[] = [
     { label: "İsim, Soyisim" },
     { label: "Ticari Ünvanı" },
-    { label: "TC Kimlik No" },
     { label: "Vergi Dairesi" },
     { label: "Cep Telefonu" },
     { label: "Vergi Numarası" },
@@ -181,7 +181,7 @@ export function buildFirmProfile(listing: Listing, reviews: SellerReview[]): Fir
 
   const about = [
     listing.description.trim(),
-    `${listing.sellerName} olarak ${listing.city}${listing.district ? ` / ${listing.district}` : ""} bölgesinde ${serviceName.toLocaleLowerCase("tr")} alanında hizmet veriyoruz.`,
+    `${listingSellerLabel(listing)} olarak ${listing.city}${listing.district ? ` / ${listing.district}` : ""} bölgesinde ${serviceName.toLocaleLowerCase("tr")} alanında hizmet veriyoruz.`,
     "Tamamladığımız proje ve işlerden bazıları referans olarak İş Örnekleri galerisinde yer alır. Teklif Al ile işinizi anlatın; uygun gördüğünüzde telefon numarasından bize ulaşın.",
     hours24
       ? "Acil durumlarda 7/24 destek veriyoruz."

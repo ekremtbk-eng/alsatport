@@ -179,7 +179,13 @@ export function extraModelsFor(cat: CatRef, brand: string): string[] {
       if (brandHit(brand, key)) return models;
     }
   }
-  if (id.startsWith("pets-")) return PET_SPECIES;
+  if (id.startsWith("pets-")) {
+    if (id.includes("kedi") || id.endsWith("-cat")) return ["Kedi"];
+    if (id.includes("kopek") || id.endsWith("-dog")) return ["Köpek"];
+    if (id.includes("kus") || id.endsWith("-bird")) return ["Kuş"];
+    if (id.includes("balik") || id.endsWith("-fish")) return ["Balık"];
+    return PET_SPECIES;
+  }
   if (id.startsWith("machines-")) {
     if (id.includes("excavator") || id.includes("ekskavator")) return ["Paletli", "Lastikli", "Mini", "Midi", "Ağır"];
     if (id.includes("loader") || id.includes("loder")) return ["Lastikli", "Kazıcı yükleyici", "Mini"];

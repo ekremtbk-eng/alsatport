@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BadgeCheck, ChevronDown, List, LogOut, PlusCircle, Settings, Shield, UserRound } from "lucide-react";
+import { BadgeCheck, ChevronDown, List, LogIn, LogOut, PlusCircle, Shield, UserPlus, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/context/AppContext";
@@ -9,7 +9,7 @@ import { useAuthModal } from "@/context/AuthModalContext";
 import { useI18n } from "@/context/I18nContext";
 import { postListingHref } from "@/lib/profile";
 
-export function UserMenu() {
+export function UserMenu({ utility = false }: { utility?: boolean }) {
   const { user, logout, hydrated } = useApp();
   const { t } = useI18n();
   const { openAuth, openRegister } = useAuthModal();
@@ -26,17 +26,19 @@ export function UserMenu() {
   }, []);
 
   if (!hydrated) {
-    return <div className="h-10 w-24 rounded-2xl border border-line bg-panel/40" />;
+    return <div className={`header-guest-skel h-10 w-24 rounded-2xl border border-line bg-panel/40 ${utility ? "is-utility" : ""}`} />;
   }
 
   if (!user) {
     return (
-      <div className="header-guest flex items-center gap-2">
-        <button type="button" className="btn-ghost h-10 px-4 text-sm" onClick={() => openAuth("login")}>
-          {t("nav.login")}
+      <div className={`header-guest flex items-center gap-2 ${utility ? "is-utility" : ""}`}>
+        <button type="button" className="header-guest-login btn-ghost inline-flex h-10 items-center gap-1.5 px-4 text-sm" aria-label={t("nav.login")} onClick={() => openAuth("login")}>
+          <LogIn className="header-guest-ico h-4 w-4" />
+          <span className="header-guest-label">{t("nav.login")}</span>
         </button>
-        <button type="button" className="header-guest-signup btn-primary h-10 px-4 text-sm" onClick={() => openRegister()}>
-          {t("nav.signup")}
+        <button type="button" className="header-guest-signup btn-primary inline-flex h-10 items-center gap-1.5 px-4 text-sm" aria-label={t("nav.signup")} onClick={() => openRegister()}>
+          <UserPlus className="header-guest-ico h-4 w-4" />
+          <span className="header-guest-label">{t("nav.signup")}</span>
         </button>
       </div>
     );
@@ -80,10 +82,6 @@ export function UserMenu() {
           <Link href={postListingHref(user)} className="user-menu-item" onClick={() => setOpen(false)}>
             <PlusCircle className="h-4 w-4" />
             {t("nav.post")}
-          </Link>
-          <Link href="/paketler" className="user-menu-item" onClick={() => setOpen(false)}>
-            <Settings className="h-4 w-4" />
-            {t("footer.packages")}
           </Link>
           {user.role === "admin" ? (
             <Link href="/admin" className="user-menu-item" onClick={() => setOpen(false)}>

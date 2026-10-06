@@ -3,7 +3,7 @@
 import { Cookie, Lock, Settings2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useCookies, type CookiePrefs } from "@/context/CookieContext";
-import { KvkkLink } from "@/components/LegalNoticeModal";
+import Link from "next/link";
 import { useI18n } from "@/context/I18nContext";
 
 const CATEGORIES: {
@@ -52,15 +52,15 @@ export function CookieConsent() {
                 <p className="text-sm font-extrabold md:text-base">{t("cookie.h")}</p>
                 <p className="mt-1 text-xs leading-relaxed text-soft md:text-sm">
                   {t("cookie.p")}{" "}
-                  <KvkkLink className="font-semibold text-lime underline-offset-2 hover:underline">
-                    {t("footer.kvkk")}
-                  </KvkkLink>
+                  <Link href="/cerez-aydinlatma" className="font-semibold text-lime underline-offset-2 hover:underline">
+                    {t("footer.cookiePolicy")}
+                  </Link>
                 </p>
               </div>
             </div>
             <div className="grid gap-2 sm:grid-cols-3">
-              <button type="button" onClick={acceptAll} className="btn-primary h-11 text-sm">
-                {t("cookie.accept")}
+              <button type="button" onClick={rejectAll} className="btn-primary h-11 text-sm">
+                {t("cookie.reject")}
               </button>
               <button
                 type="button"
@@ -68,13 +68,13 @@ export function CookieConsent() {
                   setDraft(prefs);
                   openPrefs();
                 }}
-                className="btn-blue h-11 text-sm"
+                className="btn-ghost h-11 text-sm"
               >
-                <Settings2 className="relative z-10 h-4 w-4" />
-                <span className="relative z-10">{t("cookie.manage")}</span>
+                <Settings2 className="h-4 w-4" />
+                <span>{t("cookie.manage")}</span>
               </button>
-              <button type="button" onClick={rejectAll} className="btn-ghost h-11 text-sm">
-                {t("cookie.reject")}
+              <button type="button" onClick={acceptAll} className="btn-primary h-11 text-sm">
+                {t("cookie.accept")}
               </button>
             </div>
           </div>
@@ -85,6 +85,7 @@ export function CookieConsent() {
         <div className="fixed inset-0 z-[110] grid place-items-end bg-black/40 p-3 backdrop-blur-sm sm:place-items-center">
           <div
             role="dialog"
+            aria-modal="true"
             aria-labelledby="cookie-prefs-title"
             className="chat-dock w-full max-w-lg overflow-hidden rounded-3xl bg-panel"
           >
@@ -143,16 +144,19 @@ export function CookieConsent() {
                   </div>
                 );
               })}
-              <KvkkLink className="block text-center text-xs font-semibold text-lime">
+              <Link href="/cerez-aydinlatma" onClick={closePrefs} className="block text-center text-xs font-semibold text-lime">
                 {t("cookie.read")}
-              </KvkkLink>
+              </Link>
             </div>
-            <div className="grid grid-cols-2 gap-2 border-t border-line p-3">
-              <button type="button" onClick={rejectAll} className="btn-ghost h-11 text-sm">
+            <div className="grid grid-cols-1 gap-2 border-t border-line p-3 sm:grid-cols-3">
+              <button type="button" onClick={rejectAll} className="btn-primary h-11 text-sm">
                 {t("cookie.reject")}
               </button>
-              <button type="button" onClick={() => savePrefs(draft)} className="btn-primary h-11 text-sm">
+              <button type="button" onClick={() => savePrefs(draft)} className="btn-ghost h-11 text-sm">
                 {t("cookie.save")}
+              </button>
+              <button type="button" onClick={acceptAll} className="btn-primary h-11 text-sm">
+                {t("cookie.accept")}
               </button>
             </div>
           </div>

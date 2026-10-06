@@ -1,16 +1,17 @@
-import type { Metadata } from "next";
-import { LegalNoticeBody } from "@/components/LegalNoticeBody";
+import { CookiePolicyBody } from "@/components/legal/CookiePolicyBody";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "KVKK / Çerez Aydınlatma Metni — AlsatPort",
+export const metadata = pageMetadata({
+  title: "Çerez Politikası · AlSatPort",
   description:
-    "AlsatPort Bilgi Teknolojileri A.Ş. kişisel verilerin korunması ve çerez aydınlatma metni. KVKK m.10–m.11 haklarınız ve çerez tercihleriniz.",
-};
+    "AlSatPort'un kullandığı tüm çerezler ve tarayıcı depolama kayıtları: ad, sağlayıcı, amaç, süre ve kategori. Analitik ve pazarlama çerezi kullanılmaz.",
+  path: "/cerez-aydinlatma",
+});
 
-export default function CookieNoticePage() {
+export default function CookiePolicyPage() {
   return (
-    <article className="mx-auto max-w-3xl px-4 py-8">
-      <LegalNoticeBody />
+    <article className="legal-page mx-auto max-w-4xl px-4 py-8 sm:px-6">
+      <CookiePolicyBody />
     </article>
   );
 }

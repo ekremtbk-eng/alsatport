@@ -8,6 +8,7 @@ import { VerifiedBadge } from "./VerifiedBadge";
 import { useI18n } from "@/context/I18nContext";
 import { useAuthModal } from "@/context/AuthModalContext";
 import { isUuid } from "@/lib/ids";
+import { listingSellerLabel } from "@/lib/publicName";
 
 const REPLY_KEYS = ["chat.r1", "chat.r2", "chat.r3", "chat.r4"] as const;
 
@@ -96,7 +97,7 @@ export function SellerChatPopup({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={listing.sellerAvatar} alt="" className="h-9 w-9 rounded-full object-cover" />
           <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-            {listing.sellerName}
+            {listingSellerLabel(listing)}
           </span>
           {listing.sellerVerified && <VerifiedBadge size={16} />}
           <span className="text-[11px] text-lime">{t("nav.messages")}</span>
@@ -108,7 +109,7 @@ export function SellerChatPopup({
             <img src={listing.sellerAvatar} alt="" className="h-9 w-9 rounded-full object-cover" />
             <div className="min-w-0 flex-1">
               <p className="flex items-center gap-1.5 text-sm font-bold">
-                {listing.sellerName}
+                {listingSellerLabel(listing)}
                 {listing.sellerVerified && <VerifiedBadge size={16} />}
               </p>
               <p className="truncate text-[11px] text-muted">{listing.title}</p>

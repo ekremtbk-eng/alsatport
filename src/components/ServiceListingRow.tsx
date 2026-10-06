@@ -6,6 +6,7 @@ import { findCategory, formatListingCount } from "@/data/categories";
 import type { SellerReview } from "@/data/reviews";
 import { serviceRating, serviceFirmHref } from "@/lib/serviceFirm";
 import type { Listing } from "@/data/store";
+import { listingSellerLabel } from "@/lib/publicName";
 import { catName, useI18n } from "@/context/I18nContext";
 
 export { serviceRating } from "@/lib/serviceFirm";
@@ -35,7 +36,7 @@ export function ServiceListingRow({
             <span className="svc-row-meta">
               <span>
                 <User className="h-3.5 w-3.5" />
-                {listing.sellerName}
+                {listingSellerLabel(listing)}
               </span>
               <span>
                 <MapPin className="h-3.5 w-3.5" />

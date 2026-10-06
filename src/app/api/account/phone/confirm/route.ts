@@ -7,6 +7,8 @@ import { attachSession, requireMutatingRequest, requireUser } from "@/lib/securi
 import { findUserById, saveUser } from "@/lib/security/userStore";
 import { verifyEmailOtp } from "@/lib/security/emailOtp";
 import { roleForProfile } from "@/lib/security/rbac";
+import { readJson } from "@/lib/security/parseBody";
+import { otpBodySchema } from "@/lib/security/schemas";
 
 export async function POST(req: Request) {
   const blocked = await requireMutatingRequest(req);
@@ -23,8 +25,9 @@ export async function POST(req: Request) {
     );
   }
 
-  const body = (await req.json().catch(() => null)) as { otp?: string } | null;
-  const otp = digitsOnly(body?.otp, 6);
+  const parsed = await readJson(req, otpBodySchema);
+  if (!parsed.ok) return parsed.response;
+  const otp = digitsOnly(parsed.data.otp, 6);
   if (otp.length !== 6 || !(await verifyEmailOtp(auth.user.id, otp, "phone"))) {
     return NextResponse.json({ ok: false, error: "complete.err.emailCode" }, { status: 401 });
   }

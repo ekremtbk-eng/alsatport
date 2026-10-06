@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Bell,
-  Check,
   CreditCard,
   Heart,
   LayoutDashboard,
@@ -14,7 +13,6 @@ import {
   MessageCircle,
   Phone,
   Search,
-  ShieldCheck,
 } from "lucide-react";
 import { ListingCard } from "@/components/ListingCard";
 import { ListingGrid } from "@/components/ListingGrid";
@@ -23,6 +21,9 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { useApp } from "@/context/AppContext";
 import { useI18n } from "@/context/I18nContext";
 import { isPublicListing } from "@/lib/categoryCounts";
+import { listingSellerLabel, maskPersonName } from "@/lib/publicName";
+import type { UserProfile } from "@/data/store";
+import { posterSupported } from "@/lib/poster";
 import type { DashPanelId } from "@/lib/dashboardNav";
 import { formatNotifTime, listingMatchesSearch, searchHref, searchLabel, type NotifKind } from "@/lib/notify";
 import { NUMBER_LOCALE } from "@/i18n/config";
@@ -30,7 +31,6 @@ import {
   isEmailVerified,
   isProfileComplete,
   isValidFullName,
-  isValidIdentityNo,
   isValidOpenAddress,
   isValidPhone,
   profileGaps,
@@ -38,11 +38,23 @@ import {
   postListingHref,
 } from "@/lib/profile";
 import { apiPost } from "@/lib/security/client";
+import { ACCOUNT_DELETE_PHRASE, isDeletePhrase } from "@/lib/accountDelete";
+import { LEGAL_PRIVACY_EMAIL } from "@/data/legal";
 import { TURKEY_CITIES } from "@/data/turkey";
-import { passwordChecks } from "@/lib/security/passwordPolicy";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { EntitlementStatus } from "@/components/EntitlementStatus";
-import { paymentsPaused } from "@/lib/campaign";
+import { FieldError, Notice, OtpInput, Pane, SandboxCode, ToggleRow } from "./DashUi";
+import {
+  BlocksPanel,
+  MarketingPanel,
+  MotionPanel,
+  PasswordPanel,
+  QrPanel,
+  ReadReceiptPanel,
+  SecurityPanel,
+  TwoFactorPanel,
+  VerificationStatusCard,
+} from "./AccountPanels";
 
 const KIND: Record<NotifKind, { icon: typeof Bell; key: string }> = {
   price: { icon: Bell, key: "notif.kind.price" },
@@ -55,24 +67,6 @@ function titleFor(kind: NotifKind, fallback: string, t: (k: string) => string) {
   const key = `notif.t.${kind}`;
   const v = t(key);
   return v === key ? fallback : v;
-}
-
-const PREFS_KEY = "alsatport-dash-prefs-v1";
-
-type DashPrefs = { readReceipts: boolean; marketingEmail: boolean; marketingSms: boolean; marketingPush: boolean };
-
-function loadPrefs(): DashPrefs {
-  try {
-    const raw = JSON.parse(localStorage.getItem(PREFS_KEY) || "{}") as Partial<DashPrefs>;
-    return {
-      readReceipts: raw.readReceipts !== false,
-      marketingEmail: !!raw.marketingEmail,
-      marketingSms: !!raw.marketingSms,
-      marketingPush: raw.marketingPush !== false,
-    };
-  } catch {
-    return { readReceipts: true, marketingEmail: false, marketingSms: false, marketingPush: true };
-  }
 }
 
 export function DashboardPanel({ panel }: { panel: DashPanelId }) {
@@ -109,8 +103,14 @@ export function DashboardPanel({ panel }: { panel: DashPanelId }) {
       return <TxPanel />;
     case "iptal":
       return <CancelPanel />;
+    case "guvenlik":
+      return <SecurityPanel />;
     case "sifre":
       return <PasswordPanel />;
+    case "iki-asama":
+      return <TwoFactorPanel />;
+    case "engellenenler":
+      return <BlocksPanel />;
     case "cihazlar":
       return <DevicesPanel />;
     case "bildirim-ayarlari":
@@ -119,18 +119,13 @@ export function DashboardPanel({ panel }: { panel: DashPanelId }) {
       return <ReadReceiptPanel />;
     case "pazarlama":
       return <MarketingPanel />;
+    case "hareket":
+      return <MotionPanel />;
+    case "qr":
+      return <QrPanel />;
     default:
       return <OzetPanel />;
   }
-}
-
-function Pane({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <h1 className="dash-pane-title">{title}</h1>
-      {children}
-    </div>
-  );
 }
 
 function EmptyPanel({ titleKey, bodyKey }: { titleKey: string; bodyKey: string }) {
@@ -257,6 +252,14 @@ function ListingsPanel() {
               >
                 {t("common.edit")}
               </Link>
+              {l.status === "active" && posterSupported(l) ? (
+                <Link
+                  href={`/ilan/${l.id}?afis=1`}
+                  className="rounded-full bg-lime/10 px-2 py-0.5 text-[10px] font-bold text-lime"
+                >
+                  {t("poster.short")}
+                </Link>
+              ) : null}
               <button
                 type="button"
                 onClick={() => removeListing(l.id)}
@@ -340,7 +343,7 @@ function FavSellersPanel() {
       if (!favorites.includes(l.id)) continue;
       const cur = map.get(l.sellerId);
       if (cur) cur.n += 1;
-      else map.set(l.sellerId, { id: l.sellerId, name: l.sellerName, avatar: l.images[0], n: 1 });
+      else map.set(l.sellerId, { id: l.sellerId, name: listingSellerLabel(l), avatar: l.images[0], n: 1 });
     }
     return [...map.values()];
   }, [listings, favorites]);
@@ -479,27 +482,25 @@ function NotifsPanel() {
   );
 }
 
-function FieldError({ msg }: { msg?: string }) {
-  if (!msg) return null;
-  return <p className="mt-1 text-xs font-semibold text-orange">{msg}</p>;
-}
-
 function PersonalPanel() {
-  const { user, completeProfile, startEmailVerify, startPhoneVerify, confirmPhoneVerify } = useApp();
+  const { user, completeProfile, startEmailVerify, startPhoneVerify, confirmPhoneVerify, adoptSession } = useApp();
   const { t } = useI18n();
   const router = useRouter();
   const search = useSearchParams();
-  const [edit, setEdit] = useState<"none" | "name" | "display" | "phone" | "email" | "identity" | "address">("none");
+  const [edit, setEdit] = useState<"none" | "name" | "display" | "phone" | "email" | "address">("none");
   const [fullName, setFullName] = useState(user?.fullName ?? "");
   const [displayName, setDisplayName] = useState(user?.displayName ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
-  const [nationalId, setNationalId] = useState(user?.nationalId ?? "");
   const [address, setAddress] = useState(user?.address ?? "");
   const [error, setError] = useState("");
-  const [fieldErr, setFieldErr] = useState<{ name?: string; phone?: string; id?: string; address?: string }>({});
+  const [fieldErr, setFieldErr] = useState<{ name?: string; phone?: string; address?: string }>({});
   const [hint, setHint] = useState("");
   const [phoneOtp, setPhoneOtp] = useState("");
   const [phoneCode, setPhoneCode] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [emailOtp, setEmailOtp] = useState("");
+  const [emailStep, setEmailStep] = useState<"form" | "code">("form");
+  const [emailSandbox, setEmailSandbox] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -507,14 +508,21 @@ function PersonalPanel() {
     setFullName(user.fullName ?? "");
     setDisplayName(user.displayName ?? "");
     setPhone(user.phone ?? "");
-    setNationalId(user.nationalId ?? "");
     setAddress(user.address ?? "");
   }, [user]);
 
   if (!user) return null;
-  const verified = user.verified && isProfileComplete(user);
   const gaps = profileGaps(user);
-  const showRequiredForm = gaps.some((g) => g === "name" || g === "identity" || g === "phone" || g === "address");
+  const showRequiredForm = gaps.some((g) => g === "name" || g === "phone" || g === "address");
+  const publicPreview = user.businessVerified && user.businessName
+    ? user.businessName
+    : maskPersonName(displayName.trim() || user.displayName || user.username);
+
+  function openEdit(next: typeof edit) {
+    setError("");
+    setHint("");
+    setEdit(edit === next ? "none" : next);
+  }
 
   function afterSave(needsProfile?: boolean) {
     setHint(t("bilgi.saved"));
@@ -524,15 +532,14 @@ function PersonalPanel() {
     if (!needsProfile && next) router.push(safeNextPath(next));
   }
 
-  async function persist(patch: {
-    fullName: string;
-    phone: string;
-    nationalId: string;
-    address: string;
-    displayName?: string;
-  }) {
+  async function persist(patch: { fullName?: string; phone?: string; address?: string; displayName?: string }) {
     setBusy(true);
-    const res = await completeProfile(patch);
+    const res = await completeProfile({
+      fullName: patch.fullName ?? user!.fullName ?? "",
+      phone: patch.phone ?? user!.phone ?? "",
+      address: patch.address ?? user!.address ?? "",
+      displayName: patch.displayName ?? user!.displayName,
+    });
     setBusy(false);
     if (!res.ok) {
       setError(t(res.error ?? "auth.err.server"));
@@ -547,11 +554,10 @@ function PersonalPanel() {
     const nextErr: typeof fieldErr = {};
     if (!isValidFullName(fullName)) nextErr.name = t("complete.err.name");
     if (!isValidPhone(phone)) nextErr.phone = t("complete.err.phone");
-    if (!isValidIdentityNo(nationalId)) nextErr.id = t("complete.err.id");
     if (!isValidOpenAddress(address)) nextErr.address = t("complete.err.address");
     setFieldErr(nextErr);
-    if (nextErr.name || nextErr.phone || nextErr.id || nextErr.address) return;
-    await persist({ fullName, phone, nationalId, address, displayName });
+    if (nextErr.name || nextErr.phone || nextErr.address) return;
+    await persist({ fullName, phone, address, displayName });
   }
 
   async function saveName() {
@@ -561,13 +567,7 @@ function PersonalPanel() {
       return;
     }
     setFieldErr({});
-    await persist({
-      fullName,
-      phone: user!.phone ?? "",
-      nationalId: user!.nationalId ?? "",
-      address: user!.address ?? "",
-      displayName,
-    });
+    await persist({ fullName });
   }
 
   async function savePhone() {
@@ -577,29 +577,7 @@ function PersonalPanel() {
       return;
     }
     setFieldErr({});
-    await persist({
-      fullName: user!.fullName ?? "",
-      phone,
-      nationalId: user!.nationalId ?? "",
-      address: user!.address ?? "",
-      displayName,
-    });
-  }
-
-  async function saveIdentity() {
-    setError("");
-    if (!isValidIdentityNo(nationalId)) {
-      setFieldErr({ id: t("complete.err.id") });
-      return;
-    }
-    setFieldErr({});
-    await persist({
-      fullName: user!.fullName ?? "",
-      phone: user!.phone ?? "",
-      nationalId,
-      address: user!.address ?? "",
-      displayName,
-    });
+    await persist({ phone });
   }
 
   async function saveAddress() {
@@ -609,13 +587,7 @@ function PersonalPanel() {
       return;
     }
     setFieldErr({});
-    await persist({
-      fullName: user!.fullName ?? "",
-      phone: user!.phone ?? "",
-      nationalId: user!.nationalId ?? "",
-      address,
-      displayName,
-    });
+    await persist({ address });
   }
 
   async function saveDisplay() {
@@ -625,13 +597,7 @@ function PersonalPanel() {
       setError(t("dash.display.err"));
       return;
     }
-    await persist({
-      fullName: user!.fullName ?? "",
-      phone: user!.phone ?? "",
-      nationalId: user!.nationalId ?? "",
-      address: user!.address ?? "",
-      displayName: name,
-    });
+    await persist({ displayName: name });
   }
 
   async function sendEmailCode() {
@@ -643,11 +609,47 @@ function PersonalPanel() {
       setError(t(res.error ?? "auth.err.server"));
       return;
     }
-    if (res.already) {
-      setHint(t("bilgi.emailOk"));
+    setHint(res.already ? t("bilgi.emailOk") : t("bilgi.emailSent"));
+  }
+
+  async function startEmailChange() {
+    setBusy(true);
+    setError("");
+    setHint("");
+    const res = await apiPost<{ ok: boolean; error?: string; sandboxCode?: string; maskedEmail?: string }>(
+      "/api/account/email/change/start",
+      { email: newEmail },
+    );
+    setBusy(false);
+    if (!res.ok) {
+      setError(t(res.error ?? "auth.err.server"));
       return;
     }
-    setHint(t("bilgi.emailSent"));
+    setEmailSandbox(res.sandboxCode ?? "");
+    setEmailOtp("");
+    setEmailStep("code");
+    setHint(t("acct.codeSent").replace("{email}", res.maskedEmail ?? ""));
+  }
+
+  async function confirmEmailChange() {
+    setBusy(true);
+    setError("");
+    const res = await apiPost<{ ok: boolean; error?: string; user?: UserProfile }>("/api/account/email/change/confirm", {
+      email: newEmail,
+      otp: emailOtp,
+    });
+    setBusy(false);
+    if (!res.ok || !res.user) {
+      setError(t(res.error ?? "auth.err.server"));
+      return;
+    }
+    adoptSession(res.user);
+    setEmailStep("form");
+    setNewEmail("");
+    setEmailOtp("");
+    setEmailSandbox("");
+    setEdit("none");
+    setHint(t("acct.email.changed"));
   }
 
   async function sendPhoneCode() {
@@ -685,11 +687,15 @@ function PersonalPanel() {
     <Pane title={t("dash.info.personal")}>
       <div>
         <AvatarUploader />
-        {verified ? (
+        {user.verified && isProfileComplete(user) ? (
           <div className="mt-1 flex justify-center">
             <VerifiedBadge size={18} />
           </div>
         ) : null}
+      </div>
+
+      <div className="mb-4 mt-3">
+        <VerificationStatusCard />
       </div>
 
       {showRequiredForm ? (
@@ -724,21 +730,6 @@ function PersonalPanel() {
             <p className="mt-1 text-[11px] text-muted">{t("complete.phoneHint")}</p>
             <FieldError msg={fieldErr.phone} />
           </label>
-          <label className="block" htmlFor="profile-national-id">
-            <span className="dash-row-label">{t("complete.id")}</span>
-            <input
-              id="profile-national-id"
-              name="nationalId"
-              autoComplete="off"
-              inputMode="numeric"
-              maxLength={11}
-              className="dash-input"
-              value={nationalId}
-              placeholder={t("complete.idph")}
-              onChange={(e) => setNationalId(e.target.value.replace(/\D/g, "").slice(0, 11))}
-            />
-            <FieldError msg={fieldErr.id} />
-          </label>
           <label className="block" htmlFor="profile-address">
             <span className="dash-row-label">{t("bilgi.address")}</span>
             <textarea
@@ -758,12 +749,7 @@ function PersonalPanel() {
       ) : null}
 
       <InfoRow label={t("dash.username")} value={user.username} />
-      <InfoRow
-        label={t("dash.fullname")}
-        value={user.fullName || "—"}
-        action={t("dash.update")}
-        onAction={() => setEdit(edit === "name" ? "none" : "name")}
-      />
+      <InfoRow label={t("dash.fullname")} value={user.fullName || "—"} action={t("dash.update")} onAction={() => openEdit("name")} />
       {edit === "name" ? (
         <div className="dash-inline-form">
           <label className="block" htmlFor="profile-edit-name">
@@ -784,15 +770,22 @@ function PersonalPanel() {
         </div>
       ) : null}
 
-      <InfoRow
-        label={t("dash.display")}
-        value={user.displayName}
-        action={t("dash.display.update")}
-        onAction={() => setEdit(edit === "display" ? "none" : "display")}
-      />
+      <InfoRow label={t("dash.display")} value={user.displayName} action={t("dash.display.update")} onAction={() => openEdit("display")} />
+      {edit === "display" || !user.businessVerified ? (
+        <p className="-mt-1 mb-2 text-xs text-muted">
+          {t("acct.public.preview")}: <b className="text-ink">{publicPreview}</b>
+          {user.businessVerified ? null : ` — ${t("acct.public.note")}`}
+        </p>
+      ) : null}
       {edit === "display" ? (
         <div className="dash-inline-form">
-          <input className="dash-input" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+          <input
+            className="dash-input"
+            aria-label={t("dash.display")}
+            maxLength={40}
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+          />
           <button type="button" className="btn-primary h-10 px-4 text-sm" disabled={busy} onClick={() => void saveDisplay()}>
             {t("complete.save")}
           </button>
@@ -801,9 +794,9 @@ function PersonalPanel() {
 
       <InfoRow
         label={t("dash.phone")}
-        value={user.phone ? (user.phoneVerified ? t("dash.phone.verified") : t("dash.phone.on")) : t("dash.phone.off")}
+        value={user.phone ? `${user.phone} · ${user.phoneVerified ? t("dash.phone.verified") : t("dash.phone.on")}` : t("dash.phone.off")}
         action={user.phone ? t("dash.update") : t("dash.phone.add")}
-        onAction={() => setEdit(edit === "phone" ? "none" : "phone")}
+        onAction={() => openEdit("phone")}
       />
       {edit === "phone" ? (
         <div className="dash-inline-form">
@@ -830,21 +823,12 @@ function PersonalPanel() {
           </button>
           {user.phone && !user.phoneVerified ? (
             <>
+              <p className="text-[11px] text-muted">{t("acct.phone.viaEmail")}</p>
               <button type="button" className="btn-blue h-10 px-4 text-sm" disabled={busy} onClick={() => void sendPhoneCode()}>
                 {t("bilgi.sendPhoneCode")}
               </button>
-              {phoneCode ? (
-                <p className="rounded-xl bg-elev px-3 py-2 text-xs">
-                  {t("bilgi.inbox")}: <span className="font-extrabold tracking-widest">{phoneCode}</span>
-                </p>
-              ) : null}
-              <input
-                className="dash-input text-center tracking-[0.4em]"
-                inputMode="numeric"
-                maxLength={6}
-                value={phoneOtp}
-                onChange={(e) => setPhoneOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              />
+              <SandboxCode code={phoneCode} label={t("bilgi.inbox")} />
+              <OtpInput value={phoneOtp} onChange={setPhoneOtp} />
               <button
                 type="button"
                 className="btn-primary h-10 px-4 text-sm"
@@ -861,40 +845,67 @@ function PersonalPanel() {
       ) : null}
 
       <InfoRow
-        label={t("complete.id")}
-        value={user.nationalId || "—"}
-        action={t("dash.update")}
-        onAction={() => setEdit(edit === "identity" ? "none" : "identity")}
+        label={t("dash.email")}
+        value={user.email ? `${user.email}${isEmailVerified(user) ? "" : ` · ${t("acct.email.unverified")}`}` : "—"}
+        action={t("dash.email.change")}
+        onAction={() => openEdit("email")}
       />
-      {edit === "identity" ? (
+      {edit === "email" ? (
         <div className="dash-inline-form">
-          <label className="block" htmlFor="profile-edit-id">
-            <span className="dash-row-label">{t("complete.id")}</span>
+          {isEmailVerified(user) ? (
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-lime">
+              <Mail className="h-4 w-4" /> {t("bilgi.emailOk")}
+            </p>
+          ) : (
+            <button type="button" className="btn-blue h-10 px-4 text-sm" disabled={busy} onClick={() => void sendEmailCode()}>
+              {t("bilgi.sendLink")}
+            </button>
+          )}
+          <label className="block" htmlFor="profile-new-email">
+            <span className="dash-row-label">{t("acct.email.new")}</span>
             <input
-              id="profile-edit-id"
-              name="nationalId"
-              autoComplete="off"
-              inputMode="numeric"
-              maxLength={11}
+              id="profile-new-email"
+              type="email"
+              autoComplete="email"
               className="dash-input"
-              value={nationalId}
-              placeholder={t("complete.idph")}
-              onChange={(e) => setNationalId(e.target.value.replace(/\D/g, "").slice(0, 11))}
+              value={newEmail}
+              disabled={emailStep === "code"}
+              onChange={(e) => setNewEmail(e.target.value)}
             />
-            <FieldError msg={fieldErr.id} />
           </label>
-          <button type="button" className="btn-primary h-10 px-4 text-sm" disabled={busy} onClick={() => void saveIdentity()}>
-            {t("complete.save")}
-          </button>
+          <p className="text-[11px] text-muted">{t("acct.email.p")}</p>
+          {emailStep === "code" ? (
+            <>
+              <SandboxCode code={emailSandbox} label={t("bilgi.inbox")} />
+              <OtpInput value={emailOtp} onChange={setEmailOtp} />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="btn-primary h-10 px-4 text-sm"
+                  disabled={busy || emailOtp.length !== 6}
+                  onClick={() => void confirmEmailChange()}
+                >
+                  {t("acct.confirm")}
+                </button>
+                <button type="button" className="chip" onClick={() => setEmailStep("form")}>
+                  {t("acct.cancel")}
+                </button>
+              </div>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="btn-primary h-10 px-4 text-sm"
+              disabled={busy || !newEmail.includes("@")}
+              onClick={() => void startEmailChange()}
+            >
+              {t("acct.sendCode")}
+            </button>
+          )}
         </div>
       ) : null}
 
-      <InfoRow
-        label={t("bilgi.address")}
-        value={user.address || "—"}
-        action={t("dash.update")}
-        onAction={() => setEdit(edit === "address" ? "none" : "address")}
-      />
+      <InfoRow label={t("bilgi.address")} value={user.address || "—"} action={t("dash.update")} onAction={() => openEdit("address")} />
       {edit === "address" ? (
         <div className="dash-inline-form">
           <label className="block" htmlFor="profile-edit-address">
@@ -914,31 +925,7 @@ function PersonalPanel() {
         </div>
       ) : null}
 
-      <InfoRow
-        label={t("dash.email")}
-        value={user.email ?? "—"}
-        action={t("dash.email.change")}
-        onAction={() => setEdit(edit === "email" ? "none" : "email")}
-      />
-      {edit === "email" ? (
-        <div className="dash-inline-form">
-          <p className="flex items-center gap-1.5 text-sm">
-            <Mail className="h-4 w-4 text-lime" /> {user.email}
-          </p>
-          {isEmailVerified(user) ? (
-            <p className="text-sm font-semibold text-lime">{t("bilgi.emailOk")}</p>
-          ) : (
-            <>
-              <button type="button" className="btn-blue h-10 px-4 text-sm" disabled={busy} onClick={() => void sendEmailCode()}>
-                {t("bilgi.sendLink")}
-              </button>
-            </>
-          )}
-        </div>
-      ) : null}
-
-      {error ? <p className="mt-3 text-xs font-semibold text-orange">{error}</p> : null}
-      {hint ? <p className="mt-3 text-xs font-semibold text-lime">{hint}</p> : null}
+      <Notice error={error} hint={hint} />
 
       <p className="dash-kvkk">
         {t("dash.kvkk")}{" "}
@@ -947,31 +934,10 @@ function PersonalPanel() {
         </Link>
         .
       </p>
-
-      <ul className="mt-4 space-y-1 text-xs text-muted">
-        {(
-          [
-            ["name", t("complete.name")],
-            ["identity", t("complete.id")],
-            ["phone", t("complete.phone")],
-            ["email", t("bilgi.email")],
-            ["address", t("bilgi.address")],
-          ] as const
-        ).map(([key, label]) => (
-          <li key={key} className="flex items-center gap-2">
-            <Check className={`h-3.5 w-3.5 ${gaps.includes(key) ? "text-orange" : "text-lime"}`} />
-            {label}
-          </li>
-        ))}
-      </ul>
-      {verified ? (
-        <p className="mt-3 flex items-center gap-2 text-sm font-semibold">
-          <ShieldCheck className="h-4 w-4 text-blue" /> {t("bilgi.tickOn")}
-        </p>
-      ) : null}
     </Pane>
   );
 }
+
 
 function InfoRow({
   label,
@@ -1002,17 +968,16 @@ function InfoRow({
 function PayInfoPanel() {
   const { user } = useApp();
   const { t } = useI18n();
-  const campaign = paymentsPaused();
   return (
     <Pane title={t("dash.info.pay")}>
       <EntitlementStatus compact />
       <p className="mt-3 text-sm text-muted">{t("dash.pay.p")}</p>
       <div className="mt-4 flex items-center gap-3 rounded-xl border border-line px-4 py-4">
         <CreditCard className="h-5 w-5 text-muted" />
-        <p className="text-sm">{campaign ? t("pay.campaign") : t("dash.pay.none")}</p>
+        <p className="text-sm">{t("pay.campaign")}</p>
       </div>
-      <Link href={campaign ? postListingHref(user) : "/paketler"} className="btn-primary mt-4 inline-flex h-11 px-5">
-        {campaign ? t("post.h") : t("footer.packages")}
+      <Link href={postListingHref(user)} className="btn-primary mt-4 inline-flex h-11 px-5">
+        {t("post.h")}
       </Link>
     </Pane>
   );
@@ -1030,95 +995,100 @@ function TxPanel() {
 }
 
 function CancelPanel() {
-  const { logout } = useApp();
+  const { user, listings } = useApp();
   const { t } = useI18n();
-  const [ok, setOk] = useState(false);
-  return (
-    <Pane title={t("dash.info.cancel")}>
-      <p className="text-sm text-muted">{t("dash.cancel.p")}</p>
-      <label className="mt-4 flex items-start gap-2 text-sm">
-        <input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} className="mt-1" />
-        {t("dash.cancel.ack")}
-      </label>
-      <button
-        type="button"
-        disabled={!ok}
-        className="btn-orange mt-4 h-11 px-5 disabled:opacity-40"
-        onClick={() => {
-          logout();
-          window.location.href = "/welcome";
-        }}
-      >
-        {t("dash.cancel.go")}
-      </button>
-    </Pane>
-  );
-}
-
-function PasswordPanel() {
-  const { user } = useApp();
-  const { t } = useI18n();
-  const [current, setCurrent] = useState("");
-  const [next, setNext] = useState("");
-  const [again, setAgain] = useState("");
-  const [error, setError] = useState("");
-  const [hint, setHint] = useState("");
+  const [password, setPassword] = useState("");
+  const [phrase, setPhrase] = useState("");
   const [busy, setBusy] = useState(false);
-  const checks = passwordChecks(next);
-  const oauth = user?.authProvider && user.authProvider !== "email";
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+  if (!user) return null;
+  const activeCount = listings.filter((l) => l.sellerId === user.id && l.status === "active").length;
+  const phraseOk = isDeletePhrase(phrase);
+  const needsPassword = !!user.hasPassword;
+  const canSubmit = phraseOk && (!needsPassword || password.length > 0) && !busy;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
-    if (next !== again) {
-      setError(t("dash.pw.match"));
-      return;
-    }
+    if (!canSubmit) return;
     setBusy(true);
-    const res = await apiPost<{ ok: boolean; error?: string }>("/api/account/password", { current, next });
+    setError("");
+    const res = await apiPost<{ ok?: boolean; error?: string }>("/api/account/delete", {
+      password,
+      confirm: phrase,
+    });
     setBusy(false);
     if (!res.ok) {
       setError(t(res.error ?? "auth.err.server"));
       return;
     }
-    setHint(t("dash.pw.ok"));
-    setCurrent("");
-    setNext("");
-    setAgain("");
+    setDone(true);
+    for (const store of [window.localStorage, window.sessionStorage]) {
+      try {
+        Object.keys(store)
+          .filter((k) => k.startsWith("alsatport") || k.startsWith("ap-") || k.startsWith("ap_"))
+          .forEach((k) => store.removeItem(k));
+      } catch {
+        /* storage unavailable */
+      }
+    }
+    window.setTimeout(() => {
+      window.location.href = "/";
+    }, 1800);
+  }
+
+  if (done) {
+    return (
+      <Pane title={t("account.delete.h")}>
+        <Notice hint={t("account.delete.done")} />
+      </Pane>
+    );
   }
 
   return (
-    <Pane title={t("dash.sec.pass")}>
-      {oauth ? (
-        <p className="dash-empty">{t("dash.pw.oauth")}</p>
-      ) : (
-        <form className="max-w-md space-y-3" onSubmit={(e) => void submit(e)}>
-          <label className="block">
-            <span className="dash-row-label">{t("dash.pw.current")}</span>
-            <input type="password" className="dash-input" value={current} onChange={(e) => setCurrent(e.target.value)} required />
+    <Pane title={t("account.delete.h")}>
+      <p className="text-sm text-soft">{t("account.delete.lead")}</p>
+      <h3 className="mt-5 text-sm font-extrabold text-ink">{t("account.delete.what.h")}</h3>
+      <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm text-soft">
+        <li>{t("account.delete.what.1", { n: activeCount })}</li>
+        <li>{t("account.delete.what.2")}</li>
+        <li>{t("account.delete.what.3")}</li>
+        <li>{t("account.delete.what.4")}</li>
+        <li>{t("account.delete.what.5")}</li>
+      </ul>
+      <h3 className="mt-5 text-sm font-extrabold text-ink">{t("account.delete.keep.h")}</h3>
+      <p className="mt-2 text-sm text-soft">{t("account.delete.keep.p")}</p>
+      <p className="mt-3 text-xs text-muted">
+        {t("account.delete.copy")}{" "}
+        <a className="font-semibold text-lime" href={`mailto:${LEGAL_PRIVACY_EMAIL}`}>
+          {LEGAL_PRIVACY_EMAIL}
+        </a>
+      </p>
+
+      <form className="mt-5 space-y-3 rounded-2xl border border-orange/30 bg-orange/5 p-4" onSubmit={submit}>
+        {needsPassword ? (
+          <label className="block text-sm">
+            <span className="mb-1 block font-semibold">{t("account.delete.password")}</span>
+            <input
+              type="password"
+              autoComplete="current-password"
+              className="dash-input w-full"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
           </label>
-          <label className="block">
-            <span className="dash-row-label">{t("dash.pw.next")}</span>
-            <input type="password" className="dash-input" value={next} onChange={(e) => setNext(e.target.value)} required />
-          </label>
-          <ul className="text-xs text-muted">
-            {checks.map((c) => (
-              <li key={c.id} className={c.ok ? "text-lime" : ""}>
-                {t(`dash.pw.${c.id}`)}
-              </li>
-            ))}
-          </ul>
-          <label className="block">
-            <span className="dash-row-label">{t("dash.pw.again")}</span>
-            <input type="password" className="dash-input" value={again} onChange={(e) => setAgain(e.target.value)} required />
-          </label>
-          {error ? <p className="text-xs font-semibold text-orange">{error}</p> : null}
-          {hint ? <p className="text-xs font-semibold text-lime">{hint}</p> : null}
-          <button className="btn-primary h-11 px-5" disabled={busy}>
-            {t("complete.save")}
-          </button>
-        </form>
-      )}
+        ) : (
+          <p className="text-xs text-muted">{t("account.delete.google")}</p>
+        )}
+        <label className="block text-sm">
+          <span className="mb-1 block font-semibold">{t("account.delete.phrase", { phrase: ACCOUNT_DELETE_PHRASE })}</span>
+          <input className="dash-input w-full" value={phrase} onChange={(e) => setPhrase(e.target.value)} autoComplete="off" />
+        </label>
+        {error ? <p className="text-xs font-semibold text-orange">{error}</p> : null}
+        <button type="submit" disabled={!canSubmit} className="btn-orange h-11 px-5 disabled:opacity-40">
+          {busy ? t("account.delete.busy") : t("account.delete.go")}
+        </button>
+      </form>
     </Pane>
   );
 }
@@ -1139,26 +1109,6 @@ function DevicesPanel() {
         </div>
       </div>
     </Pane>
-  );
-}
-
-function ToggleRow({ title, desc, on, onChange }: { title: string; desc?: string; on: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <div className="dash-info-row">
-      <div>
-        <p className="text-sm font-semibold">{title}</p>
-        {desc ? <p className="text-xs text-muted">{desc}</p> : null}
-      </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={on}
-        onClick={() => onChange(!on)}
-        className={`relative h-7 w-12 shrink-0 rounded-full ${on ? "bg-lime" : "bg-elev"}`}
-      >
-        <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition ${on ? "start-5" : "start-0.5"}`} />
-      </button>
-    </div>
   );
 }
 
@@ -1183,36 +1133,6 @@ function NotifPrefsPanel() {
           onChange={setGeoCity}
         />
       </div>
-    </Pane>
-  );
-}
-
-function ReadReceiptPanel() {
-  const { t } = useI18n();
-  const [prefs, setPrefs] = useState<DashPrefs>(loadPrefs);
-  useEffect(() => {
-    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
-  }, [prefs]);
-  return (
-    <Pane title={t("dash.app.read")}>
-      <p className="mb-3 text-sm text-muted">{t("dash.read.p")}</p>
-      <ToggleRow title={t("dash.read.on")} desc={t("dash.read.d")} on={prefs.readReceipts} onChange={(v) => setPrefs({ ...prefs, readReceipts: v })} />
-    </Pane>
-  );
-}
-
-function MarketingPanel() {
-  const { t } = useI18n();
-  const [prefs, setPrefs] = useState<DashPrefs>(loadPrefs);
-  useEffect(() => {
-    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
-  }, [prefs]);
-  return (
-    <Pane title={t("dash.app.mkt")}>
-      <p className="mb-3 text-sm text-muted">{t("dash.mkt.p")}</p>
-      <ToggleRow title={t("dash.mkt.email")} on={prefs.marketingEmail} onChange={(v) => setPrefs({ ...prefs, marketingEmail: v })} />
-      <ToggleRow title={t("dash.mkt.sms")} on={prefs.marketingSms} onChange={(v) => setPrefs({ ...prefs, marketingSms: v })} />
-      <ToggleRow title={t("dash.mkt.push")} on={prefs.marketingPush} onChange={(v) => setPrefs({ ...prefs, marketingPush: v })} />
     </Pane>
   );
 }

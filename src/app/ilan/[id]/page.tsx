@@ -4,7 +4,8 @@ import { isUuid } from "@/lib/ids";
 import { isBlockedLiveAnimalListing } from "@/lib/liveAnimalPolicy";
 import { findListingRecord, toClientListing } from "@/lib/listings/store";
 import { findCategory } from "@/data/categories";
-import { listingJsonLd, pageMetadata } from "@/lib/seo";
+import { listingJsonLd, pageMetadata, absoluteAssetUrl } from "@/lib/seo";
+import { formatMoney } from "@/i18n/config";
 import { ListingDetailClient } from "./ListingDetailClient";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -22,14 +23,25 @@ export async function generateMetadata({ params }: Ctx): Promise<Metadata> {
   if (isBlockedLiveAnimalListing(listing)) {
     return { title: "İlan · AlsatPort", robots: { index: false, follow: false } };
   }
-  const title = `${listing.title} · AlsatPort`;
-  const description = (listing.description || listing.subtitle || listing.title).slice(0, 160);
-  const image = listing.images[0];
+  const priceLabel = formatMoney(listing.price, "TRY", "tr");
+  const place = [listing.city, listing.district].filter(Boolean).join(" / ");
+  const title = `${listing.title} · ${priceLabel}`;
+  const description = [priceLabel, place, listing.subtitle || listing.description || listing.title]
+    .filter(Boolean)
+    .join(" · ")
+    .slice(0, 180);
   return pageMetadata({
     title,
     description,
     path: `/ilan/${id}`,
-    images: image ? [{ url: image, alt: listing.title }] : undefined,
+    images: listing.images.slice(0, 4).map((url) => ({
+      url: absoluteAssetUrl(url),
+      alt: listing.title,
+      width: 1200,
+      height: 630,
+    })),
+    priceAmount: listing.price,
+    priceCurrency: "TRY",
   });
 }
 

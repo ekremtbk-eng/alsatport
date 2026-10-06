@@ -35,10 +35,12 @@ export function PhotoUploader({
   images,
   onChange,
   note,
+  categoryId = "",
 }: {
   images: string[];
   onChange: (images: string[]) => void;
   note?: string;
+  categoryId?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { t } = useI18n();
@@ -50,10 +52,11 @@ export function PhotoUploader({
 
   async function addFiles(files: FileList | File[]) {
     const incoming = Array.from(files);
-    const videoOrAnimal = incoming.find((f) => moderateListingMaterial(f).blocked);
-    if (videoOrAnimal) {
-      const hit = moderateListingMaterial(videoOrAnimal);
-      setError(t(hit.reason ?? "mod.animal.video"));
+    const animalHit = incoming
+      .map((f) => ({ f, hit: moderateListingMaterial(f, categoryId) }))
+      .find((x) => x.hit.blocked);
+    if (animalHit) {
+      setError(t(animalHit.hit.reason ?? "mod.animal.video"));
       return;
     }
     const list = incoming.filter((f) => f.type.startsWith("image/"));
@@ -72,7 +75,11 @@ export function PhotoUploader({
     const uploaded: string[] = [];
     let fail = "";
     for (const file of ok) {
-      const res = await apiUpload<{ ok?: boolean; error?: string; url?: string }>("/api/uploads", file);
+      const res = await apiUpload<{ ok?: boolean; error?: string; url?: string }>(
+        "/api/uploads",
+        file,
+        categoryId ? { categoryId } : undefined,
+      );
       if (!res.ok || !res.url || !isAllowedListingImageUrl(res.url)) {
         fail = t(res.error === "photo.mb" ? "photo.mb" : res.error === "photo.only" ? "photo.only" : "auth.err.session");
         continue;

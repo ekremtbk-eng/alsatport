@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Eye, EyeOff, MessageCircle, Phone, PhoneCall, X } from "lucide-react";
 import { useI18n } from "@/context/I18nContext";
+import { ListingShareTrigger } from "@/components/listing/ListingShare";
 
 export function ListingContactBar({
   phone,
@@ -11,6 +12,7 @@ export function ListingContactBar({
   onMessage,
   onRevealPhone,
   onCall,
+  share,
 }: {
   phone: string;
   maskedPhone: string;
@@ -18,6 +20,14 @@ export function ListingContactBar({
   onMessage: () => void;
   onRevealPhone: () => boolean;
   onCall?: () => boolean;
+  share?: {
+    listingId: string;
+    title: string;
+    priceLabel: string;
+    imageUrl?: string;
+    description?: string;
+    kind?: "listing" | "firm";
+  };
 }) {
   const { t } = useI18n();
   const [showContactBar, setShowContactBar] = useState(true);
@@ -46,6 +56,18 @@ export function ListingContactBar({
       >
         <X className="h-5 w-5" strokeWidth={2.8} />
       </button>
+
+      {share ? (
+        <ListingShareTrigger
+          variant="dock"
+          listingId={share.listingId}
+          title={share.title}
+          priceLabel={share.priceLabel}
+          imageUrl={share.imageUrl}
+          description={share.description}
+          kind={share.kind}
+        />
+      ) : null}
 
       <button type="button" className="lc-btn lc-btn-msg" onClick={onMessage}>
         <MessageCircle className="h-4 w-4" />

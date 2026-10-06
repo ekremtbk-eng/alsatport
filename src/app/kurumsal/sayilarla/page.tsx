@@ -7,9 +7,7 @@ import { catName, useI18n } from "@/context/I18nContext";
 const STATS = [
   { value: "81", label: "stat.81", hint: "stat.81h" },
   { value: String(categories.length), label: "stat.cat", hint: "stat.cath" },
-  { value: "3", label: "stat.plan", hint: "stat.planh" },
-  { value: "10–40", label: "stat.photo", hint: "stat.photoh" },
-  { value: "7/24", label: "stat.sup", hint: "stat.suph" },
+  { value: "E-posta", label: "stat.sup", hint: "stat.suph" },
   { value: "KVKK", label: "stat.kvkk", hint: "stat.kvkkh" },
 ] as const;
 
@@ -18,12 +16,10 @@ export default function NumbersPage() {
   const { t } = useI18n();
   const cities = new Set(listings.filter((l) => l.status === "active").map((l) => l.city)).size;
   const verified = listings.filter((l) => l.status === "active" && l.sellerVerified).length;
-  const vip = listings.filter((l) => l.status === "active" && l.vip).length;
   const live = [
     { value: String(listings.filter((l) => l.status === "active").length), label: t("live.ads") },
     { value: String(cities), label: t("live.cities") },
     { value: String(verified), label: t("live.ver") },
-    { value: String(vip), label: t("live.vip") },
   ];
 
   return (
@@ -43,7 +39,7 @@ export default function NumbersPage() {
       </div>
 
       <h3 className="mt-8 text-lg font-extrabold">{t("corp.live")}</h3>
-      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
         {live.map((s) => (
           <div key={s.label} className="rounded-2xl border border-lime/25 bg-lime/5 p-4">
             <p className="text-2xl font-extrabold text-lime">{s.value}</p>
