@@ -5277,9 +5277,15 @@ html[data-device="desktop"] .chassis-canvas {
   font-size: 0.7rem;
   color: #4b5563;
 }
+/* The stage has a fixed height per breakpoint so switching photos never shifts the layout;
+   each photo is letterboxed with object-fit: contain and is never cropped or stretched. */
 .detail-gal-stage {
   position: relative;
   overflow: hidden;
+  height: min(78vw, 62vh);
+  height: min(78vw, 62svh);
+  min-height: 240px;
+  background: #eef0f3;
   touch-action: pan-y;
   user-select: none;
   -webkit-user-select: none;
@@ -5288,14 +5294,33 @@ html[data-device="desktop"] .chassis-canvas {
 }
 .detail-gal-img {
   display: block;
-  height: 280px;
+  height: 100%;
   width: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
 }
 @media (min-width: 768px) {
-  .detail-gal-img {
-    height: 420px;
+  .detail-gal-stage {
+    height: clamp(380px, 56vh, 460px);
   }
+}
+@media (min-width: 1024px) {
+  .detail-gal-stage {
+    height: clamp(420px, 60vh, 560px);
+  }
+}
+.gal-backdrop {
+  position: absolute;
+  inset: -24px;
+  z-index: 0;
+  width: calc(100% + 48px);
+  height: calc(100% + 48px);
+  object-fit: cover;
+  filter: blur(22px) saturate(1.1);
+  opacity: 0.55;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 @media (min-width: 1024px) {
   .detail-gal {
@@ -5662,9 +5687,13 @@ html[data-device="tablet"] .share-toast {
   -webkit-user-select: none;
   user-select: none;
 }
-.detail-gal-stage .media-guard {
+.detail-gal-stage .media-guard,
+.classified-gal-stage .media-guard {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 100%;
+  height: 100%;
 }
 .lb {
   position: fixed;
@@ -10168,16 +10197,21 @@ html[data-device="phone"] .svc-portal-offer {
 }
 .firm-slider {
   position: relative;
+  overflow: hidden;
+  height: 210px;
   background: #f3f4f6;
 }
-.firm-slider img {
+.firm-slide-img {
+  position: relative;
+  z-index: 1;
   width: 100%;
-  height: 210px;
-  object-fit: cover;
+  height: 100%;
+  object-fit: contain;
   display: block;
 }
 .firm-nav {
   position: absolute;
+  z-index: 2;
   top: 50%;
   transform: translateY(-50%);
   width: 1.8rem;
@@ -10411,15 +10445,18 @@ html[data-device="phone"] .svc-portal-offer {
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
+.classified-gal-stage {
+  height: 280px;
+}
 .classified-gal-img {
   display: block;
   width: 100%;
-  height: 280px;
+  height: 100%;
   object-fit: contain;
-  background: #fff;
+  object-position: center;
 }
 @media (min-width: 768px) {
-  .classified-gal-img {
+  .classified-gal-stage {
     height: 320px;
   }
 }

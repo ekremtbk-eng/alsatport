@@ -95,6 +95,8 @@ export function ListingGallery({
           }
         }}
       >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt="" aria-hidden draggable={false} decoding="async" className="gal-backdrop" />
         <ProtectedPhoto src={src} alt={alt} imgClassName={classified ? "classified-gal-img" : "detail-gal-img"} />
         {n > 1 ? (
           <>

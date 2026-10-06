@@ -410,7 +410,9 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
                 </button>
               ) : null}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={gallery[slide] ?? gallery[0]} alt="" />
+              <img src={gallery[slide] ?? gallery[0]} alt="" aria-hidden draggable={false} className="gal-backdrop" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={gallery[slide] ?? gallery[0]} alt="" className="firm-slide-img" />
               {gallery.length > 1 ? (
                 <button
                   type="button"
