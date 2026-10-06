@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { mailDebugEnabled, sendOtpEmail, sendSecurityNoticeEmail } from "@/lib/mail/authMail";
+import { recordSecurityNotice } from "@/lib/security/alerts";
 import { createEmailOtp, verifyEmailOtp } from "@/lib/security/emailOtp";
 import { smsAvailableFor } from "@/lib/security/loginFlow";
 import { readJson } from "@/lib/security/parseBody";
@@ -115,6 +116,7 @@ export async function POST(req: Request) {
   const fresh = (await findUserById(user.id))!;
   const [subject, body] = NOTICE[change];
   await sendSecurityNoticeEmail(user.email, subject, body).catch(() => undefined);
+  await recordSecurityNotice(user.id, "security.twoFactor", subject, body);
   const res = NextResponse.json({ ok: true, user: fresh.profile, ...status(fresh) });
   if (change === "enable") await trustDevice(res, user.id);
   if (change === "disable") forgetTrustedDevice(res);

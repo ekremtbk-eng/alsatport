@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendSecurityNoticeEmail } from "@/lib/mail/authMail";
+import { recordSecurityNotice } from "@/lib/security/alerts";
 import { isProfileComplete, stampVerification } from "@/lib/profile";
 import { verifyEmailOtp } from "@/lib/security/emailOtp";
 import { readJson } from "@/lib/security/parseBody";
@@ -58,6 +59,12 @@ export async function POST(req: Request) {
       `Hesabınızın e-posta adresi ${maskEmail(email)} olarak güncellendi.`,
     ).catch(() => undefined);
   }
+  await recordSecurityNotice(
+    user.id,
+    "security.email",
+    "E-posta adresiniz değiştirildi",
+    `Hesabınızın e-posta adresi ${maskEmail(email)} olarak güncellendi.`,
+  );
   const res = NextResponse.json({ ok: true, user: user.profile, needsProfile: !isProfileComplete(user.profile) });
   return attachSession(res, user);
 }

@@ -1,5 +1,6 @@
 import { findListingRecord, toClientListing } from "@/lib/listings/store";
 import { isUuid } from "@/lib/ids";
+import { isLiveRow } from "@/lib/listings/lifecycle";
 import { isBlockedLiveAnimalListing } from "@/lib/liveAnimalPolicy";
 import { resolveListingCoords, type GeoPoint } from "@/lib/placeGeo";
 
@@ -12,7 +13,7 @@ export type PublicPlace = {
 export async function publicListingPlace(id: string): Promise<PublicPlace | "bad-id" | "not-found"> {
   if (!isUuid(id)) return "bad-id";
   const row = await findListingRecord(id);
-  if (!row || row.status !== "active") return "not-found";
+  if (!row || !isLiveRow(row)) return "not-found";
   const listing = toClientListing(row);
   if (isBlockedLiveAnimalListing(listing)) return "not-found";
 

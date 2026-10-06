@@ -697,7 +697,7 @@ export function SessionsPanel() {
   );
 }
 
-function useServerSetting() {
+export function useServerSetting() {
   const { user } = useApp();
   const call = useAccountCall();
   const [busy, setBusy] = useState(false);

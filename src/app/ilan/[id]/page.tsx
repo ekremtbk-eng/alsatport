@@ -3,6 +3,7 @@ import { JsonLd } from "@/components/JsonLd";
 import { isUuid } from "@/lib/ids";
 import { isBlockedLiveAnimalListing } from "@/lib/liveAnimalPolicy";
 import { findListingRecord, toClientListing } from "@/lib/listings/store";
+import { isLiveRow } from "@/lib/listings/lifecycle";
 import { findCategory } from "@/data/categories";
 import { listingJsonLd, pageMetadata, absoluteAssetUrl } from "@/lib/seo";
 import { formatMoney } from "@/i18n/config";
@@ -16,7 +17,7 @@ export async function generateMetadata({ params }: Ctx): Promise<Metadata> {
     return pageMetadata({ title: "İlan · AlsatPort", description: "İlan detayı.", path: `/ilan/${id}`, index: false });
   }
   const row = await findListingRecord(id);
-  if (!row || row.status !== "active") {
+  if (!row || !isLiveRow(row)) {
     return { title: "İlan · AlsatPort", robots: { index: false, follow: false } };
   }
   const listing = toClientListing(row);
@@ -50,7 +51,7 @@ export default async function ListingDetailPage({ params }: Ctx) {
   let schema: ReturnType<typeof listingJsonLd> | null = null;
   if (isUuid(id)) {
     const row = await findListingRecord(id);
-    if (row && row.status === "active") {
+    if (row && isLiveRow(row)) {
       const listing = toClientListing(row);
       if (!isBlockedLiveAnimalListing(listing)) {
         const cat = findCategory(listing.categoryId);

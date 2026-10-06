@@ -16,14 +16,12 @@ import {
 } from "lucide-react";
 import { ListingCard } from "@/components/ListingCard";
 import { ListingGrid } from "@/components/ListingGrid";
-import { SearchSelect } from "@/components/SearchSelect";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { useApp } from "@/context/AppContext";
 import { useI18n } from "@/context/I18nContext";
 import { isPublicListing } from "@/lib/categoryCounts";
 import { listingSellerLabel, maskPersonName } from "@/lib/publicName";
 import type { UserProfile } from "@/data/store";
-import { posterSupported } from "@/lib/poster";
 import type { DashPanelId } from "@/lib/dashboardNav";
 import { formatNotifTime, listingMatchesSearch, searchHref, searchLabel, type NotifKind } from "@/lib/notify";
 import { NUMBER_LOCALE } from "@/i18n/config";
@@ -40,10 +38,11 @@ import {
 import { apiPost } from "@/lib/security/client";
 import { ACCOUNT_DELETE_PHRASE, isDeletePhrase } from "@/lib/accountDelete";
 import { LEGAL_PRIVACY_EMAIL } from "@/data/legal";
-import { TURKEY_CITIES } from "@/data/turkey";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { EntitlementStatus } from "@/components/EntitlementStatus";
-import { FieldError, Notice, OtpInput, Pane, SandboxCode, ToggleRow } from "./DashUi";
+import { SellerListings } from "@/components/listings/SellerListings";
+import { NotificationSettingsPanel } from "./NotificationSettings";
+import { FieldError, Notice, OtpInput, Pane, SandboxCode } from "./DashUi";
 import {
   BlocksPanel,
   MarketingPanel,
@@ -115,7 +114,7 @@ export function DashboardPanel({ panel }: { panel: DashPanelId }) {
     case "cihazlar":
       return <SessionsPanel />;
     case "bildirim-ayarlari":
-      return <NotifPrefsPanel />;
+      return <NotificationSettingsPanel />;
     case "okundu":
       return <ReadReceiptPanel />;
     case "pazarlama":
@@ -186,95 +185,10 @@ function OzetPanel() {
 }
 
 function ListingsPanel() {
-  const { user, listings, setListingStatus, removeListing, renewListing } = useApp();
-  const { formatMoney, t } = useI18n();
-  const [tab, setTab] = useState<"active" | "passive" | "pending">("active");
-  if (!user) return null;
-  const mine = listings.filter((l) => {
-    if (l.sellerId !== user.id) return false;
-    if (tab === "pending") return l.status === "pending";
-    if (tab === "active") return l.status === "active";
-    return l.status === "passive" || l.status === "rejected";
-  });
+  const { t } = useI18n();
   return (
     <Pane title={t("dash.ilanlarim")}>
-      <div className="mb-4 flex gap-2">
-        <button type="button" onClick={() => setTab("active")} className={`chip ${tab === "active" ? "chip-on" : ""}`}>
-          {t("my.active")}
-        </button>
-        <button type="button" onClick={() => setTab("pending")} className={`chip ${tab === "pending" ? "chip-on" : ""}`}>
-          {t("my.pending")}
-        </button>
-        <button type="button" onClick={() => setTab("passive")} className={`chip ${tab === "passive" ? "chip-on" : ""}`}>
-          {t("my.passive")}
-        </button>
-      </div>
-      <div className="space-y-2">
-        {mine.map((l) => (
-          <div key={l.id} className="flex gap-3 rounded-xl border border-line bg-card p-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={l.images[0]} alt="" className="h-20 w-24 rounded-xl object-cover" />
-            <div className="min-w-0 flex-1">
-              <Link href={`/ilan/${l.id}`} className="font-semibold">
-                {l.title} {l.subtitle}
-              </Link>
-              <p className="price-text text-sm font-bold">{formatMoney(l.price)}</p>
-              <p className="text-xs text-muted">
-                {l.views} {t("my.views")} · {l.city}
-                {l.expiresAt ? ` · ${t("quota.until", { date: new Date(l.expiresAt).toLocaleDateString("tr-TR") })}` : ""}
-              </p>
-            </div>
-            <div className="flex flex-col items-end gap-1">
-              <button
-                type="button"
-                onClick={() => {
-                  if (tab === "passive" && l.expiresAt && l.expiresAt <= Date.now()) {
-                    void renewListing(l.id);
-                    return;
-                  }
-                  setListingStatus(l.id, tab === "active" ? "passive" : "active");
-                }}
-                className="self-start rounded-full bg-lime/15 px-2 py-0.5 text-[10px] font-bold text-lime"
-              >
-                {tab === "active" ? t("my.activeChip") : t("my.passiveChip")}
-              </button>
-              {l.expiresAt ? (
-                <button
-                  type="button"
-                  onClick={() => void renewListing(l.id)}
-                  className="self-start rounded-full bg-blue/10 px-2 py-0.5 text-[10px] font-bold text-blue"
-                >
-                  {t("quota.renew")}
-                </button>
-              ) : null}
-              <Link
-                href={`/ilan-ver?edit=${l.id}`}
-                className="rounded-full bg-blue/10 px-2 py-0.5 text-[10px] font-bold text-blue"
-              >
-                {t("common.edit")}
-              </Link>
-              {l.status === "active" && posterSupported(l) ? (
-                <Link
-                  href={`/ilan/${l.id}?afis=1`}
-                  className="rounded-full bg-lime/10 px-2 py-0.5 text-[10px] font-bold text-lime"
-                >
-                  {t("poster.short")}
-                </Link>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => removeListing(l.id)}
-                className="rounded-full bg-orange/15 px-2 py-0.5 text-[10px] font-bold text-orange"
-              >
-                {t("common.delete")}
-              </button>
-            </div>
-          </div>
-        ))}
-        {mine.length === 0 ? (
-          <p className="dash-empty">{tab === "active" ? t("my.empty.a") : t("my.empty.p")}</p>
-        ) : null}
-      </div>
+      <SellerListings />
     </Pane>
   );
 }
@@ -1090,31 +1004,6 @@ function CancelPanel() {
           {busy ? t("account.delete.busy") : t("account.delete.go")}
         </button>
       </form>
-    </Pane>
-  );
-}
-
-function NotifPrefsPanel() {
-  const { notifPrefs, setNotifPrefs, geo, requestLocation, setGeoCity } = useApp();
-  const { t } = useI18n();
-  return (
-    <Pane title={t("dash.app.notif")}>
-      <ToggleRow title={t("notif.p1")} desc={t("notif.p1d")} on={notifPrefs.priceDrop} onChange={(v) => setNotifPrefs({ priceDrop: v })} />
-      <ToggleRow title={t("notif.p2")} desc={t("notif.p2d")} on={notifPrefs.savedSearch} onChange={(v) => setNotifPrefs({ savedSearch: v })} />
-      <ToggleRow title={t("notif.p3")} desc={t("notif.p3d")} on={notifPrefs.nearby} onChange={(v) => setNotifPrefs({ nearby: v })} />
-      <div className="mt-4">
-        <p className="dash-row-label mb-2">{t("notif.kind.nearby")}</p>
-        <button type="button" className="btn-primary mb-3 h-10 px-4 text-sm" onClick={requestLocation}>
-          {t("loc.allow")}
-        </button>
-        <SearchSelect
-          label={t("notif.city")}
-          value={geo.city ?? ""}
-          options={TURKEY_CITIES.map((c) => c.name)}
-          placeholder={t("notif.city")}
-          onChange={setGeoCity}
-        />
-      </div>
     </Pane>
   );
 }

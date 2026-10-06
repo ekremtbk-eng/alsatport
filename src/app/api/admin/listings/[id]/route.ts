@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
+import { isLiveRow, newPeriod, notifyFavoriters, notifyListingEvent } from "@/lib/listings/lifecycle";
 import { writeAudit } from "@/lib/admin/audit";
 import { isUuid } from "@/lib/ids";
 import { requireAdmin, requireMutatingRequest, stepUpError } from "@/lib/security/session";
@@ -26,20 +27,31 @@ export async function POST(req: Request, ctx: Ctx) {
   const existing = await prisma.listing.findFirst({ where: { id, deletedAt: null } });
   if (!existing) return NextResponse.json({ ok: false, error: "auth.err.session" }, { status: 404 });
 
+  const wasLive = isLiveRow(existing);
   if (body?.action === "approve") {
-    await prisma.listing.update({
+    const row = await prisma.listing.update({
       where: { id },
-      data: { status: "active", postedAt: new Date(), rejectedReason: null },
+      data: { status: "active", rejectedReason: null, soldAt: null, ...(wasLive ? {} : newPeriod()) },
+      select: { id: true, title: true, sellerId: true, expiresAt: true },
     });
+    if (!wasLive) after(() => notifyListingEvent(row, "listing.published"));
   } else if (body?.action === "reject") {
-    await prisma.listing.update({
+    const reason = sanitizeText(body.reason, 240);
+    const row = await prisma.listing.update({
       where: { id },
-      data: { status: "rejected", rejectedReason: sanitizeText(body.reason, 240) || "rejected" },
+      data: { status: "rejected", rejectedReason: reason || "rejected" },
+      select: { id: true, title: true, sellerId: true, expiresAt: true },
     });
+    after(() => notifyListingEvent(row, "listing.rejected", { extra: reason, unique: String(Date.now()) }));
   } else if (body?.action === "remove") {
-    await prisma.listing.update({
+    const row = await prisma.listing.update({
       where: { id },
       data: { status: "removed", deletedAt: new Date() },
+      select: { id: true, title: true, sellerId: true, expiresAt: true },
+    });
+    after(async () => {
+      await notifyListingEvent(row, "listing.removed");
+      if (wasLive) await notifyFavoriters(row, "favorite.gone");
     });
   } else {
     return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });

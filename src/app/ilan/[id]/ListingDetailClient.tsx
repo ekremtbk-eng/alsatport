@@ -46,6 +46,7 @@ import { usePhoneReveal } from "@/lib/usePhoneReveal";
 import { useSellerReviews } from "@/components/useSellerReviews";
 import { isClassifiedPartsListing, listingCategoryChain } from "@/lib/listingFacts";
 import { BreadcrumbNav } from "@/components/BreadcrumbNav";
+import { PublishNotifCard } from "@/components/listing/PublishNotifCard";
 import { hrefForCategory } from "@/data/categories";
 
 export function ListingDetailClient() {
@@ -259,6 +260,7 @@ export function ListingDetailClient() {
             </Link>
           </div>
         ) : null}
+        {user?.id === listing.sellerId ? <PublishNotifCard listingId={listing.id} /> : null}
         <ClassifiedListingView
           listing={listing}
           liked={liked}
@@ -352,6 +354,7 @@ export function ListingDetailClient() {
           </Link>
         </div>
       ) : null}
+      {user?.id === listing.sellerId ? <PublishNotifCard listingId={listing.id} /> : null}
 
       <div className="detail-grid px-4 pt-4">
         <div>

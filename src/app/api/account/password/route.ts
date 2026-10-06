@@ -8,6 +8,7 @@ import { writeAudit } from "@/lib/admin/audit";
 import { readJson } from "@/lib/security/parseBody";
 import { passwordChangeSchema } from "@/lib/security/schemas";
 import { sendSecurityNoticeEmail } from "@/lib/mail/authMail";
+import { recordSecurityNotice } from "@/lib/security/alerts";
 
 export async function POST(req: Request) {
   const blocked = await requireMutatingRequest(req);
@@ -56,5 +57,11 @@ export async function POST(req: Request) {
         : "Artık e-posta adresiniz ve belirlediğiniz şifreyle de giriş yapabilirsiniz.",
     ).catch(() => undefined);
   }
+  await recordSecurityNotice(
+    user.id,
+    "security.password",
+    hadPassword ? "Şifreniz değiştirildi" : "Hesabınıza şifre eklendi",
+    hadPassword ? "AlsatPort hesabınızın şifresi değiştirildi." : "Hesabınıza giriş şifresi eklendi.",
+  );
   return NextResponse.json({ ok: true, user: user.profile });
 }

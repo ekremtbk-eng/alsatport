@@ -1,5 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { sendSecurityNoticeEmail } from "@/lib/mail/authMail";
+import { recordSecurityNotice } from "@/lib/security/alerts";
 import { hashPassword } from "@/lib/security/password";
 import { resetStampMatches, verifyPasswordResetToken } from "@/lib/security/passwordReset";
 import { clientIp } from "@/lib/security/rateLimit";
@@ -39,6 +40,9 @@ export async function POST(req: Request) {
       () => undefined,
       () => undefined,
     ),
+  );
+  after(() =>
+    recordSecurityNotice(user.id, "security.password", "Şifreniz sıfırlandı", "AlsatPort hesabınızın şifresi sıfırlama bağlantısıyla değiştirildi."),
   );
   return NextResponse.json({ ok: true });
 }

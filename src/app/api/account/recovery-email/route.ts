@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isValidEmail, normalizeEmail } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { mailDebugEnabled, sendOtpEmail, sendSecurityNoticeEmail } from "@/lib/mail/authMail";
+import { recordSecurityNotice } from "@/lib/security/alerts";
 import { createEmailOtp, verifyEmailOtp } from "@/lib/security/emailOtp";
 import { readJson } from "@/lib/security/parseBody";
 import { LIMITS } from "@/lib/security/rateLimit";
@@ -36,6 +37,7 @@ export async function POST(req: Request) {
     await sendSecurityNoticeEmail(auth.user.email, "Kurtarma e-postası kaldırıldı", "Hesabınızdaki kurtarma e-postası kaldırıldı.").catch(
       () => undefined,
     );
+    await recordSecurityNotice(auth.user.id, "security.recovery", "Kurtarma e-postası kaldırıldı", "Hesabınızdaki kurtarma e-postası kaldırıldı.");
     const user = (await findUserById(auth.user.id))!;
     return NextResponse.json({ ok: true, user: user.profile });
   }
@@ -69,6 +71,12 @@ export async function POST(req: Request) {
     "Kurtarma e-postası eklendi",
     `${maskEmail(email)} adresi hesabınıza kurtarma e-postası olarak eklendi.`,
   ).catch(() => undefined);
+  await recordSecurityNotice(
+    auth.user.id,
+    "security.recovery",
+    "Kurtarma e-postası eklendi",
+    `${maskEmail(email)} adresi hesabınıza kurtarma e-postası olarak eklendi.`,
+  );
   const user = (await findUserById(auth.user.id))!;
   return NextResponse.json({ ok: true, user: user.profile });
 }

@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { postMessage } from "@/lib/messages/store";
+import { NextResponse, after } from "next/server";
+import { notifyNewMessage, postMessage } from "@/lib/messages/store";
 import { LIMITS } from "@/lib/security/rateLimit";
 import { throttle } from "@/lib/security/throttle";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
@@ -25,6 +25,9 @@ export async function POST(req: Request) {
   if ("error" in result) {
     return NextResponse.json({ ok: false, error: result.error }, { status: result.status });
   }
+  const senderId = auth.user.id;
+  const conversationId = result.conversation.id;
+  after(() => notifyNewMessage(senderId, conversationId).catch(() => undefined));
   return NextResponse.json({
     ok: true,
     conversationId: result.conversation.id,

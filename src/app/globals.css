@@ -6568,6 +6568,83 @@ html[data-device="tablet"] .flash-toast {
   color: #64748b;
   font-size: 0.9rem;
 }
+.notif-section {
+  margin-top: 1.5rem;
+}
+.notif-head,
+.notif-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.5rem 1rem;
+}
+.notif-head {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+.notif-col {
+  display: none;
+}
+.notif-row {
+  padding: 0.85rem 0;
+  border-bottom: 1px solid #eef2f1;
+}
+.notif-row-simple {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+.notif-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.notif-row:not(.notif-row-simple) {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.notif-row:not(.notif-row-simple) > :first-child {
+  grid-column: 1 / -1;
+}
+.notif-cell-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+}
+.notif-forced {
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #64748b;
+}
+@media (min-width: 640px) {
+  .notif-head,
+  .notif-row:not(.notif-row-simple) {
+    grid-template-columns: minmax(0, 1fr) 5.5rem 7.5rem;
+    align-items: center;
+  }
+  .notif-row:not(.notif-row-simple) > :first-child {
+    grid-column: auto;
+  }
+  .notif-col {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #64748b;
+    text-align: center;
+  }
+  .notif-cell {
+    justify-content: center;
+  }
+  .notif-cell-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .notif-forced {
+    text-align: center;
+  }
+}
 .dash-kvkk {
   margin-top: 1.5rem;
   font-size: 0.75rem;

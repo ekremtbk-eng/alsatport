@@ -81,6 +81,7 @@ type AppState = {
   updateListingPrice: (id: string, price: number) => void;
   setListingStatus: (id: string, status: Listing["status"]) => void;
   renewListing: (id: string) => Promise<boolean>;
+  setListingSale: (id: string, action: "sold" | "resale") => Promise<{ ok: boolean; error?: string }>;
   sendMessage: (conversationId: string, text: string, fromMe?: boolean) => Promise<boolean>;
   startConversation: (listing: Listing) => Promise<string>;
   refreshConversation: (id: string) => Promise<void>;
@@ -147,6 +148,14 @@ function capNotifs(list: AppNotification[]) {
   return list.slice(0, 60);
 }
 
+const SERVER_NOTIF_PREFIX = "srv:";
+
+/** Server inbox replaces its previous copy; device-local alerts (price, search, nearby) stay as they are. */
+function mergeServerNotifs(prev: AppNotification[], server: AppNotification[]) {
+  const local = prev.filter((n) => !n.id.startsWith(SERVER_NOTIF_PREFIX));
+  return capNotifs([...server, ...local].sort((a, b) => b.createdAt - a.createdAt));
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -189,7 +198,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         l.sellerId === sellerId && l.status === "active"
           ? {
               ...l,
-              expiresAt: patch.expiresAt,
               featured: patch.featured,
               vip: patch.vip,
             }
@@ -367,7 +375,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         JSON.stringify({
           ...parsed,
           reviews,
-          notifications,
+          notifications: notifications.filter((n) => !n.id.startsWith(SERVER_NOTIF_PREFIX)),
           geo: hasConsent("functional") ? geoRef.current : undefined,
           watchedPrices: pricesRef.current,
           savedSearches: signedIn ? parsed.savedSearches : searchesRef.current,
@@ -419,6 +427,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       window.clearInterval(timer);
     };
   }, [hydrated, user?.id]);
+
+  const inboxUserId = user?.id;
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!inboxUserId) {
+      setNotifications((prev) => prev.filter((n) => !n.id.startsWith(SERVER_NOTIF_PREFIX)));
+      return;
+    }
+    let cancelled = false;
+    const pull = async () => {
+      if (document.visibilityState === "hidden") return;
+      const res = await apiGet<{
+        ok?: boolean;
+        notifications?: (Omit<AppNotification, "kind"> & { kind: string })[];
+      }>("/api/notifications");
+      if (cancelled || !res.ok || !res.notifications) return;
+      const server: AppNotification[] = res.notifications.map((n) => ({ ...n, kind: "system" }));
+      setNotifications((prev) => mergeServerNotifs(prev, server));
+    };
+    void pull();
+    const timer = window.setInterval(() => void pull(), 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [hydrated, inboxUserId]);
 
   const migratedAlertsForUser = useRef<string | null>(null);
   useEffect(() => {
@@ -820,15 +854,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const renewListing = useCallback(async (id: string) => {
-    const res = await apiPost<{ ok: boolean; expiresAt?: number; listingStatus?: Listing["status"] }>(
-      "/api/listings/renew",
-      { id },
-    );
-    if (!res.ok || !res.expiresAt) return false;
-    setListings((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, status: "active", expiresAt: res.expiresAt, postedAt: Date.now() } : l)),
-    );
+    const res = await apiPost<{ ok: boolean; listing?: Listing }>("/api/listings/renew", { id });
+    if (!res.ok || !res.listing) return false;
+    setListings((prev) => prev.map((l) => (l.id === id ? res.listing! : l)));
     return true;
+  }, []);
+
+  const setListingSale = useCallback(async (id: string, action: "sold" | "resale") => {
+    const res = await apiPost<{ ok: boolean; error?: string; listing?: Listing }>(`/api/listings/${id}/sold`, { action });
+    if (!res.ok || !res.listing) return { ok: false, error: res.error ?? "auth.err.server" };
+    setListings((prev) => prev.map((l) => (l.id === id ? res.listing! : l)));
+    return { ok: true };
   }, []);
 
   const startPaytrCheckout = useCallback(
@@ -1067,13 +1103,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const markNotificationRead = useCallback((id: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    if (id.startsWith(SERVER_NOTIF_PREFIX) && userRef.current) {
+      void apiPost("/api/notifications", { action: "read", ids: [id] });
+    }
   }, []);
 
   const markAllNotificationsRead = useCallback(() => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    if (userRef.current) void apiPost("/api/notifications", { action: "readAll" });
   }, []);
 
-  const clearNotifications = useCallback(() => setNotifications([]), []);
+  const clearNotifications = useCallback(() => {
+    setNotifications([]);
+    if (userRef.current) void apiPost("/api/notifications", { action: "clear" });
+  }, []);
 
   const requestLocation = useCallback(() => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
@@ -1190,6 +1233,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateListingPrice,
       setListingStatus,
       renewListing,
+      setListingSale,
       sendMessage,
       startConversation,
       refreshConversation,
@@ -1243,6 +1287,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateListingPrice,
       setListingStatus,
       renewListing,
+      setListingSale,
       sendMessage,
       startConversation,
       refreshConversation,

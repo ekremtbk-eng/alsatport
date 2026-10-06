@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db";
 import { isUuid } from "@/lib/ids";
 import { sanitizeText } from "@/lib/security/sanitize";
 import { publicAccountName } from "@/lib/publicName";
+import { isLiveRow } from "@/lib/listings/lifecycle";
+import { notifySafe } from "@/lib/notifications/store";
 import type { Prisma } from "@prisma/client";
 
 const convoInclude = {
@@ -95,7 +97,7 @@ export async function startConversation(userId: string, listingId: string) {
   if (!isUuid(listingId)) return { error: "auth.err.required" as const, status: 400 };
   const listing = await prisma.listing.findFirst({
     where: { id: listingId, deletedAt: null },
-    select: { id: true, sellerId: true, status: true },
+    select: { id: true, sellerId: true, status: true, expiresAt: true },
   });
   if (!listing) return { error: "auth.err.session" as const, status: 404 };
   if (listing.sellerId === userId) return { error: "auth.err.forbidden" as const, status: 403 };
@@ -107,7 +109,7 @@ export async function startConversation(userId: string, listingId: string) {
     include: convoInclude,
   });
   if (existing) return { conversation: toClientConversation(existing, userId) };
-  if (listing.status !== "active") return { error: "list.notfound" as const, status: 404 };
+  if (!isLiveRow(listing)) return { error: "list.notfound" as const, status: 404 };
 
   try {
     const created = await prisma.conversation.create({
@@ -206,4 +208,38 @@ export async function postMessage(userId: string, conversationId: string, rawTex
     return { error: detail.error, status: detail.status };
   }
   return { conversation: detail.conversation, messageId: message.id, text };
+}
+
+/**
+ * One notice per unread burst: the key includes the recipient's last read time, so a chat partner
+ * sending ten messages in a row produces a single notification until the recipient opens the thread.
+ * The message text itself is never copied into notifications or e-mails.
+ */
+export async function notifyNewMessage(senderId: string, conversationId: string) {
+  const convo = await prisma.conversation.findFirst({
+    where: { id: conversationId },
+    select: {
+      id: true,
+      buyerId: true,
+      sellerId: true,
+      listing: { select: { id: true, title: true } },
+      reads: { select: { userId: true, lastReadAt: true } },
+    },
+  });
+  if (!convo) return;
+  const recipientId = convo.buyerId === senderId ? convo.sellerId : convo.buyerId;
+  const lastRead = convo.reads.find((r) => r.userId === recipientId)?.lastReadAt?.getTime() ?? 0;
+  const toSeller = recipientId === convo.sellerId && !!convo.listing;
+  const title = convo.listing?.title ? `“${convo.listing.title.slice(0, 80)}”` : "";
+  await notifySafe({
+    userId: recipientId,
+    event: toSeller ? "listing.message" : "message.new",
+    title: toSeller ? "İlanınıza yeni mesaj" : "Yeni mesajınız var",
+    body: toSeller
+      ? `${title} ilanınız için yeni bir mesajınız var.`
+      : `${title ? `${title} ilanı hakkında ` : ""}size yeni bir mesaj gönderildi.`,
+    href: `/mesajlar/${convo.id}`,
+    listingId: convo.listing?.id ?? null,
+    eventKey: `msg:${convo.id}:${recipientId}:${lastRead}`,
+  });
 }

@@ -80,6 +80,19 @@ export async function sendSecurityNoticeEmail(to: string, title: string, message
   return sendMail({ to, subject: `AlsatPort güvenlik bildirimi: ${title}`, html, text: `${title}: ${message}` });
 }
 
+/** Opt-in notice (listing/message events); recipients manage it under Profil → Bildirim ayarları. */
+export async function sendNoticeEmail(to: string, title: string, message: string, path: string) {
+  const href = `${appOrigin()}${path.startsWith("/") ? path : "/profil"}`;
+  const settings = `${appOrigin()}/profil?p=bildirim-ayarlari`;
+  const html = wrap(
+    title,
+    `<p>${escapeHtml(message)}</p>
+    <p style="margin:24px 0"><a href="${escapeHtml(href)}" style="background:#16a34a;color:#fff;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:12px;display:inline-block">AlsatPort'ta görüntüle</a></p>
+    <p style="color:#6b7280;font-size:12px">Bu e-postayı bildirim tercihleriniz nedeniyle aldınız. <a href="${escapeHtml(settings)}" style="color:#6b7280">Bildirim ayarları</a></p>`,
+  );
+  return sendMail({ to, subject: `AlsatPort: ${title}`, html, text: `${title}: ${message} ${href}` });
+}
+
 export function mailDebugEnabled() {
   return process.env.NODE_ENV !== "production" && process.env.MAIL_DEBUG === "1";
 }

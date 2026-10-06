@@ -1,6 +1,6 @@
 import {
-  COMPLIMENTARY_ACCESS_DAYS,
   COMPLIMENTARY_LISTING_ALLOWANCE,
+  LISTING_LIVE_DAYS,
   hasOpenAccess,
 } from "@/lib/campaign";
 
@@ -41,9 +41,8 @@ export function liveDaysForPlan(plan?: string) {
   return PLAN_LIVE_DAYS.standart;
 }
 
-export function liveDaysForUser(user: QuotaUser | null | undefined, now = Date.now()) {
-  if (hasOpenAccess(user, now)) return COMPLIMENTARY_ACCESS_DAYS;
-  return liveDaysForPlan(user?.plan);
+export function liveDaysForUser(_user?: QuotaUser | null, _now?: number) {
+  return LISTING_LIVE_DAYS;
 }
 
 export function dopingUntilFromNow(from = Date.now()) {
@@ -95,11 +94,8 @@ export function expiresAtFromNow(plan?: string, from = Date.now()) {
   return from + liveDaysForPlan(plan) * DAY_MS;
 }
 
-export function expiresAtForUser(user: QuotaUser | null | undefined, from = Date.now()) {
-  if (hasOpenAccess(user, from)) {
-    return from + COMPLIMENTARY_ACCESS_DAYS * DAY_MS;
-  }
-  return expiresAtFromNow(user?.plan, from);
+export function expiresAtForUser(_user: QuotaUser | null | undefined, from = Date.now()) {
+  return from + LISTING_LIVE_DAYS * DAY_MS;
 }
 
 export function isListingExpired(listing: { expiresAt?: number; status?: string }, now = Date.now()) {
@@ -107,12 +103,29 @@ export function isListingExpired(listing: { expiresAt?: number; status?: string 
   return listing.expiresAt <= now;
 }
 
-export function applyExpiryToListing<T extends { expiresAt?: number; status: "active" | "passive" | "pending" | "rejected" }>(
-  listing: T,
-  now = Date.now(),
-): T {
+export function applyExpiryToListing<T extends { expiresAt?: number; status: string }>(listing: T, now = Date.now()): T {
   if (listing.status === "active" && isListingExpired(listing, now)) {
-    return { ...listing, status: "passive" };
+    return { ...listing, status: "expired" };
   }
   return listing;
+}
+
+const TR_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" });
+
+/** Calendar days (Istanbul time) between now and the expiry date; negative once it has passed. */
+export function calendarDaysLeft(expiresAt: number, now = Date.now()) {
+  if (expiresAt <= now) return -1;
+  const day = (ts: number) => Date.parse(`${TR_DAY.format(ts)}T00:00:00Z`);
+  return Math.round((day(expiresAt) - day(now)) / DAY_MS);
+}
+
+export type RemainingState = { key: "left" | "tomorrow" | "today" | "expired"; days: number };
+
+export function remainingState(expiresAt: number | undefined, now = Date.now()): RemainingState | null {
+  if (!expiresAt) return null;
+  const days = calendarDaysLeft(expiresAt, now);
+  if (days < 0) return { key: "expired", days: 0 };
+  if (days === 0) return { key: "today", days: 0 };
+  if (days === 1) return { key: "tomorrow", days: 1 };
+  return { key: "left", days };
 }

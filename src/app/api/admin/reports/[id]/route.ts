@@ -1,5 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
+import { isLiveRow, notifyFavoriters, notifyListingEvent } from "@/lib/listings/lifecycle";
+import { sendSecurityNoticeEmail } from "@/lib/mail/authMail";
 import { writeAudit } from "@/lib/admin/audit";
 import { isUuid } from "@/lib/ids";
 import { requireAdmin, requireMutatingRequest, revokeUserSessions, stepUpError } from "@/lib/security/session";
@@ -34,16 +36,26 @@ export async function PATCH(req: Request, ctx: Ctx) {
     },
   });
   if (body.removeListing && report.listingId) {
-    await prisma.listing.update({
+    const before = await prisma.listing.findUnique({
+      where: { id: report.listingId },
+      select: { status: true, expiresAt: true, deletedAt: true },
+    });
+    const row = await prisma.listing.update({
       where: { id: report.listingId },
       data: { status: "removed", deletedAt: new Date() },
+      select: { id: true, title: true, sellerId: true, expiresAt: true },
+    });
+    const wasLive = !!before && isLiveRow(before);
+    after(async () => {
+      await notifyListingEvent(row, "listing.removed");
+      if (wasLive) await notifyFavoriters(row, "favorite.gone");
     });
   }
   let bannedSeller: string | null = null;
   if (body.banSeller && report.listingId) {
     const listing = await prisma.listing.findUnique({
       where: { id: report.listingId },
-      select: { seller: { select: { id: true, role: true } } },
+      select: { seller: { select: { id: true, role: true, email: true, bannedAt: true } } },
     });
     const seller = listing?.seller;
     if (seller && seller.role !== "admin" && seller.id !== auth.user.id) {
@@ -53,6 +65,16 @@ export async function PATCH(req: Request, ctx: Ctx) {
       });
       await revokeUserSessions(seller.id, "banned");
       bannedSeller = seller.id;
+      const to = seller.email;
+      if (to && !seller.bannedAt) {
+        after(() =>
+          sendSecurityNoticeEmail(
+            to,
+            "Hesabınız askıya alındı",
+            "AlsatPort hesabınız kullanım koşullarının ihlali nedeniyle askıya alındı. Bir hata olduğunu düşünüyorsanız destek ekibimizle iletişime geçebilirsiniz.",
+          ).catch(() => undefined),
+        );
+      }
     }
   }
   await writeAudit({

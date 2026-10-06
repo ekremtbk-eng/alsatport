@@ -12,6 +12,7 @@ import {
   toClientListing,
   updateListingRecord,
 } from "@/lib/listings/store";
+import { isLiveRow, notifyListingEvent } from "@/lib/listings/lifecycle";
 import { listingCreateBodySchema } from "@/lib/security/schemas";
 import { readJson } from "@/lib/security/parseBody";
 
@@ -23,7 +24,8 @@ export async function GET(_req: Request, ctx: Ctx) {
   const row = await findListingRecord(id);
   if (!row) return NextResponse.json({ ok: false, error: "auth.err.session" }, { status: 404 });
   const claims = await claimsFromCookies();
-  if (row.status !== "active") {
+  const live = isLiveRow(row);
+  if (!live) {
     if (!claims) return NextResponse.json({ ok: false, error: "auth.err.session" }, { status: 404 });
     let viewer = await findUserById(claims.sub);
     if (viewer) viewer = await promoteConfiguredAdmin(viewer);
@@ -33,7 +35,7 @@ export async function GET(_req: Request, ctx: Ctx) {
     await bumpListingViews(id);
   }
   const listing = toClientListing(row);
-  if (row.status === "active") listing.views += 1;
+  if (live) listing.views += 1;
   return NextResponse.json({ ok: true, listing: hideSellerPhone(listing) });
 }
 
@@ -52,6 +54,13 @@ export async function PUT(req: Request, ctx: Ctx) {
   }
   if (updated.listing.lat == null && typeof (parsed.data as { city?: unknown }).city === "string") {
     after(() => fillMissingListingCoords(id).catch(() => undefined));
+  }
+  const { ref, contentChanged, reactivated } = updated;
+  if (reactivated) {
+    after(() => notifyListingEvent(ref, "listing.renewed"));
+  } else if (contentChanged) {
+    const minute = String(Math.floor(Date.now() / 60_000));
+    after(() => notifyListingEvent(ref, "listing.updated", { unique: minute }));
   }
   return NextResponse.json({ ok: true, listing: updated.listing });
 }

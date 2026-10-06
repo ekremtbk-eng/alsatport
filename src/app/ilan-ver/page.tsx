@@ -33,6 +33,7 @@ import { FeatureGrid } from "@/components/FeatureGrid";
 import { catName, useI18n } from "@/context/I18nContext";
 import { isPetsCategoryId, moderateListingDraft } from "@/lib/liveAnimalPolicy";
 import { showFlashToast } from "@/components/FlashToast";
+import { PUBLISHED_PARAM } from "@/components/listing/PublishNotifCard";
 
 export default function PostListingPage() {
   const { user, addListing, updateListing, listings, hydrated } = useApp();
@@ -511,12 +512,9 @@ export default function PostListingPage() {
       }
       clearListingDraft();
       const saved = posted.listing;
-      if (saved?.status === "pending") {
-        showFlashToast(t("post.pendingOk"), "ok");
-      } else {
-        showFlashToast(t("post.publishedOk"), "ok");
-      }
-      router.push(`/ilan/${saved?.id ?? listing.id}`);
+      const published = saved?.status !== "pending";
+      showFlashToast(t(published ? "post.publishedOk" : "post.pendingOk"), "ok");
+      router.push(`/ilan/${saved?.id ?? listing.id}${published ? `?${PUBLISHED_PARAM}=1` : ""}`);
     } finally {
       publishLock.current = false;
       setPublishing(false);

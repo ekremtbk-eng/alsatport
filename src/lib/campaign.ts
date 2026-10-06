@@ -1,7 +1,8 @@
 /** Platform is permanently free: unlimited listings, no PayTR / paid plans. */
 export const PLATFORM_FREE = true;
 export const PAYMENTS_PAUSED = true;
-export const COMPLIMENTARY_ACCESS_DAYS = 365;
+/** Every listing is live for this many days; republishing is free and starts a new period. */
+export const LISTING_LIVE_DAYS = 15;
 export const COMPLIMENTARY_LISTING_ALLOWANCE = 1_000_000;
 
 const DAY_MS = 24 * 60 * 60 * 1000;

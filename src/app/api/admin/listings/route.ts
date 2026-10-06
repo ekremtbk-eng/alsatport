@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/security/session";
 import { toClientListing } from "@/lib/listings/store";
+import { isLiveRow, liveListingWhere } from "@/lib/listings/lifecycle";
 
 const STATUSES = new Set<string>(Object.values(ListingStatus));
 
@@ -13,7 +14,13 @@ export async function GET(req: Request) {
   const rows = await prisma.listing.findMany({
     where: {
       deletedAt: null,
-      ...(status === "all" ? {} : { status: (STATUSES.has(status) ? status : "pending") as ListingStatus }),
+      ...(status === "all"
+        ? {}
+        : status === "expired"
+          ? { OR: [{ status: "expired" }, { status: "active", expiresAt: { lte: new Date() } }] }
+          : status === "active"
+            ? liveListingWhere()
+            : { status: (STATUSES.has(status) ? status : "pending") as ListingStatus }),
     },
     include: {
       images: { orderBy: [{ isCover: "desc" }, { sortOrder: "asc" }] },
@@ -24,6 +31,9 @@ export async function GET(req: Request) {
   });
   return NextResponse.json({
     ok: true,
-    listings: rows.map((r) => ({ ...toClientListing(r), moderationStatus: r.status })),
+    listings: rows.map((r) => ({
+      ...toClientListing(r),
+      moderationStatus: r.status === "active" && !isLiveRow(r) ? "expired" : r.status,
+    })),
   });
 }

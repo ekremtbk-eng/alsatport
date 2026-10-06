@@ -2,6 +2,7 @@ import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { writeAudit } from "@/lib/admin/audit";
 import { isUuid } from "@/lib/ids";
+import { isLiveRow } from "@/lib/listings/lifecycle";
 import { clientIp } from "@/lib/security/rateLimit";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
 import { THROTTLE, throttle, tooMany } from "@/lib/security/throttle";
@@ -46,12 +47,13 @@ export async function POST(req: Request, ctx: Ctx) {
     where: { id, deletedAt: null },
     select: {
       status: true,
+      expiresAt: true,
       sellerId: true,
       seller: { select: { bannedAt: true, profile: { select: { phone: true, phoneVerifiedAt: true } } } },
     },
   });
   const owner = row?.sellerId === auth.user.id || auth.user.role === "admin";
-  if (!row || (row.status !== "active" && !owner) || row.seller.bannedAt) {
+  if (!row || (!isLiveRow(row) && !owner) || row.seller.bannedAt) {
     return NextResponse.json({ ok: false, error: "auth.err.session" }, { status: 404 });
   }
   const profile = row.seller.profile;

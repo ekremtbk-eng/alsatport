@@ -26,13 +26,14 @@ export type Listing = {
   views: number;
   featured: boolean;
   vip: boolean;
-  status: "active" | "passive" | "pending" | "rejected";
+  status: "active" | "passive" | "pending" | "rejected" | "expired" | "sold";
   specs: { label: string; value: string }[];
   features?: string[];
   chassis?: Record<string, ChassisStatus>;
   listingNo: string;
   postedAt?: number;
   expiresAt?: number;
+  soldAt?: number;
   urgent?: boolean;
   refurbished?: boolean;
   sellerPhone?: string;

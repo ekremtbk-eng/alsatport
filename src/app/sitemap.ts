@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { flattenCategories, hrefForCategory } from "@/data/categories";
 import { SITE_SITELINKS } from "@/data/sitelinks";
 import { prisma } from "@/lib/db";
+import { liveListingWhere } from "@/lib/listings/lifecycle";
 import { appOrigin } from "@/lib/site";
 
 export const revalidate = 3600;
@@ -42,7 +43,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let listings: { id: string; updatedAt: Date }[] = [];
   try {
     listings = await prisma.listing.findMany({
-      where: { deletedAt: null, status: "active" },
+      where: { deletedAt: null, ...liveListingWhere() },
       select: { id: true, updatedAt: true },
       take: 5000,
       orderBy: { updatedAt: "desc" },

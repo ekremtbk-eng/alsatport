@@ -10,6 +10,7 @@ import { entitlementsChanged, reconcileEntitlements } from "@/lib/entitlements";
 import { saveUser } from "@/lib/security/userStore";
 import { lookupCategory } from "@/data/categories";
 import { createListing, fillMissingListingCoords, hideSellerPhone, parseListingInput, queryListings } from "@/lib/listings/store";
+import { notifyListingEvent } from "@/lib/listings/lifecycle";
 import { parseSearch, readJson } from "@/lib/security/parseBody";
 import { listingCreateBodySchema, listingQuerySchema } from "@/lib/security/schemas";
 
@@ -94,6 +95,8 @@ export async function POST(req: Request) {
     const listingId = created.listing.id;
     after(() => fillMissingListingCoords(listingId).catch(() => undefined));
   }
+  const ref = created.ref;
+  after(() => notifyListingEvent(ref, "listing.published"));
 
   const posted = (auth.user.profile.listingsPosted ?? 0) + 1;
   return NextResponse.json({

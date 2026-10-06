@@ -16,7 +16,16 @@ type AdminListing = {
   sellerName: string;
   city: string;
   moderationStatus?: string;
+  postedAt?: number;
+  expiresAt?: number;
+  soldAt?: number;
 };
+const LISTING_FILTERS = ["pending", "active", "expired", "passive", "sold", "rejected", "all"] as const;
+type ListingFilter = (typeof LISTING_FILTERS)[number];
+
+function adminDate(ms?: number) {
+  return ms ? new Date(ms).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" }) : "—";
+}
 type AdminReport = {
   id: string;
   reason: string;
@@ -58,6 +67,7 @@ function AdminConsole() {
   const [tab, setTab] = useState<"listings" | "reports" | "users" | "days">("listings");
   const [overview, setOverview] = useState<Overview | null>(null);
   const [listings, setListings] = useState<AdminListing[]>([]);
+  const [listingFilter, setListingFilter] = useState<ListingFilter>("pending");
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [q, setQ] = useState("");
@@ -71,11 +81,11 @@ function AdminConsole() {
       return;
     }
     setOverview({ pending: ov.pending, openReports: ov.openReports, users: ov.users, banned: ov.banned });
-    const list = await apiGet<{ ok?: boolean; listings?: AdminListing[] }>("/api/admin/listings?status=pending");
+    const list = await apiGet<{ ok?: boolean; listings?: AdminListing[] }>(`/api/admin/listings?status=${listingFilter}`);
     setListings(list.listings ?? []);
     const reps = await apiGet<{ ok?: boolean; reports?: AdminReport[] }>("/api/admin/reports");
     setReports(reps.reports ?? []);
-  }, []);
+  }, [listingFilter]);
 
   useEffect(() => {
     if (hydrated && user?.role === "admin") void load();
@@ -165,13 +175,38 @@ function AdminConsole() {
       </div>
 
       {tab === "listings" ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {LISTING_FILTERS.map((id) => (
+            <button
+              key={id}
+              type="button"
+              className={`rounded-full px-3 py-1 text-xs font-bold ${listingFilter === id ? "bg-ink text-white" : "border border-line"}`}
+              onClick={() => setListingFilter(id)}
+            >
+              {t(`admin.lst.${id}`)}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {tab === "listings" ? (
         <ul className="mt-4 space-y-3">
           {listings.length === 0 ? <p className="text-sm text-muted">{t("admin.empty")}</p> : null}
           {listings.map((row) => (
             <li key={row.id} className="rounded-xl border border-line bg-card p-4">
-              <p className="font-bold text-ink">{row.title}</p>
+              <p className="flex flex-wrap items-center gap-2 font-bold text-ink">
+                {row.title}
+                {row.moderationStatus ? (
+                  <span className="rounded-full border border-line px-2 py-0.5 text-[11px] font-semibold text-muted">
+                    {t(`admin.lst.${row.moderationStatus}`)}
+                  </span>
+                ) : null}
+              </p>
               <p className="text-xs text-muted">
-                {row.sellerName} · {row.city} · {row.moderationStatus}
+                {row.sellerName} · {row.city}
+              </p>
+              <p className="mt-1 text-[11px] text-muted">
+                {t("admin.lst.publishedAt")}: {adminDate(row.postedAt)} · {t("admin.lst.expiresAt")}: {adminDate(row.expiresAt)}
+                {row.soldAt ? ` · ${t("admin.lst.soldAt")}: ${adminDate(row.soldAt)}` : ""}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <button type="button" className="btn-primary h-9 px-3 text-xs" onClick={() => void moderate(row.id, "approve")}>

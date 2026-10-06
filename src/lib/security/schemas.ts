@@ -239,6 +239,18 @@ export const notifPrefsSchema = z.object({
   savedSearch: z.boolean().optional(),
   nearby: z.boolean().optional(),
 });
+export const listingSaleBodySchema = z.object({ action: z.enum(["sold", "resale"]) }).strict();
+const channelPrefSchema = z.object({ inApp: z.boolean().optional(), email: z.boolean().optional() }).strict();
+export const notificationPrefsPatchSchema = z
+  .object({ prefs: z.record(z.string().max(40), channelPrefSchema) })
+  .strict()
+  .refine((v) => Object.keys(v.prefs).length <= 40);
+export const notificationsActionSchema = z
+  .object({
+    action: z.enum(["read", "readAll", "clear"]),
+    ids: z.array(z.string().max(60)).max(100).optional(),
+  })
+  .strict();
 export const savedSearchBodySchema = z.object({
   query: z.string().max(80).optional().default(""),
   city: z.string().max(40).optional(),

@@ -13,6 +13,7 @@ import type { StoredUser } from "@/lib/security/userStore";
 import { deleteStoredObject, isManagedStorageKey, storageKeyFromUrl } from "@/lib/storage/media";
 import { resolveListingCoords, validListingCoords } from "@/lib/placeGeo";
 import { publicAccountName, verifiedBusinessName } from "@/lib/publicName";
+import { type ListingRef, isLiveRow, liveListingWhere, newPeriod } from "@/lib/listings/lifecycle";
 
 export type ListingWithRelations = Prisma.ListingGetPayload<{
   include: {
@@ -31,15 +32,19 @@ export function toClientListing(row: ListingWithRelations): Listing {
     .sort((a, b) => Number(b.isCover) - Number(a.isCover) || a.sortOrder - b.sortOrder)
     .map((i) => i.url);
   const status: Listing["status"] =
-    row.deletedAt || row.status === "removed" || row.status === "expired" || row.status === "draft"
+    row.deletedAt || row.status === "removed" || row.status === "draft"
       ? "passive"
-      : row.status === "active"
-        ? "active"
-        : row.status === "pending"
-          ? "pending"
-          : row.status === "rejected"
-            ? "rejected"
-            : "passive";
+      : row.status === "expired" || (row.status === "active" && !isLiveRow(row))
+        ? "expired"
+        : row.status === "active"
+          ? "active"
+          : row.status === "sold"
+            ? "sold"
+            : row.status === "pending"
+              ? "pending"
+              : row.status === "rejected"
+                ? "rejected"
+                : "passive";
   const postedAt = (row.postedAt ?? row.createdAt).getTime();
   const phone =
     row.seller.profile?.phoneVerifiedAt && row.seller.profile.phone ? row.seller.profile.phone : "";
@@ -76,6 +81,7 @@ export function toClientListing(row: ListingWithRelations): Listing {
     listingNo: row.listingNo,
     postedAt,
     expiresAt: row.expiresAt?.getTime(),
+    soldAt: row.soldAt?.getTime(),
     urgent: row.urgent,
     refurbished: row.refurbished,
     sellerPhone: phone || undefined,
@@ -112,12 +118,11 @@ export async function findListingRecord(id: string) {
 }
 
 export async function listPublicAndOwnedListings(viewerId?: string) {
+  const live = liveListingWhere();
   const rows = await prisma.listing.findMany({
     where: {
       deletedAt: null,
-      OR: viewerId
-        ? [{ status: "active" }, { sellerId: viewerId }]
-        : [{ status: "active" }],
+      OR: viewerId ? [live, { sellerId: viewerId }] : [live],
     },
     include: listingInclude,
     orderBy: [{ featured: "desc" }, { vip: "desc" }, { postedAt: "desc" }],
@@ -140,19 +145,20 @@ export async function queryListings(params: {
   sellerId?: string;
 }) {
   const and: Prisma.ListingWhereInput[] = [{ deletedAt: null }];
+  const live = liveListingWhere();
   if (params.sellerId) {
     if (!isUuid(params.sellerId)) return [];
     and.push({ sellerId: params.sellerId });
-    and.push({ status: "active" });
+    and.push(live);
   } else if (params.mine && params.viewerId) {
     and.push({ sellerId: params.viewerId });
     if (params.status) and.push({ status: uiStatus(params.status) });
   } else if (params.viewerId) {
     and.push({
-      OR: [{ status: "active" }, { sellerId: params.viewerId }],
+      OR: [live, { sellerId: params.viewerId }],
     });
   } else {
-    and.push({ status: "active" });
+    and.push(live);
   }
   if (params.categoryId) {
     const ids = categoryQueryIds(params.categoryId);
@@ -204,10 +210,14 @@ export async function suggestPublicListings(rawQuery: string, take = 8) {
   const rows = await prisma.listing.findMany({
     where: {
       deletedAt: null,
-      status: "active",
-      OR: [
-        { title: { contains: q, mode: "insensitive" } },
-        { subtitle: { contains: q, mode: "insensitive" } },
+      AND: [
+        liveListingWhere(),
+        {
+          OR: [
+            { title: { contains: q, mode: "insensitive" } },
+            { subtitle: { contains: q, mode: "insensitive" } },
+          ],
+        },
       ],
     },
     select: { id: true, title: true, categoryId: true, city: true },
@@ -380,6 +390,7 @@ export async function createListing(user: StoredUser, input: ListingInput) {
   const id = input.id && /^[0-9a-f-]{36}$/i.test(input.id) ? input.id : crypto.randomUUID();
   const listingNo =
     input.listingNo || `AP-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 8)}`;
+  const period = newPeriod();
   const row = await prisma.$transaction(async (tx) => {
     const created = await tx.listing.create({
       data: {
@@ -404,8 +415,7 @@ export async function createListing(user: StoredUser, input: ListingInput) {
         specs: (input.specs ?? []) as Prisma.InputJsonValue,
         features: (input.features ?? []) as Prisma.InputJsonValue,
         chassis: input.chassis ? (input.chassis as Prisma.InputJsonValue) : undefined,
-        postedAt: new Date(),
-        expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+        ...period,
         images: { create: nestedImages(input.images) },
       },
       include: listingInclude,
@@ -416,7 +426,11 @@ export async function createListing(user: StoredUser, input: ListingInput) {
     });
     return created;
   });
-  return { listing: toClientListing(row) };
+  return { listing: toClientListing(row), ref: listingRef(row) };
+}
+
+function listingRef(row: { id: string; title: string; sellerId: string; expiresAt: Date | null }): ListingRef {
+  return { id: row.id, title: row.title, sellerId: row.sellerId, expiresAt: row.expiresAt };
 }
 
 export async function updateListingRecord(user: StoredUser, id: string, patch: Record<string, unknown>) {
@@ -476,6 +490,19 @@ export async function updateListingRecord(user: StoredUser, id: string, patch: R
     }
   }
 
+  // Expired, sold and moderation states only change through their own flows (renew / resale / admin).
+  const nextStatus: ListingStatus =
+    existing.status !== "active" && existing.status !== "passive"
+      ? existing.status
+      : parsed.status === "passive"
+        ? "passive"
+        : "active";
+  const reactivated =
+    existing.status === "passive" &&
+    nextStatus === "active" &&
+    (!existing.expiresAt || existing.expiresAt.getTime() <= Date.now());
+  const contentChanged = Object.keys(patch).some((k) => k !== "status");
+
   const row = await prisma.$transaction(async (tx) => {
     if (imagesProvided) {
       await tx.listingImage.deleteMany({ where: { listingId: id } });
@@ -495,12 +522,8 @@ export async function updateListingRecord(user: StoredUser, id: string, patch: R
         neighborhood: parsed.neighborhood || "",
         ...coordsData,
         price: parsed.price,
-        status:
-          existing.status !== "active" && existing.status !== "passive"
-            ? existing.status
-            : parsed.status === "passive"
-              ? "passive"
-              : "active",
+        status: nextStatus,
+        ...(reactivated ? newPeriod() : {}),
         urgent: parsed.urgent,
         refurbished: parsed.refurbished,
         specs: (parsed.specs ?? []) as Prisma.InputJsonValue,
@@ -510,7 +533,7 @@ export async function updateListingRecord(user: StoredUser, id: string, patch: R
       include: listingInclude,
     });
   });
-  return { listing: toClientListing(row) };
+  return { listing: toClientListing(row), ref: listingRef(row), contentChanged, reactivated };
 }
 
 /** Server-side safety net for a listing that was just saved without coordinates. */
@@ -540,30 +563,64 @@ export async function deleteListingRecord(user: StoredUser, id: string) {
   return { ok: true as const };
 }
 
-/** Moderation outcomes (pending/rejected/removed) and drafts can never be revived by the seller. */
-const RENEWABLE: ListingStatus[] = ["active", "passive", "expired"];
-
-export async function renewListingRecord(user: StoredUser, id: string, expiresAt: number) {
+/**
+ * Free republish of a listing whose period ended (or that the seller paused). A live listing cannot be
+ * extended early, so republishing never doubles as a free "bump to top". Moderation outcomes
+ * (pending/rejected/removed), drafts and sold listings use their own flows.
+ */
+export async function renewListingRecord(user: StoredUser, id: string) {
   const existing = await prisma.listing.findFirst({ where: { id, deletedAt: null } });
   if (!existing) return { error: "auth.err.session" as const, status: 404 };
   if (!canMutateListing(user, existing.sellerId)) return { error: "auth.err.forbidden" as const, status: 403 };
-  if (!RENEWABLE.includes(existing.status)) return { error: "auth.err.forbidden" as const, status: 403 };
-  const row = await prisma.listing.update({
-    where: { id },
-    data: {
-      status: "active",
-      expiresAt: new Date(expiresAt),
-      // Extending a live listing must not double as a free "bump to top".
-      ...(existing.status === "active" ? {} : { postedAt: new Date() }),
-    },
-    include: listingInclude,
+  if (existing.status !== "active" && existing.status !== "passive" && existing.status !== "expired") {
+    return { error: "auth.err.forbidden" as const, status: 403 };
+  }
+  if (isLiveRow(existing)) return { error: "listing.err.notRenewable" as const, status: 409 };
+  const moved = await prisma.listing.updateMany({
+    where: { id, status: existing.status, deletedAt: null },
+    data: { status: "active", soldAt: null, ...newPeriod() },
   });
-  return { listing: toClientListing(row) };
+  if (!moved.count) return { error: "listing.err.notRenewable" as const, status: 409 };
+  const row = await prisma.listing.findUniqueOrThrow({ where: { id }, include: listingInclude });
+  return { listing: toClientListing(row), ref: listingRef(row) };
+}
+
+/** Sold listings leave every public list and are ignored by the expiry sweep. */
+export async function markListingSold(user: StoredUser, id: string) {
+  const existing = await prisma.listing.findFirst({ where: { id, deletedAt: null } });
+  if (!existing) return { error: "auth.err.session" as const, status: 404 };
+  if (!canMutateListing(user, existing.sellerId)) return { error: "auth.err.forbidden" as const, status: 403 };
+  if (!["active", "passive", "expired"].includes(existing.status)) {
+    return { error: "listing.err.notSellable" as const, status: 409 };
+  }
+  const wasLive = isLiveRow(existing);
+  const moved = await prisma.listing.updateMany({
+    where: { id, status: existing.status, deletedAt: null },
+    data: { status: "sold", soldAt: new Date() },
+  });
+  if (!moved.count) return { error: "listing.err.notSellable" as const, status: 409 };
+  const row = await prisma.listing.findUniqueOrThrow({ where: { id }, include: listingInclude });
+  return { listing: toClientListing(row), ref: listingRef(existing), wasLive };
+}
+
+/** Puts a sold listing back on sale with a fresh 15-day period. */
+export async function resaleListingRecord(user: StoredUser, id: string) {
+  const existing = await prisma.listing.findFirst({ where: { id, deletedAt: null } });
+  if (!existing) return { error: "auth.err.session" as const, status: 404 };
+  if (!canMutateListing(user, existing.sellerId)) return { error: "auth.err.forbidden" as const, status: 403 };
+  if (existing.status !== "sold") return { error: "listing.err.notSold" as const, status: 409 };
+  const moved = await prisma.listing.updateMany({
+    where: { id, status: "sold", deletedAt: null },
+    data: { status: "active", soldAt: null, ...newPeriod() },
+  });
+  if (!moved.count) return { error: "listing.err.notSold" as const, status: 409 };
+  const row = await prisma.listing.findUniqueOrThrow({ where: { id }, include: listingInclude });
+  return { listing: toClientListing(row), ref: listingRef(row) };
 }
 
 export async function bumpListingViews(id: string) {
   await prisma.listing.updateMany({
-    where: { id, deletedAt: null, status: "active" },
+    where: { id, deletedAt: null, ...liveListingWhere() },
     data: { views: { increment: 1 } },
   });
 }
