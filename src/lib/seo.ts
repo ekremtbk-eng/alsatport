@@ -183,7 +183,6 @@ export function siteNavigationJsonLd() {
   const links = [
     ...SITE_SITELINKS.map((l) => ({ name: l.name, url: absUrl(l.href) })),
     { name: "Tüm Kategoriler", url: absUrl("/kategoriler") },
-    { name: "Mağazalar", url: absUrl("/magazalar") },
     { name: "Kurumsal", url: absUrl("/kurumsal") },
     { name: "İletişim", url: absUrl("/kurumsal/iletisim") },
   ];

@@ -77,6 +77,12 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      { source: "/magazalar", destination: "/", permanent: true },
+      { source: "/magazalar/:path*", destination: "/", permanent: true },
+    ];
+  },
 };
 
 export default function config(phase: string): NextConfig {

@@ -18,7 +18,6 @@ export default function robots(): MetadataRoute.Robots {
           "/ustalar-hizmetler",
           "/is-ilanlari",
           "/hizmet-vermek-istiyorum",
-          "/magazalar",
           "/kurumsal",
           "/gizlilik-politikasi",
           "/kullanim-kosullari",

@@ -22,7 +22,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       { path: "/son-48-saat", priority: 0.8, changeFrequency: "hourly" },
       { path: "/hizmet-vermek-istiyorum", priority: 0.7, changeFrequency: "monthly" },
       { path: "/ara", priority: 0.7, changeFrequency: "daily" },
-      { path: "/magazalar", priority: 0.6, changeFrequency: "weekly" },
       { path: "/kurumsal", priority: 0.5, changeFrequency: "monthly" },
       { path: "/kurumsal/hakkimizda", priority: 0.5, changeFrequency: "monthly" },
       { path: "/kurumsal/iletisim", priority: 0.5, changeFrequency: "monthly" },

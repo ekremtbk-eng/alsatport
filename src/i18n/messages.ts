@@ -32,7 +32,6 @@ export const MESSAGES = pack({
   "nav.catHome": ["Kategoriler", "Categories", "Kategorien", "الفئات", "Категории"],
   "nav.catHome.search": ["Kelime, kategori veya ilan no. ile ara", "Search by keyword, category or listing no.", "Nach Stichwort, Kategorie oder Anzeigennr. suchen", "ابحث بكلمة أو فئة أو رقم إعلان", "Поиск по слову, категории или номеру"],
   "nav.vitrine": ["Vitrin", "Showcase", "Schaufenster", "واجهة", "Витрина"],
-  "nav.stores": ["Mağazalar", "Stores", "Shops", "المتاجر", "Магазины"],
   "nav.favorites": ["Favorilerim", "My Favorites", "Meine Favoriten", "مفضلاتي", "Избранное"],
   "nav.messages": ["Mesajlarım", "Messages", "Nachrichten", "رسائلي", "Сообщения"],
   "nav.post": ["İlan Ver", "Post Ad", "Anzeige aufgeben", "أضف إعلاناً", "Разместить"],
@@ -1303,8 +1302,6 @@ export const MESSAGES = pack({
   "msg.search": ["Kişi veya ilan ara", "Search people or ads", "Person oder Anzeige suchen", "ابحث عن شخص أو إعلان", "Поиск людей или объявлений"],
   "msg.unread": ["Okunmamış ({n})", "Unread ({n})", "Ungelesen ({n})", "غير مقروء ({n})", "Непрочитанные ({n})"],
   "msg.fav": ["Favoriler", "Favorites", "Favoriten", "المفضلة", "Избранное"],
-  "store.h": ["Mağazalar", "Stores", "Shops", "المتاجر", "Магазины"],
-
   "loc.ask": ["Yakınındaki yeni ilanlardan haberdar olmak için konumuna izin ver.", "Allow location to get alerts for nearby new listings.", "Standort zulassen, um nahe neue Anzeigen zu sehen.", "اسمح بالموقع لتنبيهات الإعلانات القريبة.", "Разрешите геолокацию для соседних объявлений."],
   "loc.allow": ["Konuma İzin Ver", "Allow location", "Standort erlauben", "السماح بالموقع", "Разрешить геолокацию"],
   "loc.pending": ["Konum isteniyor…", "Requesting location…", "Standort wird abgefragt…", "جاري طلب الموقع…", "Запрос геолокации…"],
