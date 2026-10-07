@@ -410,16 +410,16 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
             </button>
           </div>
 
-          {detailTab === "region" ? (
-            <ListingRegionPanel listing={listing} />
-          ) : detailTab === "desc" ? (
+          {detailTab === "region" ? <ListingRegionPanel listing={listing} /> : null}
+          <div hidden={detailTab !== "desc"}>
             <ListingDescriptionPanel
               className="mt-5 rounded-xl border border-line bg-card p-4 shadow-sm"
               description={listing.description}
             />
-          ) : (
+          </div>
+          <div hidden={detailTab !== "info"}>
             <ListingSpecTables listing={listing} schema={schema} />
-          )}
+          </div>
         </div>
 
         <aside className="detail-aside">

@@ -170,11 +170,11 @@ export function ClassifiedListingView({
         </button>
       </div>
 
-      {detailTab === "region" ? (
-        <ListingRegionPanel listing={listing} />
-      ) : detailTab === "desc" ? (
+      {detailTab === "region" ? <ListingRegionPanel listing={listing} /> : null}
+      <div hidden={detailTab !== "desc"}>
         <ListingDescriptionPanel className="classified-desc" description={listing.description} />
-      ) : (
+      </div>
+      {detailTab === "info" ? (
         <>
           {extras.length ? (
             <section className="classified-feats">
@@ -194,7 +194,7 @@ export function ClassifiedListingView({
             <SafetyNotice />
           </div>
         </>
-      )}
+      ) : null}
 
       {reportHint ? <p className="mt-2 text-xs font-semibold text-lime">{reportHint}</p> : null}
       {onReport ? (
