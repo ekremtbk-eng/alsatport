@@ -141,6 +141,7 @@ export default function PostListingPage() {
     const q = new URLSearchParams(window.location.search);
     setEditId(q.get("edit"));
     if (q.get("edit")) return;
+    if (q.get("acil") === "1") setUrgent(true);
     const typeQ = q.get("type");
     const cityQ = q.get("city");
     if (

@@ -51,6 +51,7 @@ import {
   type DashPanelId,
 } from "@/lib/dashboardNav";
 import { DashboardPanel } from "./DashboardPanels";
+import { ListingNavGroup } from "./ListingNavGroup";
 
 const DASH_ICONS: Record<string, LucideIcon> = {
   ozet: LayoutDashboard,
@@ -197,6 +198,18 @@ function DashTree({
           );
         }
         const isCollapsed = collapsed[node.id] === true;
+        if (depth === 0 && node.id === "ilan") {
+          return (
+            <ListingNavGroup
+              key={node.id}
+              panel={panel}
+              go={go}
+              t={t}
+              collapsed={isCollapsed}
+              toggle={() => toggle(node.id)}
+            />
+          );
+        }
         const inPath = groupContains(node, panel) || activeTrail.includes(node.id);
         return (
           <li key={node.id}>

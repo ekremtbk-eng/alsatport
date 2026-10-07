@@ -6920,6 +6920,197 @@ html[data-device="tablet"] .flash-toast {
 .dash-nav-chev.is-open {
   transform: rotate(180deg);
 }
+.dash-ilan {
+  margin: 0.4rem 0 0.55rem;
+  padding: 0.3rem;
+  border-radius: 0.95rem;
+  background: #f7fbf9;
+  border: 1px solid #e3efe9;
+}
+.dash-ilan-head {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.5rem;
+  border: 0;
+  border-radius: 0.7rem;
+  background: transparent;
+  cursor: pointer;
+  text-align: start;
+  color: #0f172a;
+}
+.dash-ilan-head:hover {
+  background: #eef7f2;
+}
+.dash-ilan-head:focus-visible,
+.dash-ilan-row:focus-visible {
+  outline: 2px solid #10b981;
+  outline-offset: 1px;
+}
+.dash-ilan-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  flex-shrink: 0;
+  border-radius: 0.6rem;
+  background: #059669;
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(5, 150, 105, 0.25);
+}
+.dash-ilan-tile svg {
+  width: 1rem;
+  height: 1rem;
+}
+.dash-ilan-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #0f172a;
+}
+.dash-ilan-list {
+  display: grid;
+  gap: 0.2rem;
+  list-style: none;
+  margin: 0.2rem 0 0;
+  padding: 0;
+}
+.dash-ilan-row {
+  display: flex;
+  width: 100%;
+  min-height: 2.6rem;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 0.7rem;
+  background: transparent;
+  cursor: pointer;
+  text-align: start;
+  text-decoration: none;
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #1e293b;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.dash-ilan-row:hover {
+  background: #fff;
+  border-color: #e2e8e6;
+  color: #0f172a;
+}
+.dash-ilan-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
+  border-radius: 0.55rem;
+  background: #fff;
+  border: 1px solid #e2e8e6;
+  color: #64748b;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.dash-ilan-ico svg {
+  width: 1rem;
+  height: 1rem;
+}
+.dash-ilan-row:hover .dash-ilan-ico {
+  color: #059669;
+  border-color: #bbf7d0;
+}
+.dash-ilan-label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.dash-ilan-row.is-active {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+  font-weight: 700;
+  box-shadow: inset 3px 0 0 #10b981;
+}
+.dash-ilan-row.is-active .dash-ilan-ico {
+  background: #d1fae5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+.dash-ilan-row.is-urgent .dash-ilan-ico {
+  color: #d97706;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+.dash-ilan-row.is-biz {
+  background: #fff;
+  border-color: #e2e8e6;
+}
+.dash-ilan-row.is-biz:hover {
+  border-color: #a7f3d0;
+}
+.dash-ilan-row.is-biz.tone-verified .dash-ilan-ico,
+.dash-ilan-row.is-biz.tone-free .dash-ilan-ico {
+  color: #059669;
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+}
+.dash-ilan-row.is-biz.tone-pending .dash-ilan-ico {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+.dash-ilan-row.is-sub {
+  width: calc(100% - 1.1rem);
+  margin-inline-start: 1.1rem;
+  min-height: 2.35rem;
+  font-size: 0.8rem;
+}
+.dash-ilan-row.is-sub .dash-ilan-ico {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+.dash-ilan-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+  padding: 0.14rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.dash-ilan-badge svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+.dash-ilan-badge.tone-free {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+.dash-ilan-badge.tone-pending {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #b45309;
+}
+.dash-ilan-badge.tone-verified {
+  background: #059669;
+  color: #fff;
+}
+.dash-ilan-badge.tone-attention {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #c2410c;
+}
 .dash-content {
   background: #fff;
   min-height: 32rem;
