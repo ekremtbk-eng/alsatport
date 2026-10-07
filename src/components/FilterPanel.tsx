@@ -9,6 +9,7 @@ import { StdFilterSidebar } from "@/components/StdFilterSidebar";
 import { catName, useI18n } from "@/context/I18nContext";
 import { categoryPath, visibleChildren, type Category } from "@/data/categories";
 import {
+  AGE_MONTH_PRESETS,
   districtOptions,
   filterNavFor,
   HOURS_PRESETS,
@@ -146,7 +147,9 @@ function FieldControl({
             ? HOURS_PRESETS
             : field.key.startsWith("year")
               ? YEAR_OPTIONS.filter((_, i) => i % 8 === 0).slice(0, 6)
-              : [];
+              : field.key.startsWith("age")
+                ? AGE_MONTH_PRESETS
+                : [];
     return (
       <RangePair
         minField={field}
@@ -295,7 +298,7 @@ function FieldControl({
   );
 }
 const STD_FIELD_KEYS = new Set(["city", "district", "posted", "keyword", "hours24"]);
-const PRIMARY_FIELD_KEYS = new Set(["priceMin", "priceMax", "kimden"]);
+const PRIMARY_FIELD_KEYS = new Set(["priceMin", "priceMax", "kimden", "species", "petProduct", "breed", "sex", "ageMin"]);
 const PLUGIN_FIELD_KEYS = new Set([
   "brand",
   "model",
@@ -406,7 +409,6 @@ export function FilterPanel({
   const moreFields = restFields.filter((f) => !pluginKeys.has(f.key));
   const path = categoryPath(currentCat);
   const pathLabel = path.map((c) => catName(t, c.id, c.name)).filter(Boolean).join(" › ") || t("nav.categories");
-  const locSummary = [state.city, state.district].filter(Boolean).join(" / ");
   const priceSummary = [state.priceMin, state.priceMax].filter(Boolean).join(" – ");
   const kimdenSummary = state.kimden || "";
 
@@ -452,7 +454,9 @@ export function FilterPanel({
         const value =
           field.key === "priceMin" ? (priceSummary ? `${priceSummary} TL` : undefined)
           : field.key === "kimden" ? kimdenSummary || undefined
-          : locSummary || undefined;
+          : field.kind === "range"
+            ? [state[field.key], field.pairKey ? state[field.pairKey] : ""].filter(Boolean).join(" – ") || undefined
+            : state[field.key] || undefined;
         return (
           <details key={field.key} className="flt-acc flt-acc-sheet" open={Boolean(value)}>
             <summary className="flt-acc-sum">

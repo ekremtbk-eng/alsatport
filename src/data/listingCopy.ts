@@ -1,5 +1,6 @@
 import { findCategory, rootOf } from "@/data/categories";
 import { vehicleProfileFromCategoryId } from "@/data/listingOptions";
+import { livestockGroupOf, petListingKind, petProductBranch } from "@/data/petCatalog";
 
 function has(id: string, ...parts: string[]) {
   return parts.some((p) => id.includes(p));
@@ -78,7 +79,26 @@ function titleExample(id: string, root: string, attrs?: Record<string, string>):
   }
 
   if (root === "pets") {
-    return "Kedi Taşıma Çantası, Yıkanabilir";
+    if (petListingKind(id) === "livestock") {
+      const group = livestockGroupOf(id);
+      if (group === "sheep") return "Sahibinden 8 Aylık Merinos Kuzu, 10 Adet";
+      if (group === "poultry") return "Sahibinden Gezen Yumurta Tavuğu, 20 Adet";
+      return "Sahibinden 18 Aylık Gebe Holstein Düve";
+    }
+    switch (petProductBranch(id)) {
+      case "food":
+        return "Royal Canin Yetişkin Kedi Maması 10 kg, Açılmamış";
+      case "cage":
+        return "Büyük Boy Köpek Kulübesi, Ahşap";
+      case "leash":
+        return "Ayarlanabilir Köpek Göğüs Tasması, M Beden";
+      case "tank":
+        return "100 Litre Akvaryum, Filtre ve Isıtıcı Dahil";
+      case "care":
+        return "Topaklanan Kedi Kumu 10 L, Açılmamış";
+      default:
+        return "Kedi Taşıma Çantası, Yıkanabilir";
+    }
   }
 
   if (has(id, "phone", "cep-telefon")) return "iPhone 15 Pro Max 128 GB, Kutulu";
@@ -215,6 +235,13 @@ function bodyExample(root: string, id: string): string {
     return "Uyumluluk, orijinal/muadil ve durum bilgilerini yazın...";
   }
   if (root === "pets") {
+    if (petListingKind(id) === "livestock") {
+      return "Tür, ırk, yaş, kilo, sağlık ve aşı durumu, küpe/kayıt ve teslim bilgisini yazın...";
+    }
+    const branch = petProductBranch(id);
+    if (branch === "food") return "Marka, paket miktarı, son kullanma tarihi ve teslim bilgisini yazın...";
+    if (branch === "tank") return "Hacim/ölçü, dahil olan ekipman ve kullanım durumunu yazın...";
+    if (branch === "care") return "Ürün içeriği, miktarı ve açılıp açılmadığını yazın...";
     return "Ürün türü, ölçü ve kullanım durumunu yazın...";
   }
   return "Ürünün durumunu, kutu/fatura ve teslim bilgisini yazın...";

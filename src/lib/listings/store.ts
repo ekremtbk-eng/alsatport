@@ -6,7 +6,7 @@ import { isAllowedListingImageUrl } from "@/lib/listingMedia";
 import { sanitizeMultiline, sanitizeText } from "@/lib/security/sanitize";
 import { sanitizeSearchQuery } from "@/lib/security/inputGuard";
 import { listingCreateBodySchema } from "@/lib/security/schemas";
-import { isBannedLiveAnimalCategory, isBannedLiveAnimalSlug, isBlockedLiveAnimalListing } from "@/lib/liveAnimalPolicy";
+import { isBannedLiveAnimalCategory, isBannedLiveAnimalSlug, moderateListingDraft } from "@/lib/liveAnimalPolicy";
 import { categoryQueryIds, lookupCategory } from "@/data/categories";
 import { postedFilterHours } from "@/lib/listingQuery";
 import type { StoredUser } from "@/lib/security/userStore";
@@ -14,6 +14,7 @@ import { deleteStoredObject, isManagedStorageKey, storageKeyFromUrl } from "@/li
 import { resolveListingCoords, validListingCoords } from "@/lib/placeGeo";
 import { publicAccountName, verifiedBusinessName } from "@/lib/publicName";
 import { type ListingRef, isLiveRow, liveListingWhere, newPeriod } from "@/lib/listings/lifecycle";
+import { enforcePetSpecs } from "@/lib/listings/petSpecPolicy";
 
 export type ListingWithRelations = Prisma.ListingGetPayload<{
   include: {
@@ -297,14 +298,18 @@ export function parseListingInput(body: Record<string, unknown> | null): Listing
   }
   const images = parseImages(body.images);
   if (!images.length) return { error: "photo.minN" };
-  const draft = {
-    title,
-    description,
+  const moderation = moderateListingDraft({ title: `${title} ${subtitle}`, description, categoryId, images });
+  if (moderation.blocked) return { error: moderation.reason ?? "mod.animal" };
+  const pet = enforcePetSpecs(
     categoryId,
-    images,
-    subtitle,
-  };
-  if (isBlockedLiveAnimalListing(draft)) return { error: "mod.animal" };
+    Array.isArray(body.specs)
+      ? (body.specs as Listing["specs"]).slice(0, 48).map((s) => ({
+          label: sanitizeText(String(s?.label ?? ""), 80),
+          value: sanitizeText(String(s?.value ?? ""), 120),
+        })).filter(validSpec)
+      : [],
+  );
+  if (pet.missingRequired) return { error: "post.needSchema" };
   return {
     id: typeof body.id === "string" ? sanitizeText(body.id, 80) : undefined,
     title,
@@ -317,12 +322,7 @@ export function parseListingInput(body: Record<string, unknown> | null): Listing
     coords: body.lat == null && body.lng == null ? undefined : validListingCoords(body.lat, body.lng, city),
     price,
     images,
-    specs: Array.isArray(body.specs)
-      ? (body.specs as Listing["specs"]).slice(0, 48).map((s) => ({
-          label: sanitizeText(String(s?.label ?? ""), 80),
-          value: sanitizeText(String(s?.value ?? ""), 120),
-        })).filter(validSpec)
-      : [],
+    specs: pet.specs,
     features: Array.isArray(body.features)
       ? body.features.map((f) => sanitizeText(String(f), 80)).filter(Boolean)
       : [],

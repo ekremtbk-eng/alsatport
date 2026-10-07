@@ -85,7 +85,17 @@ export function DynamicAttributeForm({
                       field.kind === "number" ? e.target.value.replace(/\D/g, "") : e.target.value,
                     )
                   }
-                  placeholder={field.key === "km" ? "120000" : field.key.includes("sqm") ? "120" : ""}
+                  placeholder={
+                    field.key === "km"
+                      ? "120000"
+                      : field.key.includes("sqm")
+                        ? "120"
+                        : field.key === "ageMonths"
+                          ? "18"
+                          : field.key === "qty"
+                            ? "1"
+                            : ""
+                  }
                   className="h-12 w-full rounded-xl border border-line bg-panel px-3 text-sm text-ink shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </label>

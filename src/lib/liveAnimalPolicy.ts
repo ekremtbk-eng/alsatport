@@ -1,7 +1,11 @@
 import type { Listing } from "@/data/store";
 
+/** Çiftlik Hayvanları branch: the only Hayvanlar Alemi subtree where live (farm) animals may be listed. */
+export const LIVESTOCK_ROOT_ID = "pets-farm";
+
 export const ALLOWED_PET_CATEGORY_IDS = [
   "pets",
+  LIVESTOCK_ROOT_ID,
   "pets-acc",
   "pets-food",
   "pets-cage",
@@ -30,8 +34,36 @@ export const BANNED_LIVE_ANIMAL_SLUGS = [
 
 export type ModerationHit = {
   blocked: boolean;
-  reason?: "mod.animal" | "mod.animal.video" | "mod.animal.cat";
+  reason?: "mod.animal" | "mod.animal.video" | "mod.animal.cat" | "mod.animal.pet";
 };
+
+/** Companion animals stay banned even inside Çiftlik Hayvanları (bıldırcın/tavuk are poultry, so no bare "kuş"). */
+const PET_ONLY_SPECIES = [
+  "kedi",
+  "kopek",
+  "papagan",
+  "muhabbet",
+  "kanarya",
+  "hamster",
+  "tavsan",
+  "iguana",
+  "yilan",
+  "kaplumbaga",
+  "balik",
+  "beta",
+  "japon balik",
+  "pitbull",
+  "golden",
+  "yorkshire",
+  "sokak kedisi",
+  "sokak kopegi",
+  "yavru kedi",
+  "yavru kopek",
+  "ucretli sahiplendirme",
+  "sahiplendirme ucret",
+  "kitten",
+  "puppy",
+];
 
 const ACCESSORY = [
   "mama",
@@ -68,6 +100,18 @@ const ACCESSORY = [
   "feeder",
   "litter",
   "harness",
+  "mamasi",
+  "mamalari",
+  "yemi",
+  "tasmasi",
+  "kafesi",
+  "kulubesi",
+  "akvaryumu",
+  "kumu",
+  "oyuncagi",
+  "yatagi",
+  "sampuani",
+  "kabi",
 ];
 
 const SPECIES = [
@@ -184,6 +228,11 @@ export function isPetsCategoryId(categoryId: string) {
   return id === "pets" || id.startsWith("pets-");
 }
 
+export function isLivestockCategoryId(categoryId: string) {
+  const id = categoryId.trim();
+  return id === LIVESTOCK_ROOT_ID || id.startsWith(`${LIVESTOCK_ROOT_ID}-`);
+}
+
 export type ListingPolicyKind = "live-animal";
 
 export function applicableListingPolicies(categoryId: string): ListingPolicyKind[] {
@@ -223,6 +272,12 @@ function detectInText(text: string, categoryId: string): ModerationHit {
 
   const hay = foldPolicyText(text);
   if (!hay) return { blocked: false };
+
+  if (isLivestockCategoryId(categoryId)) {
+    if (hasAny(hay, VIDEO_HINT)) return { blocked: true, reason: "mod.animal.video" };
+    if (hasAny(hay, PET_ONLY_SPECIES)) return { blocked: true, reason: "mod.animal.pet" };
+    return { blocked: false };
+  }
 
   if (hasAny(hay, VIDEO_HINT) && (hasAny(hay, SPECIES) || hasAny(hay, LIVE_SALE))) {
     return { blocked: true, reason: "mod.animal.video" };

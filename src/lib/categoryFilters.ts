@@ -124,6 +124,21 @@ import {
 } from "@/data/filterCatalog";
 import { extraBrandsFor, extraModelsFor, extraTrimsFor, extraNavRooms } from "@/data/categoryFiles";
 import { listingMatchesTextQuery, listingMatchesTitleQuery, listingPostedAt, postedFilterHours } from "@/lib/listingQuery";
+import {
+  LIVESTOCK_FROM,
+  LIVESTOCK_SEXES,
+  PET_FOOD_AMOUNTS,
+  PET_PRODUCT_ANIMALS,
+  PET_PRODUCT_FROM,
+  PET_SPEC,
+  livestockBreedsFor,
+  livestockSpeciesFor,
+  petConditionsFor,
+  petListingKind,
+  petProductAsksAnimal,
+  petProductBranch,
+  petProductTypesFor,
+} from "@/data/petCatalog";
 
 export type FilterKind = "select" | "range" | "toggle" | "city" | "district" | "multi" | "text";
 
@@ -151,9 +166,6 @@ export type FilterState = Record<string, string>;
 const CITIES = TURKEY_CITIES.map((c) => c.name);
 const SERVICE_TYPES = ["Keşif", "Montaj", "Tamir", "Nakliye", "Bakım"];
 const HELP_TYPES = ["Gündüzlü", "Yatılı", "Tam Zamanlı", "Yarı Zamanlı"];
-const PET_KINDS = ["Yem & Mama", "Kafes & Kulübe", "Tasma & Gezdirme", "Akvaryum", "Bakım & Hijyen", "Aksesuar"];
-const PET_QTY = ["0-1 kg", "1-5 kg", "5-10 kg", "10-20 kg", "20+ kg"];
-
 function sel(
   key: string,
   labelKey: string,
@@ -773,31 +785,7 @@ function fieldsForCategoryNode(cat: Category): FilterField[] {
     ];
   }
   if (root === "pets") {
-    const brands = extraBrandsFor(cat);
-    const species = extraModelsFor(cat, "marka");
-    const food = cat.id === "pets-food" || cat.id.startsWith("pets-food-");
-    const leaf = !visibleChildren(cat).length;
-    const out: FilterField[] = [];
-    if (!leaf) {
-      out.push(sel("petKind", "flt.petKind", PET_KINDS, ["Tür", "Ürün"], { preferOpen: true }));
-    }
-    out.push(
-      sel("species", "flt.petSpecies", species.length ? species : ["Kedi", "Köpek", "Kuş", "Balık", "Kemirgen"], ["Tür", "Hayvan"], {
-        preferOpen: true,
-      }),
-      sel("brand", "post.brand", brands.length ? brands : PET_FOOD_BRANDS, ["Marka", "Brand"], {
-        searchable: true,
-        preferOpen: true,
-        catalogId: cat.id,
-      }),
-    );
-    if (food) {
-      out.push(sel("qty", "flt.qty", PET_QTY, ["Miktar", "Kg", "Ağırlık", "Paket"], { preferOpen: true }));
-    } else {
-      out.push(sel("cond", "post.cond", PRODUCT_CONDITIONS, ["Durum", "Condition"], { preferOpen: true }));
-    }
-    out.push(sel("kimden", "flt.kimden", kimdenOptionsForRoot("pets"), ["Kimden"]));
-    return out;
+    return petFilterFields(cat);
   }
   if (root === "helpers") {
     return [
@@ -817,6 +805,41 @@ function fieldsForCategoryNode(cat: Category): FilterField[] {
     sel("cond", "post.cond", PRODUCT_CONDITIONS, ["Durum", "Condition"], { preferOpen: true }),
     sel("kimden", "flt.kimden", kimdenOptionsForRoot(rootOf(cat).id), ["Kimden"]),
   ];
+}
+
+/** Hayvanlar Alemi root shows only the subcategory picker; each branch then opens its own filters. */
+function petFilterFields(cat: Category): FilterField[] {
+  const kind = petListingKind(cat.id);
+  if (!kind || cat.id === "pets") return [];
+  if (kind === "livestock") {
+    return [
+      sel("species", "flt.petSpecies", livestockSpeciesFor(cat.id), [PET_SPEC.animal], { preferOpen: true }),
+      sel("breed", "flt.breed", livestockBreedsFor(cat.id), [PET_SPEC.breed], { searchable: true }),
+      sel("sex", "flt.sex", LIVESTOCK_SEXES, [PET_SPEC.sex]),
+      ...range("ageMin", "ageMax", "flt.ageMonths", [PET_SPEC.age], "ay"),
+      sel("kimden", "flt.kimden", LIVESTOCK_FROM, [PET_SPEC.from]),
+    ];
+  }
+  const branch = petProductBranch(cat.id);
+  const out: FilterField[] = [];
+  if (petProductAsksAnimal(cat.id)) {
+    out.push(sel("species", "flt.petSpecies", PET_PRODUCT_ANIMALS, [PET_SPEC.animal, "Tür"], { preferOpen: true }));
+  }
+  const types = petProductTypesFor(branch);
+  if (types.length) out.push(sel("petProduct", "flt.petProduct", types, [PET_SPEC.product], { preferOpen: true }));
+  if (branch === "food" || branch === "cage") {
+    out.push(
+      sel("brand", "post.brand", branch === "food" ? PET_FOOD_BRANDS : PET_CAGE_BRANDS, [PET_SPEC.brand, "Brand"], {
+        searchable: true,
+        catalogId: cat.id,
+      }),
+    );
+  }
+  if (branch === "food") out.push(sel("qty", "flt.qty", PET_FOOD_AMOUNTS, [PET_SPEC.amount, "Kg", "Ağırlık", "Paket"]));
+  const conditions = petConditionsFor(branch);
+  if (conditions) out.push(sel("cond", "post.cond", conditions, [PET_SPEC.cond, "Condition"]));
+  out.push(sel("kimden", "flt.kimden", PET_PRODUCT_FROM, [PET_SPEC.from]));
+  return out;
 }
 
 export function filterFieldsForCategory(cat?: Category | null): FilterField[] {
@@ -1260,3 +1283,4 @@ export const KM_PRESETS = ["25000", "50000", "100000", "150000", "200000"];
 export const PRICE_PRESETS = ["5000", "25000", "100000", "500000", "1000000"];
 export const SQM_PRESETS = ["50", "80", "100", "150", "200"];
 export const HOURS_PRESETS = ["500", "1000", "2500", "5000", "10000"];
+export const AGE_MONTH_PRESETS = ["3", "6", "12", "24", "36"];

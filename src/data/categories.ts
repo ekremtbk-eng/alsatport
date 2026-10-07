@@ -1479,6 +1479,16 @@ export const categories: Category[] = [
     count: 30_333,
     seeAll: true,
     children: [
+      node("pets-farm", "ciftlik-hayvanlari", "Çiftlik Hayvanları", "paw", {
+        count: 0,
+        parentId: "pets",
+        browse: true,
+        children: [
+          node("pets-farm-cattle", "buyukbas-hayvan", "Büyükbaş", "paw", { count: 0, parentId: "pets-farm" }),
+          node("pets-farm-sheep", "kucukbas-hayvan", "Küçükbaş", "paw", { count: 0, parentId: "pets-farm" }),
+          node("pets-farm-poultry", "kumes-hayvani", "Kümes Hayvanları", "paw", { count: 0, parentId: "pets-farm" }),
+        ],
+      }),
       node("pets-food", "yem-mama", "Yem & Mama", "utensils", {
         count: 1_305,
         parentId: "pets",

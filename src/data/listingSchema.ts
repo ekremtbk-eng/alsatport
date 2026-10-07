@@ -78,6 +78,22 @@ import {
   VEHICLE_FROM,
 } from "@/data/listingOptions";
 import { TUTOR_PLACES, tutorLevelsFor, tutorSubjectsFor } from "@/data/tutorOptions";
+import { PET_CAGE_BRANDS, PET_FOOD_BRANDS } from "@/data/filterCatalog";
+import {
+  LIVESTOCK_FROM,
+  LIVESTOCK_SEXES,
+  PET_FOOD_AMOUNTS,
+  PET_PRODUCT_ANIMALS,
+  PET_PRODUCT_FROM,
+  PET_SPEC,
+  livestockBreedsFor,
+  livestockSpeciesFor,
+  petConditionsFor,
+  petListingKind,
+  petProductAsksAnimal,
+  petProductBranch,
+  petProductTypesFor,
+} from "@/data/petCatalog";
 
 export type AttrKind = "text" | "number" | "select" | "search" | "cascade";
 export type CascadeSource = "vehicleModels" | "vehiclePackages" | "vehicleEngines" | "vehicleBodies" | "vehicleRanges";
@@ -1057,6 +1073,55 @@ function autoSpareFields(categoryId: string): AttrField[] {
   return fields;
 }
 
+function petSchema(id: string): ListingSchema {
+  if (petListingKind(id) === "livestock") {
+    return {
+      family: "diger",
+      chassis: false,
+      fields: [
+        f("species", "Hayvan türü", "select", {
+          options: livestockSpeciesFor(id),
+          specLabel: PET_SPEC.animal,
+          required: true,
+        }),
+        f("breed", "Irk", "select", { options: livestockBreedsFor(id), specLabel: PET_SPEC.breed, searchable: true }),
+        f("ageMonths", "Yaş (ay)", "number", { specLabel: PET_SPEC.age }),
+        f("sex", "Cinsiyet", "select", { options: LIVESTOCK_SEXES, specLabel: PET_SPEC.sex, required: true }),
+        f("qty", "Adet", "number", { specLabel: PET_SPEC.qty }),
+        f("kimden", "Kimden", "select", { options: LIVESTOCK_FROM, specLabel: PET_SPEC.from }),
+      ],
+      groups: [],
+    };
+  }
+  const branch = petProductBranch(id);
+  const fields: AttrField[] = [];
+  if (petProductAsksAnimal(id)) {
+    fields.push(f("species", "Hayvan", "select", { options: PET_PRODUCT_ANIMALS, specLabel: PET_SPEC.animal }));
+  }
+  const types = petProductTypesFor(branch);
+  if (types.length) {
+    fields.push(f("petProduct", "Ürün türü", "select", { options: types, specLabel: PET_SPEC.product }));
+  }
+  if (branch === "food" || branch === "cage") {
+    fields.push(
+      f("brand", "Marka", "search", {
+        options: branch === "food" ? [...PET_FOOD_BRANDS] : [...PET_CAGE_BRANDS],
+        specLabel: PET_SPEC.brand,
+        searchable: true,
+      }),
+    );
+  }
+  if (branch === "food") {
+    fields.push(f("amount", "Miktar", "select", { options: PET_FOOD_AMOUNTS, specLabel: PET_SPEC.amount }));
+  }
+  const conditions = petConditionsFor(branch);
+  if (conditions) {
+    fields.push(f("cond", "Durum", "select", { options: conditions, specLabel: PET_SPEC.cond }));
+  }
+  fields.push(f("kimden", "Kimden", "select", { options: PET_PRODUCT_FROM, specLabel: PET_SPEC.from }));
+  return { family: "urun", chassis: false, fields, groups: [] };
+}
+
 function withKimden(schema: ListingSchema, root: string): ListingSchema {
   if (schema.fields.some((field) => field.key === "kimden")) return schema;
   return {
@@ -1319,22 +1384,7 @@ function buildSchemaForCategoryId(categoryId: string): ListingSchema {
   }
 
   if (root === "pets") {
-    return {
-      family: "urun",
-      chassis: false,
-      fields: [
-        f("species", "Hayvan", "select", {
-          options: ["Kedi", "Köpek", "Kuş", "Balık", "Kemirgen", "Sürüngen", "At", "Diğer"],
-          specLabel: "Hayvan",
-        }),
-        f("petKind", "Ürün türü", "select", {
-          options: ["Yem & Mama", "Kafes & Kulübe", "Tasma & Gezdirme", "Akvaryum", "Bakım & Hijyen", "Aksesuar"],
-          specLabel: "Ürün",
-        }),
-        cond,
-      ],
-      groups: [],
-    };
+    return petSchema(id);
   }
 
   if (root === "tutors") {

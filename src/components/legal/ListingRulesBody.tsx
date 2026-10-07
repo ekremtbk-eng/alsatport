@@ -67,7 +67,12 @@ export function ListingRulesBody() {
           <li>Ateşli silahlar, mermi, patlayıcı ve ruhsata tabi silahlar,</li>
           <li>Reçeteli ilaçlar, tıbbi cihazlar için mevzuatın izin vermediği satışlar,</li>
           <li>Çalıntı, kaçak veya sahte (taklit) ürünler,</li>
-          <li>Canlı hayvan satışı (evcil hayvan aksesuar, mama ve bakım ürünleri hariç),</li>
+          <li>
+            Evcil hayvan (kedi, köpek, kuş, balık, kemirgen, sürüngen vb.) satışı ve ücretli sahiplendirme; canlı hayvan
+            ilanları yalnızca Çiftlik Hayvanları kategorisinde (büyükbaş, küçükbaş, kümes hayvanları) ve ilgili mevzuata
+            (küpe/kayıt, sağlık belgesi, hayvan hareketleri izni) uygun olarak verilebilir. Evcil hayvan aksesuar, mama ve
+            bakım ürünleri serbesttir,
+          </li>
           <li>İnsan organı, kan ve vücut ürünleri,</li>
           <li>Sahte belge, kimlik, diploma; hesap, abonelik veya kişisel veri satışı,</li>
           <li>Kumar, bahis, piramit/saadet zinciri ve benzeri yasa dışı kazanç vaatleri,</li>
