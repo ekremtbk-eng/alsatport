@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Filter, X } from "lucide-react";
 import {
@@ -27,6 +27,11 @@ import { ServicesHome } from "@/components/ServicesHome";
 import { StdFilterSidebar } from "@/components/StdFilterSidebar";
 import { listingMatchesDynamicFilters } from "@/lib/categoryFilters";
 import { isSeaEquipCategoryId } from "@/data/seaEquip";
+import { CompactListingList, CompactListingRow } from "@/components/CompactListingRow";
+import { MobileResultsBar, usePhoneView } from "@/components/MobileResultsBar";
+import { useDevice } from "@/context/DeviceContext";
+import { apiGet } from "@/lib/security/client";
+import type { Listing } from "@/data/store";
 
 function HubCount({ cat }: { cat: Category }) {
   const { categoryCounts } = useApp();
@@ -144,13 +149,33 @@ export function CategoryHub({ cat }: { cat: Category }) {
   const [more, setMore] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetCat, setSheetCat] = useState<Category>(cat);
+  const [sort, setSort] = useState("onerilen");
+  const { isDesktop } = useDevice();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const compact = mounted && !isDesktop;
+  const phoneView = usePhoneView();
+  const [remote, setRemote] = useState<Listing[] | null>(null);
+  useEffect(() => {
+    if (cat.id === "services") return;
+    setRemote(null);
+    let cancelled = false;
+    void apiGet<{ listings?: Listing[] }>(`/api/listings?${new URLSearchParams({ kategori: cat.id }).toString()}`)
+      .then((res) => {
+        if (!cancelled && Array.isArray(res.listings)) setRemote(res.listings);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [cat.id]);
   const parent = parentOf(cat);
   const kids = visibleChildren(cat);
   const related = relatedCategories(cat);
   const name = catName(t, cat.id, cat.name);
   const pool = useMemo(
-    () => listings.filter((l) => isPublicListing(l) && listingMatchesCategory(l, cat)),
-    [listings, cat],
+    () => (remote ?? listings).filter((l) => isPublicListing(l) && listingMatchesCategory(l, cat)),
+    [remote, listings, cat],
   );
   const vitrine = useMemo(() => {
     return pool.filter((l) =>
@@ -168,6 +193,13 @@ export function CategoryHub({ cat }: { cat: Category }) {
       ),
     );
   }, [pool, city, district, posted, mappedOnly, word, includeDesc]);
+  const sorted = useMemo(() => {
+    if (sort === "ucuz") return [...vitrine].sort((a, b) => a.price - b.price);
+    if (sort === "pahali") return [...vitrine].sort((a, b) => b.price - a.price);
+    if (sort === "yeni") return [...vitrine].sort((a, b) => (b.postedAt ?? 0) - (a.postedAt ?? 0));
+    return vitrine;
+  }, [vitrine, sort]);
+  const activeFilters = [city, district, posted, word].filter(Boolean).length + (mappedOnly ? 1 : 0) + (includeDesc && word ? 1 : 0);
   const updated = new Date().toLocaleDateString(locale === "tr" ? "tr-TR" : locale, {
     day: "numeric",
     month: "long",
@@ -263,20 +295,49 @@ export function CategoryHub({ cat }: { cat: Category }) {
         </aside>
 
         <div className="hub-main">
-          <h1 className="hub-title hub-title-mobile">{name}</h1>
-          <div className="browse-mobile-tools">
-            <button
-              type="button"
-              className="browse-filter-btn"
-              onClick={() => {
+          {showcase ? (
+            <>
+              <h1 className="hub-title hub-title-mobile">{name}</h1>
+              <div className="browse-mobile-tools">
+                <button
+                  type="button"
+                  className="browse-filter-btn"
+                  onClick={() => {
+                    setSheetCat(cat);
+                    setSheetOpen(true);
+                  }}
+                >
+                  <Filter className="h-4 w-4" />
+                  {t("cat.filter")}
+                </button>
+              </div>
+            </>
+          ) : (
+            <MobileResultsBar
+              title={name}
+              titleAsHeading
+              count={vitrine.length}
+              onBack={() => {
+                if (window.history.length > 1) router.back();
+                else router.push(parent ? hrefForCategory(parent) : "/kategoriler");
+              }}
+              activeFilters={activeFilters}
+              onFilter={() => {
                 setSheetCat(cat);
                 setSheetOpen(true);
               }}
-            >
-              <Filter className="h-4 w-4" />
-              {t("cat.filter")}
-            </button>
-          </div>
+              sort={sort}
+              sortOptions={[
+                { value: "onerilen", label: t("cat.sort.rec") },
+                { value: "yeni", label: t("cat.sort.new") },
+                { value: "ucuz", label: t("cat.sort.asc") },
+                { value: "pahali", label: t("cat.sort.desc") },
+              ]}
+              onSort={setSort}
+              view={phoneView.view}
+              onToggleView={phoneView.toggle}
+            />
+          )}
           {showcase ? (
             <ServiceHubShowcase cat={cat} kids={kids} />
           ) : (
@@ -285,9 +346,15 @@ export function CategoryHub({ cat }: { cat: Category }) {
             <h2>{t("acil.found", { n: formatListingCount(vitrine.length) })}</h2>
             <Link href={hrefForCategoryListings(cat)}>{t("cat.hub.allVitrine")}</Link>
           </div>
-          {vitrine.length ? (
+          {vitrine.length && compact && phoneView.view === "rows" ? (
+            <CompactListingList>
+              {sorted.map((l) => (
+                <CompactListingRow key={l.id} listing={l} />
+              ))}
+            </CompactListingList>
+          ) : vitrine.length ? (
             <div className="hub-vitrine">
-              {vitrine.map((l) => (
+              {(compact ? sorted : vitrine).map((l) => (
                 <Link key={l.id} href={`/ilan/${l.id}`} className="vitrine-cell" title={l.title}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={l.images[0]} alt={l.title} />

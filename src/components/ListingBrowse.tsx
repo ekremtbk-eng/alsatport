@@ -2,12 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Filter, LayoutGrid, List, SlidersHorizontal, X } from "lucide-react";
+import { LayoutGrid, List, SlidersHorizontal, X } from "lucide-react";
 import { FilterPanel } from "@/components/FilterPanel";
 import { FilterSheet } from "@/components/FilterSheet";
 import { ListingCard } from "@/components/ListingCard";
 import { ListingGrid } from "@/components/ListingGrid";
 import { ServiceListingRow, serviceRating } from "@/components/ServiceListingRow";
+import { CompactListingList, CompactListingRow } from "@/components/CompactListingRow";
+import { MobileResultsBar, usePhoneView } from "@/components/MobileResultsBar";
+import { useDevice } from "@/context/DeviceContext";
 import { catName, useI18n } from "@/context/I18nContext";
 import { useApp } from "@/context/AppContext";
 import { useAuthModal } from "@/context/AuthModalContext";
@@ -73,8 +76,18 @@ export function ListingBrowse({
   emptyText,
   loading = false,
   serverResult = null,
+  mobileTitle,
+  onSaveSearch,
+  saved = false,
+  saveHint,
 }: {
   category?: Category | null;
+  /** Phone/tablet header title; defaults to the category name. */
+  mobileTitle?: string;
+  /** Only passed where the saved-search backend can store the search (keyword + city). */
+  onSaveSearch?: () => void;
+  saved?: boolean;
+  saveHint?: string;
   listings: Listing[];
   /** API-filtered result for the current URL filters; `listings` stays unfiltered for option counts. */
   serverResult?: Listing[] | null;
@@ -98,6 +111,11 @@ export function ListingBrowse({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetCat, setSheetCat] = useState<Category | undefined>();
   const sidebar = useSidebarPreference();
+  const { isDesktop } = useDevice();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const compact = mounted && !isDesktop;
+  const phoneView = usePhoneView();
   const openBtnRef = useRef<HTMLButtonElement>(null);
   const sideRef = useRef<HTMLDivElement>(null);
   const focusAfterToggle = useRef(false);
@@ -267,18 +285,65 @@ export function ListingBrowse({
     );
   };
 
+  const sortOptions = [
+    { value: "onerilen", label: t("cat.sort.rec") },
+    { value: "yeni", label: serviceTree ? t("cat.sort.adv") : t("cat.sort.new") },
+    ...(serviceTree
+      ? [{ value: "puan", label: t("cat.sort.rating") }]
+      : [
+          { value: "ucuz", label: t("cat.sort.asc") },
+          { value: "pahali", label: t("cat.sort.desc") },
+        ]),
+  ];
+  const pageItems = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const ratingMeta = (l: Listing) => {
+    if (!serviceTree) return undefined;
+    const { avg, count } = serviceRating(l, reviewsFor(l.sellerId));
+    return count > 0 && avg > 0 ? `★ ${avg.toFixed(1)} (${count})` : undefined;
+  };
+
   return (
     <div>
-      {serviceTree && category ? (
-        <div className="browse-pagehead">
-          <h1 className="text-lg font-extrabold tracking-tight text-ink">
-            {t("cat.svc.hits", { name: catName(t, category.id, category.name), n: formatListingCount(items.length) })}
-          </h1>
-        </div>
-      ) : (
-        heading
-      )}
-          {extra}
+      <div className="browse-heading">
+        {serviceTree && category ? (
+          <div className="browse-pagehead">
+            <h1 className="text-lg font-extrabold tracking-tight text-ink">
+              {t("cat.svc.hits", { name: catName(t, category.id, category.name), n: formatListingCount(items.length) })}
+            </h1>
+          </div>
+        ) : (
+          heading
+        )}
+      </div>
+      <MobileResultsBar
+        title={mobileTitle ?? (category ? catName(t, category.id, category.name) : t("common.search"))}
+        titleAsHeading={compact}
+        count={items.length}
+        onBack={() => {
+          if (window.history.length > 1) router.back();
+          else {
+            const up = category ? parentOf(category) : undefined;
+            router.push(up ? hrefForCategoryListings(up) : "/");
+          }
+        }}
+        activeFilters={active}
+        onFilter={() => {
+          setSheetCat(category ?? undefined);
+          setSheetOpen(true);
+        }}
+        sort={sort}
+        sortOptions={sortOptions}
+        onSort={(next) => {
+          setSort(next);
+          commit(filters, next, view, 1);
+        }}
+        view={phoneView.view}
+        onToggleView={phoneView.toggle}
+        onSave={onSaveSearch}
+        saved={saved}
+        hint={saveHint}
+      />
+      {extra}
       {category ? (
         <div className="flt-chips">
           {categoryPath(category).map((c, i, arr) => {
@@ -322,20 +387,6 @@ export function ListingBrowse({
         </div>
 
         <div className="browse-main">
-          <div className="browse-mobile-tools">
-            <button
-              type="button"
-              className="browse-filter-btn"
-              onClick={() => {
-                setSheetCat(category ?? undefined);
-                setSheetOpen(true);
-              }}
-            >
-              <Filter className="h-4 w-4" />
-              {t("cat.filter")}
-              {active > 0 ? <span className="browse-filter-badge">{active}</span> : null}
-            </button>
-          </div>
           <div className={`browse-toolbar ${serviceTree ? "is-svc" : ""}`}>
             {sidebar.open ? null : (
               <button
@@ -434,22 +485,34 @@ export function ListingBrowse({
                 </button>
               ) : null}
             </div>
+          ) : compact && phoneView.view === "rows" ? (
+            <CompactListingList>
+              {pageItems.map((l) => (
+                <CompactListingRow key={l.id} listing={l} meta={ratingMeta(l)} />
+              ))}
+            </CompactListingList>
+          ) : compact ? (
+            <ListingGrid>
+              {pageItems.map((l) => (
+                <ListingCard key={l.id} listing={l} compact />
+              ))}
+            </ListingGrid>
           ) : serviceTree ? (
             <div className="svc-list">
-              {items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((l) => (
+              {pageItems.map((l) => (
                 <ServiceListingRow key={l.id} listing={l} reviews={reviewsFor(l.sellerId)} />
               ))}
             </div>
           ) : view === "list" || isSeaEquipCategoryId(category?.id ?? "") ? (
             <ClassifiedSearchTable
-              listings={items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)}
+              listings={pageItems}
               showProduct={Boolean(
                 category && (rootOf(category).id === "pets" || (isSeaEquipCategoryId(category.id) && category.id !== "parts-sea")),
               )}
             />
           ) : (
             <ListingGrid>
-              {items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((l) => (
+              {pageItems.map((l) => (
                 <ListingCard key={l.id} listing={l} compact />
               ))}
             </ListingGrid>

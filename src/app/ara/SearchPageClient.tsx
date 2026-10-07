@@ -182,6 +182,10 @@ function SearchInner() {
         serverResult={serverResult && serverResult.key === filterKey ? serverResult.listings : null}
         loading={loading}
         emptyText={t("search.noneFilters")}
+        mobileTitle={pickedCat ? (city ? `${heading} · ${city}` : heading) : q ? `"${q}"` : heading}
+        onSaveSearch={onSave}
+        saved={saved}
+        saveHint={hint}
         heading={
           <div className="browse-pagehead justify-between">
                 <h1 className="text-lg font-extrabold tracking-tight text-ink">
