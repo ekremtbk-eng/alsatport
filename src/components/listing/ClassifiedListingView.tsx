@@ -10,7 +10,6 @@ import { ListingGallery } from "@/components/listing/ListingGallery";
 import { ListingShareTrigger } from "@/components/listing/ListingShare";
 import { ListingRegionPanel } from "@/components/listing/ListingRegionPanel";
 import { ListingDescriptionPanel } from "@/components/listing/ListingDescriptionPanel";
-import { GuestLock } from "@/components/GuestLock";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { classifiedFactRows, classifiedFeatureItems, listingCategoryChain } from "@/lib/listingFacts";
 import { listingSellerLabel } from "@/lib/publicName";
@@ -172,9 +171,7 @@ export function ClassifiedListingView({
       </div>
 
       {detailTab === "region" ? (
-        <GuestLock>
-          <ListingRegionPanel listing={listing} />
-        </GuestLock>
+        <ListingRegionPanel listing={listing} />
       ) : detailTab === "desc" ? (
         <ListingDescriptionPanel className="classified-desc" description={listing.description} />
       ) : (

@@ -40,7 +40,6 @@ import { ListingPosterButton, ListingPosterDialog } from "@/components/listing/L
 import { posterSupported } from "@/lib/poster";
 import { listingSellerLabel } from "@/lib/publicName";
 import { ListingDescriptionPanel } from "@/components/listing/ListingDescriptionPanel";
-import { GuestLock } from "@/components/GuestLock";
 import { apiGet } from "@/lib/security/client";
 import { usePhoneReveal } from "@/lib/usePhoneReveal";
 import { useSellerReviews } from "@/components/useSellerReviews";
@@ -49,7 +48,7 @@ import { BreadcrumbNav } from "@/components/BreadcrumbNav";
 import { PublishNotifCard } from "@/components/listing/PublishNotifCard";
 import { hrefForCategory } from "@/data/categories";
 
-export function ListingDetailClient() {
+export function ListingDetailClient({ initialListing }: { initialListing?: Listing }) {
   const { id } = useParams<{ id: string }>();
   const { listings, favorites, toggleFavorite, user } = useApp();
   const { formatMoney, t } = useI18n();
@@ -60,7 +59,8 @@ export function ListingDetailClient() {
   const [fetched, setFetched] = useState<Listing | null>(null);
   const skipRemote = !rawId || rawId.startsWith("podium-") || listingId.startsWith("demo-");
   const [fetchDone, setFetchDone] = useState(skipRemote);
-  const listing = cached ?? fetched;
+  const fresh = fetched && (fetched.id === rawId || fetched.id === listingId) ? fetched : null;
+  const listing = fresh ?? initialListing ?? cached;
   const { reviews } = useSellerReviews(listing?.sellerId ?? "");
   const blocked = listing ? isBlockedLiveAnimalListing(listing) : false;
   const [chatOpen, setChatOpen] = useState(false);
@@ -272,10 +272,7 @@ export function ListingDetailClient() {
           onChat={openChat}
           onTogglePhone={togglePhone}
           onReport={user?.id === listing.sellerId ? undefined : reportListing}
-          onTab={(tab) => {
-            if (tab === "region" && !requireAuth("member")) return;
-            setDetailTab(tab);
-          }}
+          onTab={setDetailTab}
           formatMoney={formatMoney}
         />
         <ListingContactBar
@@ -405,32 +402,23 @@ export function ListingDetailClient() {
             <button
               type="button"
               className={detailTab === "region" ? "is-on" : ""}
-              onPointerEnter={() => regionTarget && user && prefetchRegion(regionTarget, true)}
-              onFocus={() => regionTarget && user && prefetchRegion(regionTarget, true)}
-              onClick={() => {
-                if (!requireAuth("member")) return;
-                setDetailTab("region");
-              }}
+              onPointerEnter={() => regionTarget && prefetchRegion(regionTarget, true)}
+              onFocus={() => regionTarget && prefetchRegion(regionTarget, true)}
+              onClick={() => setDetailTab("region")}
             >
               {t("loc.tab.region")}
             </button>
           </div>
 
           {detailTab === "region" ? (
-            <GuestLock>
-              <ListingRegionPanel listing={listing} />
-            </GuestLock>
+            <ListingRegionPanel listing={listing} />
           ) : detailTab === "desc" ? (
-            <GuestLock>
-              <ListingDescriptionPanel
-                className="mt-5 rounded-xl border border-line bg-card p-4 shadow-sm"
-                description={listing.description}
-              />
-            </GuestLock>
+            <ListingDescriptionPanel
+              className="mt-5 rounded-xl border border-line bg-card p-4 shadow-sm"
+              description={listing.description}
+            />
           ) : (
-            <GuestLock>
-              <ListingSpecTables listing={listing} schema={schema} />
-            </GuestLock>
+            <ListingSpecTables listing={listing} schema={schema} />
           )}
         </div>
 
@@ -464,9 +452,7 @@ export function ListingDetailClient() {
               {listing.sellerVerified ? <span className="seller-pill is-ok">{t("badge.verified")}</span> : null}
             </div>
           </section>
-          <GuestLock>
-            <SellerReviews sellerId={listing.sellerId} listingId={listing.id} />
-          </GuestLock>
+          <SellerReviews sellerId={listing.sellerId} listingId={listing.id} />
           <div className="detail-contact-aside hidden rounded-xl border border-line bg-card p-3 lg:block">{contact}</div>
         </aside>
       </div>

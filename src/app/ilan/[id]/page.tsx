@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import { JsonLd } from "@/components/JsonLd";
 import { isUuid } from "@/lib/ids";
 import { isBlockedLiveAnimalListing } from "@/lib/liveAnimalPolicy";
-import { findListingRecord, toClientListing } from "@/lib/listings/store";
+import type { Listing } from "@/data/store";
+import { findListingRecord, hideSellerPhone, toClientListing } from "@/lib/listings/store";
 import { isLiveRow } from "@/lib/listings/lifecycle";
 import { isDemoListingRow, isServiceCategoryId } from "@/lib/seoIndexing";
 import { findCategory } from "@/data/categories";
@@ -12,12 +14,14 @@ import { ListingDetailClient } from "./ListingDetailClient";
 
 type Ctx = { params: Promise<{ id: string }> };
 
+const loadListingRow = cache(findListingRecord);
+
 export async function generateMetadata({ params }: Ctx): Promise<Metadata> {
   const { id } = await params;
   if (!isUuid(id)) {
     return pageMetadata({ title: "İlan · AlsatPort", description: "İlan detayı.", path: `/ilan/${id}`, index: false });
   }
-  const row = await findListingRecord(id);
+  const row = await loadListingRow(id);
   if (!row || !isLiveRow(row)) {
     return { title: "İlan · AlsatPort", robots: { index: false, follow: false } };
   }
@@ -52,11 +56,13 @@ export async function generateMetadata({ params }: Ctx): Promise<Metadata> {
 export default async function ListingDetailPage({ params }: Ctx) {
   const { id } = await params;
   let schema: ReturnType<typeof listingJsonLd> | null = null;
+  let initialListing: Listing | undefined;
   if (isUuid(id)) {
-    const row = await findListingRecord(id);
-    if (row && isLiveRow(row) && !isDemoListingRow(row)) {
-      const listing = toClientListing(row);
-      if (!isBlockedLiveAnimalListing(listing)) {
+    const row = await loadListingRow(id);
+    const listing = row && isLiveRow(row) ? toClientListing(row) : null;
+    if (row && listing && !isBlockedLiveAnimalListing(listing)) {
+      initialListing = hideSellerPhone(listing);
+      if (!isDemoListingRow(row)) {
         const cat = findCategory(listing.categoryId);
         schema = listingJsonLd({
           id: listing.id,
@@ -74,7 +80,7 @@ export default async function ListingDetailPage({ params }: Ctx) {
   return (
     <>
       {schema ? <JsonLd data={schema} /> : null}
-      <ListingDetailClient />
+      <ListingDetailClient initialListing={initialListing} />
     </>
   );
 }
