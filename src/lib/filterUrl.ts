@@ -1,4 +1,4 @@
-import type { FilterState } from "@/lib/categoryFilters";
+import type { FilterField, FilterState } from "@/lib/categoryFilters";
 
 const RESERVED = new Set(["q", "kategori", "cat", "filter", "next", "type", "edit"]);
 const META = new Set(["sira", "gorunum", "sayfa"]);
@@ -26,6 +26,47 @@ export function filtersFromSearchParams(params: URLSearchParams, extra?: FilterS
   for (const [rawKey, value] of params.entries()) {
     if (!value || RESERVED.has(rawKey) || META.has(rawKey)) continue;
     const key = FROM_URL[rawKey] ?? rawKey;
+    state[key] = value;
+  }
+  return state;
+}
+
+/** Stable query string of only the filter params (no category, keyword or paging), for server-side filtering. */
+export function filterQueryKey(params: URLSearchParams) {
+  const pairs: [string, string][] = [];
+  for (const [key, value] of params.entries()) {
+    if (!value || RESERVED.has(key) || META.has(key)) continue;
+    pairs.push([key, value]);
+  }
+  pairs.sort(([a], [b]) => a.localeCompare(b));
+  return new URLSearchParams(pairs).toString();
+}
+
+const SERVER_STD_KEYS = new Set(["city", "district", "neighborhood", "posted", "keyword", "includeDesc", "seller", "urgent", "mappedOnly"]);
+
+/** Filter state from untrusted query params, limited to the category's own fields with bounded values. */
+export function serverFilterState(params: URLSearchParams, fields: FilterField[]): FilterState {
+  const allowed = new Set(SERVER_STD_KEYS);
+  const numeric = new Set<string>();
+  for (const f of fields) {
+    allowed.add(f.key);
+    if (f.kind === "range") {
+      numeric.add(f.key);
+      if (f.pairKey) {
+        allowed.add(f.pairKey);
+        numeric.add(f.pairKey);
+      }
+    }
+  }
+  const state: FilterState = {};
+  for (const [key, raw] of Object.entries(filtersFromSearchParams(params))) {
+    if (!allowed.has(key)) continue;
+    const value = raw.trim().slice(0, 200);
+    if (!value) continue;
+    if (numeric.has(key)) {
+      if (/^\d{1,12}$/.test(value)) state[key] = value;
+      continue;
+    }
     state[key] = value;
   }
   return state;

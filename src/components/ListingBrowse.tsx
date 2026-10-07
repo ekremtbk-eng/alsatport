@@ -72,9 +72,12 @@ export function ListingBrowse({
   extra,
   emptyText,
   loading = false,
+  serverResult = null,
 }: {
   category?: Category | null;
   listings: Listing[];
+  /** API-filtered result for the current URL filters; `listings` stays unfiltered for option counts. */
+  serverResult?: Listing[] | null;
   heading?: ReactNode;
   extra?: ReactNode;
   emptyText: string;
@@ -134,7 +137,8 @@ export function ListingBrowse({
   }, [sheetOpen, filterCat, category, listings, catalog]);
 
   const items = useMemo(() => {
-    let list = scopedListings.filter((l) => listingMatchesDynamicFilters(l, filters, fields));
+    const source = serverResult && scopedListings === listings ? serverResult : scopedListings;
+    let list = source.filter((l) => listingMatchesDynamicFilters(l, filters, fields));
     if (sort === "ucuz") list = [...list].sort((a, b) => a.price - b.price);
     else if (sort === "pahali") list = [...list].sort((a, b) => b.price - a.price);
     else if (sort === "yeni") {
@@ -155,7 +159,7 @@ export function ListingBrowse({
       });
     }
     return list;
-  }, [scopedListings, filters, fields, sort, reviewsFor]);
+  }, [serverResult, scopedListings, listings, filters, fields, sort, reviewsFor]);
 
   const active = countActiveFilters(filters);
 

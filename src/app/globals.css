@@ -4553,6 +4553,12 @@ html[data-device="desktop"] .browse-filter-btn {
   line-height: 1.15rem;
   text-align: center;
 }
+.flt-side-head h2 .browse-filter-badge,
+.filter-title .browse-filter-badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+}
 .browse-toolbar {
   display: flex;
   flex-wrap: wrap;

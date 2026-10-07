@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { SearchSelect } from "@/components/SearchSelect";
 import { useI18n } from "@/context/I18nContext";
 import { TURKEY_CITIES, districtsOf } from "@/data/turkey";
+import { mahallelerOf } from "@/data/regionProfiles";
 
 function SheetAcc({
   title,
@@ -52,6 +53,8 @@ export function StdFilterSidebar({
   plugins,
   city,
   district,
+  neighborhood = "",
+  onNeighborhood,
   posted,
   mappedOnly,
   draft,
@@ -77,6 +80,8 @@ export function StdFilterSidebar({
   plugins?: ReactNode;
   city: string;
   district: string;
+  neighborhood?: string;
+  onNeighborhood?: (value: string) => void;
   posted: string;
   mappedOnly: boolean;
   draft: string;
@@ -98,8 +103,9 @@ export function StdFilterSidebar({
 }) {
   const { t } = useI18n();
   const districts = city ? districtsOf(city) : [];
+  const hoods = onNeighborhood && city && district ? mahallelerOf(city, district) : [];
   const dateLabel = datePresets.find((p) => p.id === posted);
-  const locLabel = [city, district].filter(Boolean).join(" / ") || t("acil.turkey");
+  const locLabel = [city, district, neighborhood].filter(Boolean).join(" / ") || t("acil.turkey");
   const searchLabel =
     resultCount != null ? t("flt.apply", { n: resultCount }) : t("common.search");
   const hasMore = Boolean(extra || plugins);
@@ -129,6 +135,16 @@ export function StdFilterSidebar({
           anyLabel={t("acil.ilce")}
           onChange={onDistrict}
         />
+        {onNeighborhood && hoods.length > 0 ? (
+          <SearchSelect
+            label={t("post.neighborhood")}
+            value={neighborhood}
+            options={hoods}
+            placeholder={t("post.neighborhood")}
+            anyLabel={t("flt.any")}
+            onChange={onNeighborhood}
+          />
+        ) : null}
       </SheetAcc>
 
       {primary}

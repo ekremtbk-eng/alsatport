@@ -18,6 +18,7 @@ import {
   resolvedOptions,
   SQM_PRESETS,
   YEAR_OPTIONS,
+  countActiveFilters,
   countFilterOption,
   type FilterField,
   type FilterState,
@@ -297,7 +298,7 @@ function FieldControl({
     </label>
   );
 }
-const STD_FIELD_KEYS = new Set(["city", "district", "posted", "keyword", "hours24"]);
+const STD_FIELD_KEYS = new Set(["city", "district", "neighborhood", "posted", "keyword", "hours24"]);
 const PRIMARY_FIELD_KEYS = new Set(["priceMin", "priceMax", "kimden", "species", "petProduct", "breed", "sex", "ageMin"]);
 const PLUGIN_FIELD_KEYS = new Set([
   "brand",
@@ -402,8 +403,10 @@ export function FilterPanel({
     if (field.kind === "range" && field.key.endsWith("Max")) return false;
     return true;
   });
-  const primaryFields = extraFields.filter((f) => PRIMARY_FIELD_KEYS.has(f.key));
-  const restFields = extraFields.filter((f) => !PRIMARY_FIELD_KEYS.has(f.key));
+  const isPrimary = (f: FilterField) => PRIMARY_FIELD_KEYS.has(f.key) || Boolean(f.primary);
+  const primaryFields = extraFields.filter(isPrimary);
+  const restFields = extraFields.filter((f) => !isPrimary(f));
+  const activeCount = countActiveFilters(state);
   const pluginFields = restFields.filter((f) => f.preferOpen || PLUGIN_FIELD_KEYS.has(f.key));
   const pluginKeys = new Set(pluginFields.map((f) => f.key));
   const moreFields = restFields.filter((f) => !pluginKeys.has(f.key));
@@ -499,14 +502,28 @@ export function FilterPanel({
     <div className={variant === "sheet" ? "contents" : "filter-aside acil-side"}>
       {onClose ? (
         <div className="filter-head">
-          <h2 className="filter-title">{t("cat.filter")}</h2>
+          <h2 className="filter-title">
+            {t("cat.filter")}
+            {activeCount > 0 ? (
+              <span className="browse-filter-badge" aria-label={t("flt.activeN", { n: activeCount })}>
+                {activeCount}
+              </span>
+            ) : null}
+          </h2>
           <button type="button" className="filter-x" onClick={onClose} aria-label={t("common.close")}>
             <X className="h-4 w-4" />
           </button>
         </div>
       ) : (
         <div className="flt-side-head">
-          <h2>{t("cat.filter")}</h2>
+          <h2>
+            {t("cat.filter")}
+            {activeCount > 0 ? (
+              <span className="browse-filter-badge" aria-label={t("flt.activeN", { n: activeCount })}>
+                {activeCount}
+              </span>
+            ) : null}
+          </h2>
           <button type="button" className="flt-side-clear" onClick={onClear}>
             {t("flt.clearShort")}
           </button>
@@ -533,6 +550,8 @@ export function FilterPanel({
         plugins={plugins}
         city={state.city ?? ""}
         district={state.district ?? ""}
+        neighborhood={state.neighborhood ?? ""}
+        onNeighborhood={(v) => onChange("neighborhood", v)}
         posted={state.posted ?? ""}
         mappedOnly={state.mappedOnly === "1"}
         draft={draft}

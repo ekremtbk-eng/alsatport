@@ -41,7 +41,11 @@ export function FilterChips({
   const seen = new Set<string>();
   for (const [key, value] of Object.entries(state)) {
     if (!value || skip.has(key) || seen.has(key)) continue;
-    if (key.endsWith("Max") && fields.some((f) => f.pairKey === key)) continue;
+    const minPair = key.endsWith("Max") ? fields.find((f) => f.pairKey === key) : undefined;
+    if (minPair) {
+      if (!state[minPair.key]) chips.push({ key, text: `${labelOf(t, minPair, key)}: ≤ ${value}` });
+      continue;
+    }
     const field = fields.find((f) => f.key === key) ?? fields.find((f) => f.pairKey === key);
     if (key.endsWith("Min") && field?.pairKey) {
       const max = state[field.pairKey] ?? "";

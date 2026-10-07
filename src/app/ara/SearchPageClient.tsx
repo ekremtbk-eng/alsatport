@@ -26,6 +26,7 @@ import Link from "next/link";
 import { apiGet } from "@/lib/security/client";
 import { listingCategoryChain } from "@/lib/listingFacts";
 import { BreadcrumbNav } from "@/components/BreadcrumbNav";
+import { filterQueryKey } from "@/lib/filterUrl";
 import type { Listing } from "@/data/store";
 
 function SearchInner() {
@@ -73,6 +74,33 @@ function SearchInner() {
       cancelled = true;
     };
   }, [q, city, catSlug, resolvedCat]);
+
+  const filterKey = filterQueryKey(params);
+  const [serverResult, setServerResult] = useState<{ key: string; listings: Listing[] } | null>(null);
+
+  useEffect(() => {
+    if (!filterKey || !resolvedCat || resolvedCat.filter) {
+      setServerResult(null);
+      return;
+    }
+    const qs = new URLSearchParams(filterKey);
+    if (q) qs.set("q", q);
+    qs.set("kategori", resolvedCat.id);
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void apiGet<{ ok?: boolean; listings?: Listing[] }>(`/api/listings?${qs.toString()}`)
+        .then((res) => {
+          if (!cancelled && Array.isArray(res.listings)) {
+            setServerResult({ key: filterKey, listings: res.listings.filter(isPublicListing) });
+          }
+        })
+        .catch(() => undefined);
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [filterKey, q, resolvedCat]);
 
   useEffect(() => {
     if (filter !== "urgent" && filter !== "h48") return;
@@ -151,6 +179,7 @@ function SearchInner() {
       <ListingBrowse
         category={pickedCat}
         listings={baseList}
+        serverResult={serverResult && serverResult.key === filterKey ? serverResult.listings : null}
         loading={loading}
         emptyText={t("search.noneFilters")}
         heading={

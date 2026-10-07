@@ -91,6 +91,8 @@ import {
   BERTHS,
 } from "@/data/listingOptions";
 import { TURKEY_CITIES, districtsOf } from "@/data/turkey";
+import { catalogForSegment } from "@/data/vehicleIndex";
+import type { VehicleModelLine } from "@/data/vehicleCatalog";
 import { mahallelerOf } from "@/data/regionProfiles";
 import { tutorLevelsFor, tutorSubjectsFor, TUTOR_PLACES } from "@/data/tutorOptions";
 import {
@@ -156,6 +158,10 @@ export type FilterField = {
   catalogId?: string;
   searchable?: boolean;
   preferOpen?: boolean;
+  /** Rendered in the always-visible block instead of behind "more filters". */
+  primary?: boolean;
+  /** Compare against the listing's spec value as a whole; text-blob matching only for listings lacking the spec. */
+  exact?: boolean;
   currencyTabs?: boolean;
   ui?: "chips";
   chipKind?: "tutorSubject" | "tutorLevel" | "tutorPlace";
@@ -251,6 +257,57 @@ function vehicleCascade(segment: VehicleSegment): FilterField[] {
   return fields;
 }
 
+function catalogValues(segment: VehicleSegment, pick: (line: VehicleModelLine) => string[]) {
+  const seen = new Set<string>();
+  for (const brand of catalogForSegment(segment)) {
+    for (const line of brand.models) for (const value of pick(line)) if (value.trim()) seen.add(value.trim());
+  }
+  return [...seen];
+}
+
+function engineOrder(a: string, b: string) {
+  const na = Number(a);
+  const nb = Number(b);
+  if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+  if (Number.isFinite(na)) return -1;
+  if (Number.isFinite(nb)) return 1;
+  return a.localeCompare(b, "tr");
+}
+
+/** Chassis statuses written by the listing form (`original` / `painted` / `local` / `changed`). */
+export const PAINT_FILTER_OPTIONS = ["Tamamı orijinal", "Boyasız", "Değişensiz"];
+
+/** Passenger cars (otomobil, arazi/SUV and their profiles): every field maps to a spec the listing form writes. */
+function carFilterFields(segment: VehicleSegment): FilterField[] {
+  const top = { preferOpen: true, primary: true, exact: true };
+  return [
+    sel("brand", "post.brand", brandNamesForSegment(segment), ["Marka", "Brand"], { ...top, searchable: true, catalogKind: segment }),
+    { ...cascadeSel(segment, "model", "flt.series", ["Model"], "brand", "vehicleModels"), primary: true, exact: true },
+    { ...cascadeSel(segment, "trim", "flt.modelPkg", ["Paket", "Seri", "Trim"], "model", "vehiclePackages"), primary: true, exact: true },
+    ...range("yearMin", "yearMax", "post.year", ["Yıl", "Year"], undefined, true).map((f) => ({ ...f, primary: true })),
+    ...range("kmMin", "kmMax", "post.km", ["Km", "Kilometre"], undefined, true).map((f) => ({ ...f, primary: true })),
+    sel("fuel", "post.fuel", FUELS, ["Yakıt", "Fuel"], top),
+    sel("gear", "post.gear", GEARS, ["Vites", "Gearbox"], { ...top, catalogKind: segment }),
+    sel("bodyType", "flt.body", catalogValues(segment, (l) => l.bodies), ["Kasa", "Kasa tipi", "Body"], {
+      ...top,
+      optionSource: "vehicleBodies",
+      catalogKind: segment,
+    }),
+    sel("engineSize", "flt.engine", catalogValues(segment, (l) => l.engines).sort(engineOrder), ["Motor", "Motor hacmi", "Engine"], {
+      ...top,
+      optionSource: "vehicleEngines",
+      catalogKind: segment,
+    }),
+    sel("power", "flt.power", ENGINE_POWERS, ["Motor gücü", "Güç"], top),
+    sel("drive", "flt.drive", DRIVES, ["Çekiş", "Drive"], top),
+    sel("color", "post.color", COLORS, ["Renk", "Color"], top),
+    sel("damage", "flt.damage", DAMAGE_RECORDS, ["Hasar kaydı", "Hasar", "Tramer"], top),
+    sel("paint", "flt.paint", PAINT_FILTER_OPTIONS, [], { preferOpen: true, primary: true }),
+    sel("kimden", "flt.kimden", VEHICLE_FROM, ["Kimden"], { exact: true }),
+    { key: "equip", kind: "multi", labelKey: "flt.equip", options: FILTER_VEHICLE_FEATURES },
+  ];
+}
+
 function vehicleCore(segment: VehicleSegment): FilterField[] {
   const skipKm = segment === "deniz";
   const skipFuel = segment === "ev" || segment === "deniz";
@@ -344,6 +401,7 @@ function fieldsForCategoryNode(cat: Category): FilterField[] {
     if (hid(id, "deniz")) {
       return [...vehicleCore("deniz"), sel("cond", "post.cond", PRODUCT_CONDITIONS, ["Durum", "Condition"]), ...extra];
     }
+    if (id !== "vasita" && (segment === "auto" || segment === "suv")) return [...carFilterFields(segment), ...extra];
     return [...vehicleCore(segment), ...extra];
   }
 
@@ -1120,8 +1178,14 @@ export function resolvedOptions(field: FilterField, state: FilterState) {
   const kind = field.catalogKind ?? "auto";
   if (field.optionSource === "vehicleModels") return modelsOfBrand(state.brand, kind);
   if (field.optionSource === "vehiclePackages") return packagesOfModel(state.brand, state.model, kind);
-  if (field.optionSource === "vehicleEngines") return enginesOfModel(state.brand, state.model, kind);
-  if (field.optionSource === "vehicleBodies") return bodiesOfModel(state.brand, state.model, kind);
+  if (field.optionSource === "vehicleEngines") {
+    const narrowed = enginesOfModel(state.brand, state.model, kind);
+    return narrowed.length || !field.options ? narrowed : field.options;
+  }
+  if (field.optionSource === "vehicleBodies") {
+    const narrowed = bodiesOfModel(state.brand, state.model, kind);
+    return narrowed.length || !field.options ? narrowed : field.options;
+  }
   if (field.optionSource === "vehicleRanges") return rangesOfModel(state.brand, state.model, kind);
   if (field.optionSource === "neighborhoods") return mahallelerOf(state.city, state.district);
   if (field.optionSource === "catalogModels") {
@@ -1143,24 +1207,16 @@ export function applyFilterChange(prev: FilterState, key: string, value: string)
     next.body = "";
     next.series = "";
     next.range = "";
-    next.gear = "";
-    next.drive = "";
-    next.power = "";
   }
   if (key === "model" || key === "trim") {
     next.trim = key === "model" ? "" : next.trim;
     next.engine = "";
     next.body = "";
     next.range = "";
-    next.gear = "";
-    next.drive = "";
-    next.power = "";
   }
   if (key === "engine") {
     next.body = "";
     next.range = "";
-    next.gear = "";
-    next.drive = "";
   }
   if (key === "body") {
     next.drive = "";
@@ -1211,9 +1267,25 @@ export function listingMatchesDynamicFilters(listing: Listing, state: FilterStat
       if (wanted && !listingMatchesTextQuery(listing, wanted)) return false;
     }
     if (field.key === "posted") continue;
+    if (field.key === "paint" && state.paint) {
+      const parts = listing.chassis ? Object.values(listing.chassis) : [];
+      if (!parts.length) return false;
+      if (state.paint === "Tamamı orijinal" && parts.some((p) => p !== "original")) return false;
+      if (state.paint === "Boyasız" && parts.some((p) => p === "painted" || p === "local")) return false;
+      if (state.paint === "Değişensiz" && parts.some((p) => p === "changed")) return false;
+      continue;
+    }
     if (field.kind === "select") {
       const wanted = state[field.key];
       if (!wanted) continue;
+      if (field.exact) {
+        const wants = wanted.split(",").filter(Boolean);
+        const own = specOf(listing, field.specKeys);
+        if (own) {
+          if (!wants.some((w) => norm(own) === norm(w))) return false;
+          continue;
+        }
+      }
       const specKeys = field.specKeys?.length
         ? field.specKeys
         : [field.key, "Marka", "Brand", "Model", "Ürün"];

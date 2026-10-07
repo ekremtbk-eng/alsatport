@@ -13,6 +13,8 @@ import { createListing, fillMissingListingCoords, hideSellerPhone, parseListingI
 import { notifyListingEvent } from "@/lib/listings/lifecycle";
 import { parseSearch, readJson } from "@/lib/security/parseBody";
 import { listingCreateBodySchema, listingQuerySchema } from "@/lib/security/schemas";
+import { filterFieldsForCategory, listingMatchesDynamicFilters } from "@/lib/categoryFilters";
+import { serverFilterState } from "@/lib/filterUrl";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -46,7 +48,13 @@ export async function GET(req: Request) {
     sellerId: query.sellerId,
     mine: mine && !!claims?.sub,
   });
-  return NextResponse.json({ ok: true, listings: listings.map(hideSellerPhone) });
+  let result = listings;
+  if (catHit && !catHit.filter) {
+    const fields = filterFieldsForCategory(catHit);
+    const state = serverFilterState(url.searchParams, fields);
+    if (Object.keys(state).length) result = listings.filter((l) => listingMatchesDynamicFilters(l, state, fields));
+  }
+  return NextResponse.json({ ok: true, listings: result.map(hideSellerPhone) });
 }
 
 export async function POST(req: Request) {
