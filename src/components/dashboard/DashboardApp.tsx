@@ -189,6 +189,8 @@ function DashTree({
               <button
                 type="button"
                 className={`dash-nav-item depth-${depth} ${active ? "is-active" : ""}`}
+                data-nav={node.id}
+                aria-current={active ? "page" : undefined}
                 onClick={() => go(node.id)}
               >
                 <DashIcon id={node.id} />
@@ -216,6 +218,7 @@ function DashTree({
             <button
               type="button"
               className={`dash-nav-group depth-${depth} ${inPath ? "is-current" : ""}`}
+              aria-expanded={!isCollapsed}
               onClick={() => toggle(node.id)}
             >
               <DashIcon id={node.id} />
