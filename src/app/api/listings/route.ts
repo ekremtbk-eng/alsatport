@@ -97,7 +97,7 @@ export async function POST(req: Request) {
 
   const created = await createListing(auth.user, parsed);
   if ("error" in created) {
-    return NextResponse.json({ ok: false, error: created.error }, { status: 400 });
+    return NextResponse.json({ ok: false, error: created.error }, { status: "status" in created ? created.status : 400 });
   }
   if (created.listing.lat == null) {
     const listingId = created.listing.id;

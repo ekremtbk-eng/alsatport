@@ -2,7 +2,7 @@ import { ListingStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/security/session";
-import { toClientListing } from "@/lib/listings/store";
+import { listingInclude, toClientListing } from "@/lib/listings/store";
 import { isLiveRow, liveListingWhere } from "@/lib/listings/lifecycle";
 
 const STATUSES = new Set<string>(Object.values(ListingStatus));
@@ -22,10 +22,7 @@ export async function GET(req: Request) {
             ? liveListingWhere()
             : { status: (STATUSES.has(status) ? status : "pending") as ListingStatus }),
     },
-    include: {
-      images: { orderBy: [{ isCover: "desc" }, { sortOrder: "asc" }] },
-      seller: { include: { profile: true } },
-    },
+    include: listingInclude,
     orderBy: { createdAt: "desc" },
     take: 80,
   });

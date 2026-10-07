@@ -32,6 +32,25 @@ export const listingInclude = {
   seller: { include: { profile: true as const, business: storeSelect } },
 };
 
+type UrgentSeller = {
+  bannedAt: Date | null;
+  profile: { businessVerifiedAt: Date | null } | null;
+  business?: { status: string } | null;
+};
+
+/** "Acil Acil" belongs to admin-approved business accounts only; the DB is the sole source of truth. */
+export function sellerUrgentEligible(seller: UrgentSeller | null | undefined) {
+  return !!seller && !seller.bannedAt && seller.business?.status === "approved" && !!seller.profile?.businessVerifiedAt;
+}
+
+export async function sellerCanUseUrgent(userId: string) {
+  const seller = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { bannedAt: true, profile: { select: { businessVerifiedAt: true } }, business: { select: { status: true } } },
+  });
+  return sellerUrgentEligible(seller);
+}
+
 function storeRef(business: StoreRow | null | undefined): Listing["store"] {
   if (!business || business.status !== "approved") return undefined;
   return { slug: business.slug, name: business.name, ...(business.logoUrl ? { logo: business.logoUrl } : {}) };
@@ -92,7 +111,8 @@ export function toClientListing(row: ListingWithRelations): Listing {
     postedAt,
     expiresAt: row.expiresAt?.getTime(),
     soldAt: row.soldAt?.getTime(),
-    urgent: row.urgent,
+    // Stored flags of non-approved (individual, pending, rejected, revoked) sellers stay in the DB but are never shown.
+    urgent: row.urgent && sellerUrgentEligible(row.seller),
     refurbished: row.refurbished,
     sellerPhone: phone || undefined,
     sellerSince,
@@ -393,6 +413,9 @@ async function ensureCategoryRow(categoryId: string) {
 }
 
 export async function createListing(user: StoredUser, input: ListingInput) {
+  if (input.urgent && !(await sellerCanUseUrgent(user.id))) {
+    return { error: "urgent.err.businessOnly" as const, status: 403 as const };
+  }
   input.images = ownedImages(input.images, user.id);
   if (!input.images.length) return { error: "photo.minN" as const };
   const category = await ensureCategoryRow(input.categoryId);
@@ -450,6 +473,10 @@ export async function updateListingRecord(user: StoredUser, id: string, patch: R
   });
   if (!existing) return { error: "auth.err.session" as const, status: 404 };
   if (!canMutateListing(user, existing.sellerId)) return { error: "auth.err.forbidden" as const, status: 403 };
+  // Judged on the listing owner, not the editor, so an admin edit cannot grant it either.
+  if (patch.urgent === true && !existing.urgent && !(await sellerCanUseUrgent(existing.sellerId))) {
+    return { error: "urgent.err.businessOnly" as const, status: 403 };
+  }
 
   const imagesProvided = Array.isArray(patch.images);
   const parsed = parseListingInput({

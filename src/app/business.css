@@ -403,6 +403,147 @@
   flex-shrink: 0;
 }
 
+/* "Acil Acil" option on the listing form (approved businesses) / locked teaser (everyone else). */
+.urgent-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid #fed7aa;
+  border-radius: 0.9rem;
+  background: #fff7ed;
+  color: #7c2d12;
+  cursor: pointer;
+}
+.urgent-opt.is-on {
+  border-color: #f97316;
+  box-shadow: inset 0 0 0 1px #f97316;
+}
+.urgent-opt input {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.45rem;
+  flex-shrink: 0;
+  accent-color: #ea580c;
+}
+.urgent-opt-icon {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 0.65rem;
+  background: #ffedd5;
+  color: #ea580c;
+}
+.urgent-opt-body {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.urgent-opt-body b {
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+.urgent-opt-body em {
+  margin-inline-start: 0.35rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.urgent-opt-body small {
+  color: #9a3412;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+.urgent-opt.is-locked {
+  border-color: #e5e7eb;
+  background: #f9fafb;
+  color: #374151;
+  cursor: default;
+}
+.urgent-opt.is-locked .urgent-opt-icon {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+.urgent-opt.is-locked small {
+  color: #4b5563;
+}
+.urgent-opt-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 0.65rem;
+  background: #047857;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+.urgent-opt-cta:hover {
+  background: #065f46;
+}
+.biz-urgent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid #fed7aa;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+}
+.biz-urgent > div {
+  flex: 1 1 14rem;
+}
+.biz-urgent h2 {
+  color: #7c2d12;
+  font-size: 1rem;
+  font-weight: 800;
+}
+.biz-urgent p {
+  margin-top: 0.15rem;
+  color: #9a3412;
+  font-size: 0.84rem;
+}
+.biz-urgent-icon {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 0.8rem;
+  background: #ea580c;
+  color: #fff;
+}
+.biz-urgent-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.acil-store {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  margin: 0.15rem 0;
+  color: #047857;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.acil-store span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Login / register: corporate promo next to the auth card (page variant only). */
 .auth-biz {
   position: relative;

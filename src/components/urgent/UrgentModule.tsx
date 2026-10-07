@@ -30,6 +30,7 @@ import { listingMatchesFilter, listingMatchesTextQuery, listingMatchesTitleQuery
 import { StdFilterSidebar, STD_DATE_PRESETS, STD_FRESH_PRESETS } from "@/components/StdFilterSidebar";
 import { FilterCategoryTree } from "@/components/FilterCategoryTree";
 import { FilterSheet } from "@/components/FilterSheet";
+import { VerifiedBusinessBadge } from "@/components/business/StoreBits";
 
 export type SpecialMode = "urgent" | "h48";
 type ViewMode = "split" | "grid" | "list";
@@ -74,6 +75,12 @@ function SpecialRow({ listing, mode }: { listing: Listing; mode: SpecialMode }) 
           <span className="acil-age">{ageText(listing, t)}</span>
         </p>
         <h3 className="acil-title">{listing.title}</h3>
+        {mode === "urgent" && listing.store ? (
+          <p className="acil-store">
+            <VerifiedBusinessBadge compact />
+            <span>{listing.store.name}</span>
+          </p>
+        ) : null}
         <p className={`acil-price ${unspecified ? "is-na" : ""}`}>
           {unspecified ? t("acil.unspecified") : formatMoney(listing.price)}
         </p>

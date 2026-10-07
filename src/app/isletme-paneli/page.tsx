@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Eye, Heart, MessageCircle, PlusCircle, Store } from "lucide-react";
+import { Eye, Heart, MessageCircle, PlusCircle, Store, Zap } from "lucide-react";
 import { ProfileFields, type ProfileValues } from "@/components/business/BusinessFormFields";
 import { BusinessStatusCard } from "@/components/business/BusinessStatusCard";
 import { StoreLogo, VerifiedBusinessBadge } from "@/components/business/StoreBits";
@@ -118,6 +118,20 @@ export default function BusinessPanelPage() {
           </div>
         </section>
       ) : null}
+
+      <section className="biz-urgent">
+        <span className="biz-urgent-icon">
+          <Zap aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <h2>{t("urgent.panel.title")}</h2>
+          <p>{t("urgent.panel.text")}</p>
+        </div>
+        <Link href="/ilan-ver" className="biz-btn is-primary">
+          <Zap aria-hidden="true" className="h-4 w-4" />
+          {t("urgent.panel.cta")}
+        </Link>
+      </section>
 
       <section className="biz-card">
         <h2>{t("biz.myListings")}</h2>

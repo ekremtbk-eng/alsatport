@@ -34,6 +34,8 @@ import { catName, useI18n } from "@/context/I18nContext";
 import { isPetsCategoryId, moderateListingDraft } from "@/lib/liveAnimalPolicy";
 import { showFlashToast } from "@/components/FlashToast";
 import { PUBLISHED_PARAM } from "@/components/listing/PublishNotifCard";
+import { UrgentOption } from "@/components/business/UrgentOption";
+import { useOwnBusiness } from "@/components/business/useOwnBusiness";
 
 export default function PostListingPage() {
   const { user, addListing, updateListing, listings, hydrated } = useApp();
@@ -75,6 +77,9 @@ export default function PostListingPage() {
   const [previewPhoto, setPreviewPhoto] = useState(0);
   const [featuresOpen, setFeaturesOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [urgent, setUrgent] = useState(false);
+  const { business } = useOwnBusiness();
+  const urgentAllowed = business?.status === "approved";
   const publishLock = useRef(false);
   const publishIdRef = useRef(crypto.randomUUID());
   const draftRestored = useRef(false);
@@ -171,6 +176,7 @@ export default function PostListingPage() {
     setFeatures(editing.features ?? []);
     setChassis(editing.chassis ?? emptyChassis());
     setAttrs(nextAttrs);
+    setUrgent(!!editing.urgent);
     setEditReady(true);
   }, [hydrated, editReady, editing]);
 
@@ -454,6 +460,7 @@ export default function PostListingPage() {
           specs,
           features,
           chassis: schema.chassis ? chassis : undefined,
+          ...(urgentAllowed ? { urgent } : {}),
         });
         if (!saved.ok) {
           if (saved.error === "auth.err.session") {
@@ -495,7 +502,7 @@ export default function PostListingPage() {
         listingNo: String(Math.floor(10000000 + Math.random() * 89999999)),
         postedAt: Date.now(),
         expiresAt: expiresAtForUser(live),
-        urgent: true,
+        urgent: urgentAllowed && urgent,
       };
       const posted = await addListing(listing);
       if (!posted.ok) {
@@ -755,6 +762,7 @@ export default function PostListingPage() {
             onToggleFeatures={() => setFeaturesOpen((v) => !v)}
             t={t}
           />
+          <UrgentOption business={business} value={urgentAllowed && urgent} onChange={setUrgent} />
           {formHint ? <p className="text-xs text-orange">{formHint}</p> : null}
           <div className="post-preview-actions">
             <button type="button" onClick={() => setStep(1)} className="h-12 rounded-xl border border-line" disabled={publishing}>
