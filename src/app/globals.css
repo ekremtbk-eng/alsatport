@@ -7967,13 +7967,16 @@ html[data-device="tablet"] .auth-gate-feats {
     z-index: 45;
     left: 0.7rem;
     right: 0.7rem;
-    bottom: calc(4.55rem + env(safe-area-inset-bottom, 0px));
-    padding: 2.55rem 0.75rem 0.8rem;
-    border: 1px solid rgba(0, 200, 83, 0.2);
-    border-radius: 1.15rem;
-    background: rgba(255, 255, 255, 0.96);
-    box-shadow: 0 16px 40px rgba(17, 24, 39, 0.16);
-    backdrop-filter: blur(18px);
+    bottom: calc(4.6rem + env(safe-area-inset-bottom, 0px));
+    max-width: 30rem;
+    margin-inline: auto;
+    padding: 0.5rem 0.5rem 0.35rem;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 6px 20px rgba(17, 24, 39, 0.1);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
   }
   .lc-reopen {
     display: inline-flex;
@@ -7997,95 +8000,106 @@ html[data-device="tablet"] .auth-gate-feats {
     transform: scale(0.96);
   }
   .detail-page {
-    padding-bottom: 12rem;
+    padding-bottom: 10rem;
   }
 }
 .lc-close {
   position: absolute;
-  top: 0.45rem;
-  inset-inline-end: 0.45rem;
+  top: -0.6rem;
+  inset-inline-end: -0.35rem;
   z-index: 2;
   display: grid;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 1.6rem;
+  height: 1.6rem;
   place-items: center;
-  border: 0;
+  border: 2px solid #fff;
   border-radius: 999px;
   background: #111827;
   color: #fff;
-  box-shadow: 0 6px 16px rgba(17, 24, 39, 0.22);
+  box-shadow: 0 2px 6px rgba(17, 24, 39, 0.2);
+}
+.lc-close::before {
+  content: "";
+  position: absolute;
+  inset: -0.55rem;
 }
 .lc-close:active {
-  transform: scale(0.94);
-  background: #00c853;
+  transform: scale(0.92);
 }
-.lc-row {
+.lc-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.375rem;
 }
 .lc-btn {
   display: inline-flex;
   width: 100%;
+  min-width: 0;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
-  min-height: 3rem;
-  padding: 0 0.7rem;
+  gap: 0.375rem;
+  height: 2.75rem;
+  padding: 0 0.5rem;
   border: 0;
-  border-radius: 0.75rem;
+  border-radius: 0.7rem;
   color: #fff;
-  font-size: 0.82rem;
-  font-weight: 800;
-  letter-spacing: -0.01em;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
   text-decoration: none;
-  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.12);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  box-shadow: none;
+  transition: transform 0.15s ease, filter 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.lc-btn > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lc-btn svg {
+  flex-shrink: 0;
 }
 .lc-btn:hover {
-  filter: brightness(1.05);
-  box-shadow: 0 10px 22px rgba(17, 24, 39, 0.16);
+  filter: brightness(1.04);
 }
 .lc-btn:active {
   transform: scale(0.97);
-  filter: brightness(0.96);
+  filter: brightness(0.95);
 }
 .lc-btn-msg {
-  background: linear-gradient(180deg, #14d46a 0%, #00c853 55%, #00b34a 100%);
-  box-shadow: 0 8px 18px rgba(0, 200, 83, 0.28);
+  background: #00c853;
 }
 .lc-btn-call {
-  background: linear-gradient(180deg, #ff9100 0%, #ff6d00 100%);
-  box-shadow: 0 8px 18px rgba(255, 109, 0, 0.26);
+  background: #ff7a00;
 }
 .lc-btn-share {
-  width: 100%;
-  margin-bottom: 0.45rem;
-  background: linear-gradient(180deg, #f0fdf4, #ffffff);
-  color: #065f46 !important;
-  border: 1px solid rgba(0, 200, 83, 0.4);
-  box-shadow: none;
+  background: #f3f4f6;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb;
 }
 .lc-btn-phone {
-  background: linear-gradient(180deg, #4c8df6 0%, #1a73e8 100%);
-  box-shadow: 0 8px 18px rgba(26, 115, 232, 0.26);
+  background: #1a73e8;
 }
 .lc-mask,
 .lc-number {
   display: flex;
-  margin: 0.55rem 0 0;
+  margin: 0.25rem 0 0;
   align-items: center;
   justify-content: center;
-  gap: 0.35rem;
-  font-size: 0.72rem;
-  font-weight: 700;
+  gap: 0.3rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
 }
 .lc-mask {
   color: #6b7280;
 }
 .lc-number {
   color: #1a73e8;
+  font-size: 0.75rem;
+  font-weight: 700;
   text-decoration: none;
 }
 
