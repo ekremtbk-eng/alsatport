@@ -21,6 +21,7 @@ export function SiteFooter() {
             <Link href="/">{t("nav.home")}</Link>
             <Link href="/ara">{t("footer.allListings")}</Link>
             <Link href="/kategoriler">{t("footer.categories")}</Link>
+            <Link href="/kurumsal-hesap">{t("footer.business")}</Link>
             <Link href="/kurumsal/hakkimizda">{t("corp.nav.hakkimizda")}</Link>
             <Link href="/kurumsal/iletisim">{t("corp.nav.iletisim")}</Link>
           </nav>

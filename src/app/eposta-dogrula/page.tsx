@@ -2,7 +2,8 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { rememberReturn, takeReturn } from "@/lib/returnTo";
 import { useI18n } from "@/context/I18nContext";
 import { useApp } from "@/context/AppContext";
 import { MailCheck } from "lucide-react";
@@ -12,6 +13,7 @@ function VerifyInner() {
   const { t } = useI18n();
   const { user, startEmailVerify, logout } = useApp();
   const params = useSearchParams();
+  const router = useRouter();
   const token = params.get("token") ?? "";
   const ok = params.get("ok") === "1";
   const err = params.get("err") === "1";
@@ -21,10 +23,24 @@ function VerifyInner() {
   const [hint, setHint] = useState(sent ? t("auth.verify.sent") : "");
   const [error, setError] = useState(mailFail ? t("auth.err.mail") : "");
 
+  const [resume, setResume] = useState<string | null>(null);
+
   useEffect(() => {
     if (!token || ok || err) return;
     window.location.replace(`/api/auth/verify-email?token=${encodeURIComponent(token)}`);
   }, [token, ok, err]);
+
+  useEffect(() => {
+    rememberReturn(params.get("next"));
+  }, [params]);
+
+  useEffect(() => {
+    if (!ok || !user) return;
+    const dest = takeReturn();
+    if (!dest) return;
+    setResume(dest);
+    router.replace(dest);
+  }, [ok, user, router]);
 
   async function resend() {
     setBusy(true);
@@ -43,9 +59,15 @@ function VerifyInner() {
       <div className="mt-6 rounded-2xl border border-lime/30 bg-lime/10 p-5">
         <MailCheck className="h-8 w-8 text-lime" />
         <p className="mt-3 text-sm font-semibold text-ink">{t("auth.verify.ok")}</p>
-        <Link href="/" className="mt-4 inline-flex text-sm font-bold text-lime">
-          {t("nav.home")}
-        </Link>
+        {resume ? (
+          <Link href={resume} className="mt-4 inline-flex text-sm font-bold text-lime">
+            {t("biz.auth.resume")}
+          </Link>
+        ) : (
+          <Link href="/" className="mt-4 inline-flex text-sm font-bold text-lime">
+            {t("nav.home")}
+          </Link>
+        )}
       </div>
     );
   }

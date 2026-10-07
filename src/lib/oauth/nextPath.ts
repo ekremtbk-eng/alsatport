@@ -7,7 +7,7 @@ export function safeNextPath(raw: string | null | undefined) {
   if (!next.startsWith("/") || /[\\\u0000-\u001f\u007f]/.test(next)) return "/profil";
   try {
     const url = new URL(next, SAME_ORIGIN_BASE);
-    if (url.origin !== SAME_ORIGIN_BASE) return "/profil";
+    if (url.origin !== SAME_ORIGIN_BASE || url.pathname.startsWith("//")) return "/profil";
     return `${url.pathname}${url.search}`;
   } catch {
     return "/profil";

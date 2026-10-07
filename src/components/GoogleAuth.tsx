@@ -74,7 +74,7 @@ export function SocialAuth({
   function start(provider: SocialProvider) {
     if (busy) return;
     setBusy(provider);
-    const next = params.get("next") || "/profil";
+    const next = new URLSearchParams(window.location.search).get("next") || params.get("next") || "/profil";
     window.location.assign(`/api/auth/oauth/${provider}/start?next=${encodeURIComponent(next)}`);
   }
 

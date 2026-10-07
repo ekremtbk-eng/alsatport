@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, FileText, Lock, Mail, MapPin, QrCode, ShieldCheck, UserRound } from "lucide-react";
+import { ArrowLeft, FileText, Lock, Mail, MapPin, QrCode, ShieldCheck, Store, UserRound } from "lucide-react";
+import { BusinessAuthCard } from "@/components/auth/BusinessAuthCard";
 import { ForgotPasswordPanel } from "@/components/auth/ForgotPasswordPanel";
 import { QrLoginPanel } from "@/components/auth/QrLoginPanel";
 import { TwoFactorStep } from "@/components/auth/TwoFactorStep";
@@ -19,7 +20,7 @@ import { CategoryIcon } from "@/components/CategoryIcon";
 import { useApp } from "@/context/AppContext";
 import { useI18n } from "@/context/I18nContext";
 import { isValidEmail } from "@/lib/auth";
-import { afterAuthHref, isValidPhone } from "@/lib/profile";
+import { BUSINESS_RETURN, afterAuthHref, allowlistedReturn, isValidPhone } from "@/lib/profile";
 import { isStrongPassword } from "@/lib/security/passwordPolicy";
 import { apiGet } from "@/lib/security/client";
 import { executeRecaptcha, preloadRecaptcha } from "@/lib/security/recaptchaClient";
@@ -58,7 +59,9 @@ export function AuthStage({
   const [qrOpen, setQrOpen] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
   const [notice, setNotice] = useState("");
+  const [bizIntent, setBizIntent] = useState(false);
   const gateRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -76,6 +79,7 @@ export function AuthStage({
     if (email && isValidEmail(email)) setIdentifier(email);
     if (params.get("reset") === "1") setNotice("auth.reset.loginNow");
     if (params.get("forgot") === "1") setForgotOpen(true);
+    setBizIntent(allowlistedReturn(params.get("next")) === BUSINESS_RETURN);
     if (params.get("tfa") === "1") {
       void apiGet<{ ok?: boolean; error?: string; twoFactor?: TwoFactorChallenge }>("/api/auth/login/verify")
         .then((res) => {
@@ -203,6 +207,23 @@ export function AuthStage({
     }
   }
 
+  function chooseBusiness(on: boolean) {
+    const url = new URL(window.location.href);
+    if (on) url.searchParams.set("next", BUSINESS_RETURN);
+    else if (allowlistedReturn(url.searchParams.get("next")) === BUSINESS_RETURN) url.searchParams.delete("next");
+    window.history.replaceState(null, "", url.pathname + url.search);
+    setBizIntent(on);
+  }
+
+  function startBusiness() {
+    chooseBusiness(true);
+    if (cardRef.current) cardRef.current.scrollTop = 0;
+    for (const box of [gateRef.current, gateRef.current?.querySelector<HTMLElement>(".auth-gate-sheet")]) {
+      if (box && box.scrollHeight > box.clientHeight) box.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function onContinue(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -282,7 +303,7 @@ export function AuthStage({
   return (
     <div
       ref={gateRef}
-      className={`auth-gate ${variant === "overlay" ? "is-overlay" : ""}`}
+      className={`auth-gate ${variant === "overlay" ? "is-overlay" : "has-biz"}`}
       role={variant === "overlay" ? "dialog" : undefined}
       aria-modal={variant === "overlay" || undefined}
     >
@@ -323,7 +344,7 @@ export function AuthStage({
             </div>
           </aside>
 
-          <section className="auth-gate-card">
+          <section className="auth-gate-card" ref={cardRef}>
             <div className="auth-gate-scroll" hidden={tab === "login" && !!challenge}>
               {promptKey ? <p className="mb-3 text-center text-sm font-extrabold text-ink">{t(promptKey)}</p> : null}
               <div className="auth-gate-tabs" role="tablist">
@@ -346,6 +367,31 @@ export function AuthStage({
                   {t("nav.signup")}
                 </button>
               </div>
+
+              {variant === "page" && tab === "signup" ? (
+                <div className="auth-biz-choice" role="radiogroup" aria-label={t("biz.auth.typeLabel")}>
+                  <button type="button" role="radio" aria-checked={!bizIntent} className={!bizIntent ? "is-on" : ""} onClick={() => chooseBusiness(false)}>
+                    <UserRound className="h-4 w-4" aria-hidden />
+                    {t("biz.auth.personal")}
+                  </button>
+                  <button type="button" role="radio" aria-checked={bizIntent} className={bizIntent ? "is-on" : ""} onClick={() => chooseBusiness(true)}>
+                    <Store className="h-4 w-4" aria-hidden />
+                    {t("biz.auth.business")}
+                  </button>
+                </div>
+              ) : null}
+
+              {variant === "page" && bizIntent ? (
+                <p className="auth-biz-intent" role="status">
+                  <Store className="h-4 w-4 shrink-0" aria-hidden />
+                  <span>{t(tab === "login" ? "biz.auth.noteLogin" : "biz.auth.noteSignup")}</span>
+                  {tab === "login" ? (
+                    <button type="button" onClick={() => chooseBusiness(false)}>
+                      {t("biz.auth.cancel")}
+                    </button>
+                  ) : null}
+                </p>
+              ) : null}
 
               <SocialAuth
                 mode={tab === "login" ? "login" : "register"}
@@ -511,6 +557,8 @@ export function AuthStage({
             </form>
             )}
           </section>
+
+          {variant === "page" ? <BusinessAuthCard signedIn={!!user} onStart={startBusiness} /> : null}
         </div>
 
         <nav className="auth-gate-cats" aria-label={t("nav.categories")}>

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MapPin, Store } from "lucide-react";
+import { ArrowRight, MapPin, Store } from "lucide-react";
+import { BUSINESS_RETURN } from "@/lib/profile";
 import { StoreLogo, VerifiedBusinessBadge } from "@/components/business/StoreBits";
 import { catName, useI18n } from "@/context/I18nContext";
 import { TURKEY_CITIES, districtsOf } from "@/data/turkey";
@@ -36,6 +37,11 @@ export function StoresDirectory({ stores, filters }: { stores: PublicStore[]; fi
           {t("biz.stores.title")}
         </h1>
         <p>{t("biz.stores.lead")}</p>
+        <Link href={BUSINESS_RETURN} className="biz-dir-join">
+          <Store aria-hidden="true" />
+          <span>{t("biz.stores.join")}</span>
+          <ArrowRight className="auth-biz-arrow" aria-hidden="true" />
+        </Link>
       </header>
 
       <form className="biz-filters" onSubmit={(e) => e.preventDefault()}>

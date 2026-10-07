@@ -62,20 +62,43 @@ export const PROFILE_NUDGE_TEXT =
 
 const AUTH_LOOP_PATHS = new Set(["/giris", "/kayit", "/welcome", "/hesap-tamamla", "/eposta-dogrula"]);
 
+const SAME_ORIGIN_BASE = "https://same-origin.invalid";
+
+/** Same-origin path only; `/..//evil.com` normalises to `//evil.com`, so the resolved URL is checked too. */
 export function safeNextPath(value: string | null | undefined, fallback = "/ilan-ver") {
    
-  if (!value || !value.startsWith("/") || value.startsWith("//") || /[\\\u0000-\u001f\u007f]/.test(value)) return fallback;
-  const path = value.split("?")[0] ?? value;
-  if (AUTH_LOOP_PATHS.has(path)) return fallback;
+  if (!value || value.length > 300 || !value.startsWith("/") || value.startsWith("//") || /[\\\u0000-\u001f\u007f]/.test(value)) return fallback;
+  let url: URL;
+  try {
+    url = new URL(value, SAME_ORIGIN_BASE);
+  } catch {
+    return fallback;
+  }
+  if (url.origin !== SAME_ORIGIN_BASE || url.pathname.startsWith("//")) return fallback;
+  if (AUTH_LOOP_PATHS.has(url.pathname)) return fallback;
   return value;
+}
+
+export const BUSINESS_RETURN = "/kurumsal-hesap";
+
+/** Destinations that may survive e-mail verification and skip the profile-completion gate. */
+const RETURN_ALLOWLIST = new Set([BUSINESS_RETURN, "/isletme-paneli"]);
+
+export function allowlistedReturn(raw: string | null | undefined): string | null {
+  const safe = safeNextPath(raw, "");
+  if (!safe) return null;
+  const path = safe.split(/[?#]/)[0] ?? "";
+  return RETURN_ALLOWLIST.has(path) ? path : null;
 }
 
 /** Giriş / kayıt sonrası hedef. Overlay’de profil tamamsa null = sayfada kal. */
 export function afterAuthHref(needsProfile: boolean, stayIfComplete = false, needsEmailVerify = false): string | null {
-  if (needsEmailVerify) return "/eposta-dogrula?sent=1";
   const search = typeof window !== "undefined" ? window.location.search : "";
   const path = typeof window !== "undefined" ? window.location.pathname : "/";
   const q = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search).get("next");
+  const carry = allowlistedReturn(q);
+  if (needsEmailVerify) return carry ? `/eposta-dogrula?sent=1&next=${encodeURIComponent(carry)}` : "/eposta-dogrula?sent=1";
+  if (carry) return carry;
   const blocked = AUTH_LOOP_PATHS.has(path);
   const dest = q ? safeNextPath(q, "/") : blocked ? "/" : path;
   if (needsProfile) {

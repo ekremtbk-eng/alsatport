@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { upsertVerifiedOAuthUser, safeNextPath } from "@/lib/oauth/complete";
-import { COMPLETE_PATH } from "@/lib/profile";
+import { COMPLETE_PATH, allowlistedReturn } from "@/lib/profile";
 import {
   exchangeOAuthCode,
   parseOAuthProvider,
@@ -42,10 +42,15 @@ async function finish(req: Request, provider: OAuthProvider, code: string, state
   if (upserted.user.bannedAt) return oauthFail("denied");
   const user = await promoteConfiguredAdmin(upserted.user);
 
+  const target = safeNextPath(parsed.next);
+  const carry = allowlistedReturn(target);
+
   if (await needsSecondFactor(user)) {
     const sent = await sendLoginCode(user);
     if (!sent.ok) return oauthFail("mail");
-    const res = NextResponse.redirect(new URL("/giris?tfa=1", CANONICAL_ORIGIN));
+    const challengeUrl = new URL("/giris?tfa=1", CANONICAL_ORIGIN);
+    if (carry) challengeUrl.searchParams.set("next", carry);
+    const res = NextResponse.redirect(challengeUrl);
     res.cookies.set("ap_oauth_nonce", "", { path: "/", maxAge: 0 });
     await setLoginChallenge(res, user.id);
     return res;
@@ -53,12 +58,16 @@ async function finish(req: Request, provider: OAuthProvider, code: string, state
 
   const next = upserted.needsEmailVerify
     ? "/eposta-dogrula"
-    : upserted.needsProfile
-      ? COMPLETE_PATH
-      : safeNextPath(parsed.next);
+    : carry
+      ? carry
+      : upserted.needsProfile
+        ? COMPLETE_PATH
+        : target;
   const dest = new URL(next, CANONICAL_ORIGIN);
+  if (dest.origin !== new URL(CANONICAL_ORIGIN).origin) return oauthFail("bad");
   if (upserted.needsEmailVerify) {
     dest.searchParams.set(upserted.mailSent ? "sent" : "mail", upserted.mailSent ? "1" : "0");
+    if (carry) dest.searchParams.set("next", carry);
   } else {
     dest.searchParams.set("social", "1");
   }
