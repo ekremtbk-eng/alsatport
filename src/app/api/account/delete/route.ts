@@ -15,7 +15,7 @@ import {
 } from "@/lib/security/session";
 import { readJson } from "@/lib/security/parseBody";
 import { accountDeleteSchema } from "@/lib/security/schemas";
-import { deleteStoredObject, isManagedStorageKey, storageKeyFromUrl } from "@/lib/storage/media";
+import { deleteStoredObject, isManagedStorageKey, isOwnBusinessImage, storageKeyFromUrl } from "@/lib/storage/media";
 
 const DELETED_MESSAGE_BODY = "Bu mesaj, hesabını silen bir kullanıcıya aitti.";
 
@@ -51,6 +51,10 @@ export async function POST(req: Request) {
     select: { storageKey: true, url: true },
   });
   const avatarUrl = user.profile.avatar;
+  const business = await prisma.businessAccount.findUnique({
+    where: { userId: user.id },
+    select: { logoUrl: true, coverUrl: true },
+  });
   const now = new Date();
   const unusableHash = await hashPassword(randomBytes(32).toString("base64url"));
 
@@ -75,6 +79,7 @@ export async function POST(req: Request) {
     await tx.verificationOtp.deleteMany({ where: { userId: user.id } });
     await tx.conversationRead.deleteMany({ where: { userId: user.id } });
     await tx.sellerReview.deleteMany({ where: { OR: [{ authorId: user.id }, { sellerId: user.id }] } });
+    await tx.businessAccount.deleteMany({ where: { userId: user.id } });
     await tx.profile.update({
       where: { userId: user.id },
       data: {
@@ -124,6 +129,9 @@ export async function POST(req: Request) {
     images.filter((img) => isManagedStorageKey(img.storageKey)).map((img) => deleteStoredObject(img.storageKey, img.url)),
   );
   if (avatarUrl) await deleteStoredObject(storageKeyFromUrl(avatarUrl), avatarUrl);
+  for (const url of [business?.logoUrl, business?.coverUrl]) {
+    if (isOwnBusinessImage(user.id, url)) await deleteStoredObject(storageKeyFromUrl(url!), url!);
+  }
 
   await writeAudit({
     actorId: user.id,

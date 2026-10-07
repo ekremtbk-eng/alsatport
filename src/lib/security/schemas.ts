@@ -282,5 +282,51 @@ export const adminReportPatchSchema = z.object({
   banSeller: z.boolean().optional(),
 });
 
+const businessText = (min: number, max: number) =>
+  z.string().trim().min(min, "biz.err.required").max(max, "biz.err.tooLong");
+const businessUrlField = z.string().trim().max(500).optional().default("");
+
+/** Strict: unknown keys (e.g. national ID or birth date) are rejected, never stored. */
+export const businessApplySchema = z
+  .object({
+    name: businessText(2, 120),
+    contactName: businessText(3, 80).refine(isValidFullName, "biz.err.contactName"),
+    companyType: z.enum(["sahis", "limited", "anonim", "diger"]),
+    taxOffice: businessText(2, 60),
+    taxNumber: z.string().trim().max(20),
+    categoryId: businessText(1, 80),
+    city: businessText(2, 40),
+    district: z.string().trim().max(40).optional().default(""),
+    description: z.string().trim().max(2000, "biz.err.tooLong"),
+    website: z.string().trim().max(200).optional().default(""),
+    email: emailField,
+    phone: z.string().trim().max(24),
+    logoUrl: businessUrlField,
+    coverUrl: businessUrlField,
+  })
+  .strict();
+
+/** Owner edits after approval; legal identity (name, tax data, company type) is locked. */
+export const businessProfilePatchSchema = z
+  .object({
+    categoryId: businessText(1, 80).optional(),
+    city: businessText(2, 40).optional(),
+    district: z.string().trim().max(40).optional(),
+    description: z.string().trim().max(2000, "biz.err.tooLong").optional(),
+    website: z.string().trim().max(200).optional(),
+    email: emailField.optional(),
+    phone: z.string().trim().max(24).optional(),
+    logoUrl: z.string().trim().max(500).optional(),
+    coverUrl: z.string().trim().max(500).optional(),
+  })
+  .strict();
+
+export const adminBusinessActionSchema = z
+  .object({
+    action: z.enum(["approve", "reject", "revoke"]),
+    reason: z.string().trim().max(500).optional().default(""),
+  })
+  .strict();
+
 export type LoginBody = z.infer<typeof loginBodySchema>;
 export type RegisterBody = z.infer<typeof registerBodySchema>;

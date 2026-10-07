@@ -38,6 +38,8 @@ export type Listing = {
   refurbished?: boolean;
   sellerPhone?: string;
   sellerSince?: string;
+  /** Present only while the seller's corporate store is admin-approved. */
+  store?: { slug: string; name: string; logo?: string };
 };
 
 export type UserProfile = {

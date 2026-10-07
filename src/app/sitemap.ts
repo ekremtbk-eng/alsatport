@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { flattenCategories, hrefForCategory } from "@/data/categories";
 import { CORPORATE_NAV } from "@/data/corporate";
 import { prisma } from "@/lib/db";
+import { storeSitemapRows } from "@/lib/business/store";
 import { liveListingWhere } from "@/lib/listings/lifecycle";
 import { nonDemoListingWhere, serviceCategoryIds } from "@/lib/seoIndexing";
 import { appOrigin } from "@/lib/site";
@@ -26,6 +27,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: "/son-48-saat", priority: 0.8, changeFrequency: "hourly" },
     { path: "/hizmet-vermek-istiyorum", priority: 0.7, changeFrequency: "monthly" },
     { path: "/ara", priority: 0.7, changeFrequency: "daily" },
+    { path: "/magazalar", priority: 0.6, changeFrequency: "daily" },
     ...CORPORATE_NAV.map((n) => ({ path: n.href, priority: 0.5, changeFrequency: "monthly" as const })),
     { path: "/kvkk", priority: 0.3, changeFrequency: "yearly" },
     { path: "/gizlilik-politikasi", priority: 0.4, changeFrequency: "yearly" },
@@ -59,6 +61,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   } catch {
     listings = [];
   }
+  let stores: { slug: string; updatedAt: Date }[] = [];
+  try {
+    stores = await storeSitemapRows();
+  } catch {
+    stores = [];
+  }
   return [
     ...staticPaths.map((row) => ({
       url: `${origin}${row.path}`,
@@ -77,6 +85,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: row.updatedAt,
       changeFrequency: "daily" as const,
       priority: 0.7,
+    })),
+    ...stores.map((row) => ({
+      url: `${origin}/magaza/${row.slug}`,
+      lastModified: row.updatedAt,
+      changeFrequency: "weekly" as const,
+      priority: 0.6,
     })),
   ];
 }

@@ -41,6 +41,8 @@ import { LEGAL_PRIVACY_EMAIL } from "@/data/legal";
 import { AvatarUploader } from "@/components/AvatarUploader";
 import { EntitlementStatus } from "@/components/EntitlementStatus";
 import { SellerListings } from "@/components/listings/SellerListings";
+import { BusinessStatusCard } from "@/components/business/BusinessStatusCard";
+import { useOwnBusiness } from "@/components/business/useOwnBusiness";
 import { NotificationSettingsPanel } from "./NotificationSettings";
 import { FieldError, Notice, OtpInput, Pane, SandboxCode } from "./DashUi";
 import {
@@ -123,9 +125,21 @@ export function DashboardPanel({ panel }: { panel: DashPanelId }) {
       return <MotionPanel />;
     case "qr":
       return <QrPanel />;
+    case "kurumsal":
+      return <BusinessPanel />;
     default:
       return <OzetPanel />;
   }
+}
+
+function BusinessPanel() {
+  const { t } = useI18n();
+  const { business } = useOwnBusiness();
+  return (
+    <Pane title={t("dash.biz")}>
+      {business === undefined ? <p className="dash-empty">{t("common.loading")}</p> : <BusinessStatusCard business={business} />}
+    </Pane>
+  );
 }
 
 function EmptyPanel({ titleKey, bodyKey }: { titleKey: string; bodyKey: string }) {

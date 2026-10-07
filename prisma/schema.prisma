@@ -115,6 +115,24 @@ enum ReportStatus {
   @@map("report_status")
 }
 
+enum BusinessStatus {
+  pending
+  approved
+  rejected
+  revoked
+
+  @@map("business_status")
+}
+
+enum BusinessCompanyType {
+  sahis
+  limited
+  anonim
+  diger
+
+  @@map("business_company_type")
+}
+
 enum PromotionKind {
   featured
   urgent
@@ -162,6 +180,8 @@ model User {
   blocksReceived      UserBlock[]        @relation("BlocksReceived")
   qrTokens            QrToken[]
   notifications       Notification[]
+  business            BusinessAccount?   @relation("BusinessOwner")
+  businessReviews     BusinessAccount[]  @relation("BusinessReviewer")
 
   @@unique([provider, providerSub], map: "users_provider_sub_uidx")
   @@index([role], map: "users_role_idx")
@@ -213,6 +233,47 @@ model Profile {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("profiles")
+}
+
+/// Corporate application + public store. Tax data stays private (admin and owner only).
+/// `tier` is reserved for future paid store plans; everything is free while it is "free".
+model BusinessAccount {
+  id           String              @id @default(uuid()) @db.Uuid
+  userId       String              @unique(map: "business_accounts_user_uidx") @map("user_id") @db.Uuid
+  slug         String              @unique(map: "business_accounts_slug_uidx")
+  status       BusinessStatus      @default(pending)
+  name         String
+  contactName  String              @map("contact_name")
+  companyType  BusinessCompanyType @map("company_type")
+  taxOffice    String              @map("tax_office")
+  taxNumber    String              @map("tax_number")
+  categoryId   String              @map("category_id")
+  city         String
+  district     String              @default("")
+  description  String              @default("")
+  website      String?
+  email        String
+  phone        String
+  logoUrl      String?             @map("logo_url")
+  coverUrl     String?             @map("cover_url")
+  tier         String              @default("free")
+  tierUntil    DateTime?           @map("tier_until") @db.Timestamptz(6)
+  rejectReason String?             @map("reject_reason")
+  submittedAt  DateTime            @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  reviewedAt   DateTime?           @map("reviewed_at") @db.Timestamptz(6)
+  reviewedById String?             @map("reviewed_by") @db.Uuid
+  approvedAt   DateTime?           @map("approved_at") @db.Timestamptz(6)
+  revokedAt    DateTime?           @map("revoked_at") @db.Timestamptz(6)
+  createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user       User  @relation("BusinessOwner", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("BusinessReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status, submittedAt], map: "business_accounts_status_submitted_idx")
+  @@index([status, city, district], map: "business_accounts_status_city_idx")
+  @@index([status, categoryId], map: "business_accounts_status_category_idx")
+  @@map("business_accounts")
 }
 
 model UserBlock {

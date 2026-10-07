@@ -28,6 +28,8 @@ export default function robots(): MetadataRoute.Robots {
           "/sifre-sifirla",
           "/karsilastir",
           "/qr",
+          "/kurumsal-hesap",
+          "/isletme-paneli",
           "/*?*marka=",
           "/*?*priceMin=",
           "/*?*priceMax=",

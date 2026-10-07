@@ -5,6 +5,7 @@ import { apiGet, apiPatch, apiPost } from "@/lib/security/client";
 import { useApp } from "@/context/AppContext";
 import { useI18n } from "@/context/I18nContext";
 import { SpecialDaysPanel } from "@/components/admin/SpecialDaysPanel";
+import { BusinessApplicationsPanel } from "@/components/admin/BusinessApplicationsPanel";
 import { StepUpProvider, useStepUp } from "@/components/admin/StepUpProvider";
 import { LEGAL_CONTROLLER_MISSING, LEGAL_CONTROLLER_READY, LEGAL_CONTROLLER_WARNING } from "@/data/legal";
 import Link from "next/link";
@@ -64,7 +65,7 @@ function AdminConsole() {
   const { user, hydrated } = useApp();
   const { t } = useI18n();
   const guard = useStepUp();
-  const [tab, setTab] = useState<"listings" | "reports" | "users" | "days">("listings");
+  const [tab, setTab] = useState<"listings" | "reports" | "users" | "business" | "days">("listings");
   const [overview, setOverview] = useState<Overview | null>(null);
   const [listings, setListings] = useState<AdminListing[]>([]);
   const [listingFilter, setListingFilter] = useState<ListingFilter>("pending");
@@ -162,7 +163,7 @@ function AdminConsole() {
       {error ? <p className="mt-3 text-sm font-semibold text-orange">{t(error)}</p> : null}
 
       <div className="mt-6 flex flex-wrap gap-2">
-        {(["listings", "reports", "users", "days"] as const).map((id) => (
+        {(["listings", "reports", "users", "business", "days"] as const).map((id) => (
           <button
             key={id}
             type="button"
@@ -350,6 +351,7 @@ function AdminConsole() {
         </div>
       ) : null}
 
+      {tab === "business" ? <BusinessApplicationsPanel /> : null}
       {tab === "days" ? <SpecialDaysPanel /> : null}
     </div>
   );

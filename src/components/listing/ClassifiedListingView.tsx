@@ -11,6 +11,7 @@ import { ListingShareTrigger } from "@/components/listing/ListingShare";
 import { ListingRegionPanel } from "@/components/listing/ListingRegionPanel";
 import { ListingDescriptionPanel } from "@/components/listing/ListingDescriptionPanel";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { StoreRefCard } from "@/components/business/StoreBits";
 import { classifiedFactRows, classifiedFeatureItems, listingCategoryChain } from "@/lib/listingFacts";
 import { listingSellerLabel } from "@/lib/publicName";
 import { ListingPrintButton } from "@/components/listing/ListingPrint";
@@ -123,6 +124,7 @@ export function ClassifiedListingView({
             <span>·</span>
             <Link href={`/satici/${listing.sellerId}`}>{t("nav.profile")}</Link>
           </div>
+          {listing.store ? <StoreRefCard store={listing.store} /> : null}
           {phone ? (
             <ul className="classified-phones">
               {shop ? (

@@ -107,6 +107,23 @@ export async function moderateAvatarImage(bytes: Buffer, filename = "photo.jpg")
   return { blocked: false as const };
 }
 
+export async function normalizeBusinessLogo(bytes: Buffer) {
+  return sharp(bytes, SHARP_INPUT)
+    .rotate()
+    .resize(512, 512, { fit: "contain", background: { r: 255, g: 255, b: 255, alpha: 1 } })
+    .flatten({ background: "#ffffff" })
+    .webp({ quality: 85 })
+    .toBuffer();
+}
+
+export async function normalizeBusinessCover(bytes: Buffer) {
+  return sharp(bytes, SHARP_INPUT)
+    .rotate()
+    .resize(1600, 500, { fit: "cover", position: "attention" })
+    .webp({ quality: 80 })
+    .toBuffer();
+}
+
 export async function normalizeAvatar(bytes: Buffer) {
   return sharp(bytes, SHARP_INPUT)
     .rotate()

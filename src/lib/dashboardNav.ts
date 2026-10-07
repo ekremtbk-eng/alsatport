@@ -27,6 +27,7 @@ export const DASH_PANELS = [
   "pazarlama",
   "hareket",
   "qr",
+  "kurumsal",
 ] as const;
 
 export type DashPanelId = (typeof DASH_PANELS)[number];
@@ -56,7 +57,10 @@ const FULL_DASH_NAV: DashNode[] = [
     kind: "group",
     id: "ilan",
     labelKey: "dash.g.ilan",
-    children: [{ kind: "item", id: "ilanlarim", labelKey: "dash.ilanlarim" }],
+    children: [
+      { kind: "item", id: "ilanlarim", labelKey: "dash.ilanlarim" },
+      { kind: "item", id: "kurumsal", labelKey: "dash.biz" },
+    ],
   },
   {
     kind: "group",

@@ -16,17 +16,26 @@ import { publicAccountName, verifiedBusinessName } from "@/lib/publicName";
 import { type ListingRef, isLiveRow, liveListingWhere, newPeriod } from "@/lib/listings/lifecycle";
 import { enforcePetSpecs } from "@/lib/listings/petSpecPolicy";
 
+const storeSelect = { select: { status: true, slug: true, name: true, logoUrl: true } } as const;
+
+type StoreRow = Prisma.BusinessAccountGetPayload<typeof storeSelect>;
+
 export type ListingWithRelations = Prisma.ListingGetPayload<{
   include: {
     images: true;
     seller: { include: { profile: true } };
   };
-}>;
+}> & { seller: { business?: StoreRow | null } };
 
-const listingInclude = {
+export const listingInclude = {
   images: { orderBy: [{ isCover: "desc" as const }, { sortOrder: "asc" as const }] },
-  seller: { include: { profile: true as const } },
+  seller: { include: { profile: true as const, business: storeSelect } },
 };
+
+function storeRef(business: StoreRow | null | undefined): Listing["store"] {
+  if (!business || business.status !== "approved") return undefined;
+  return { slug: business.slug, name: business.name, ...(business.logoUrl ? { logo: business.logoUrl } : {}) };
+}
 
 export function toClientListing(row: ListingWithRelations): Listing {
   const images = [...row.images]
@@ -87,6 +96,7 @@ export function toClientListing(row: ListingWithRelations): Listing {
     refurbished: row.refurbished,
     sellerPhone: phone || undefined,
     sellerSince,
+    store: storeRef(row.seller.business),
   };
 }
 

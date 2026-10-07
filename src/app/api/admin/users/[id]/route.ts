@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { writeAudit } from "@/lib/admin/audit";
+import { revokeStoreForUser } from "@/lib/business/store";
 import { isUuid } from "@/lib/ids";
 import type { Role } from "@/lib/security/rbac";
 import { requireAdmin, requireMutatingRequest, revokeUserSessions } from "@/lib/security/session";
@@ -41,6 +42,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
       where: { userId: id },
       data: { businessName: name, businessVerifiedAt: verifiedAt },
     });
+    if (!verifiedAt) await revokeStoreForUser(auth.user.id, id);
   }
   await writeAudit({
     actorId: auth.user.id,

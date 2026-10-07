@@ -23,6 +23,7 @@ import { useAuthModal } from "@/context/AuthModalContext";
 import { isBlockedLiveAnimalListing } from "@/lib/liveAnimalPolicy";
 import { isServiceListing, serviceFirmHref } from "@/lib/serviceFirm";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { StoreRefCard } from "@/components/business/StoreBits";
 import { SellerChatPopup } from "@/components/SellerChatPopup";
 import { SellerRatingBlock } from "@/components/SellerRatingBlock";
 import { SellerReviews } from "@/components/SellerReviews";
@@ -451,6 +452,7 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
               {memberYears > 0 ? <span className="seller-pill">{t("seller.years", { n: memberYears })}</span> : null}
               {listing.sellerVerified ? <span className="seller-pill is-ok">{t("badge.verified")}</span> : null}
             </div>
+            {listing.store ? <StoreRefCard store={listing.store} /> : null}
           </section>
           <SellerReviews sellerId={listing.sellerId} listingId={listing.id} />
           <div className="detail-contact-aside hidden rounded-xl border border-line bg-card p-3 lg:block">{contact}</div>

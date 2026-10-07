@@ -17,6 +17,8 @@ const PROTECTED_PREFIXES = [
   "/bildirimler",
   "/bildirim-ayarlari",
   "/qr",
+  "/kurumsal-hesap",
+  "/isletme-paneli",
 ];
 
 const EMAIL_HOLD_ALLOW = [

@@ -24,7 +24,7 @@ export function sniffImage(bytes: Uint8Array): { mime: string; ext: string } | n
 }
 
 export function isManagedStorageKey(key: string) {
-  return /^(listings|avatars)\//.test(key) && !key.includes("..") && !key.includes("\\");
+  return /^(listings|avatars|business)\//.test(key) && !key.includes("..") && !key.includes("\\");
 }
 
 export function storageKeyFromUrl(url: string) {
@@ -80,6 +80,32 @@ export async function putAvatarImage(userId: string, bytes: Buffer) {
   await fs.writeFile(abs, bytes);
   const publicPath = storageKey.split("/").map(encodeURIComponent).join("/");
   return { storageKey, url: `/api/media/${publicPath}`, mime, byteSize: bytes.length };
+}
+
+export async function putBusinessImage(userId: string, kind: "logo" | "cover", bytes: Buffer) {
+  const storageKey = `business/${userId}/${kind}-${crypto.randomUUID()}.webp`;
+  const mime = "image/webp";
+  if (blobEnabled()) {
+    const blob = await put(storageKey, bytes, {
+      access: "public",
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+      contentType: mime,
+      addRandomSuffix: false,
+    });
+    return { storageKey, url: blob.url };
+  }
+  const abs = path.join(LOCAL_ROOT, ...storageKey.split("/"));
+  await fs.mkdir(path.dirname(abs), { recursive: true });
+  await fs.writeFile(abs, bytes);
+  const publicPath = storageKey.split("/").map(encodeURIComponent).join("/");
+  return { storageKey, url: `/api/media/${publicPath}` };
+}
+
+/** True only for images this user uploaded through the business media endpoint. */
+export function isOwnBusinessImage(userId: string, url: string | null | undefined) {
+  if (!url || !/^[0-9a-f-]{36}$/i.test(userId)) return false;
+  const key = storageKeyFromUrl(url);
+  return new RegExp(`^business/${userId}/(logo|cover)-[0-9a-f-]{36}\\.webp$`, "i").test(key);
 }
 
 export async function putListingImage(userId: string, bytes: Buffer, mime: string, ext: string) {

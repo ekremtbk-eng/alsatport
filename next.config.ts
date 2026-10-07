@@ -40,6 +40,8 @@ const NOINDEX_PATHS = [
   "/qr/:path*",
   "/admin",
   "/admin/:path*",
+  "/kurumsal-hesap",
+  "/isletme-paneli",
   "/paketler",
 ];
 /** Public but thin/duplicate pages: links are followed, the page itself stays out of the index. */
@@ -119,8 +121,7 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
-      { source: "/magazalar", destination: "/", permanent: true },
-      { source: "/magazalar/:path*", destination: "/", permanent: true },
+      { source: "/magazalar/:path+", destination: "/magazalar", permanent: true },
     ];
   },
 };
