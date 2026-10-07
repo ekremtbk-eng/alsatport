@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./business.css";
+import "./smart-search.css";
 import { AppProvider } from "@/context/AppContext";
 import { CookieProvider } from "@/context/CookieContext";
 import { LegalNoticeProvider } from "@/context/LegalNoticeContext";

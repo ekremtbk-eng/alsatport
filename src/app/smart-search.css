@@ -1,0 +1,291 @@
+.hp-ai {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(13rem, 17rem) minmax(0, 1fr);
+  grid-template-areas:
+    "head form"
+    "head chips"
+    "out out";
+  gap: 0.55rem 1rem;
+  align-items: center;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border: 1px solid #bbf7d0;
+  border-radius: 1.1rem;
+  background:
+    radial-gradient(420px 120px at 0% 0%, rgba(187, 247, 208, 0.55), transparent 70%),
+    #fff;
+  box-shadow: 0 16px 36px -26px rgba(5, 150, 105, 0.55);
+}
+.hp-ai-head {
+  grid-area: head;
+  min-width: 0;
+}
+.hp-ai-title {
+  margin: 0;
+  font-size: 1.12rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #064e3b;
+}
+.hp-ai-sub {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: #475569;
+}
+.hp-ai-form {
+  grid-area: form;
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 0.4rem;
+  min-width: 0;
+  height: 3.2rem;
+  padding: 0.3rem;
+  border: 1.5px solid #86efac;
+  border-radius: 0.95rem;
+  background: #fff;
+}
+.hp-ai-form:focus-within {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+}
+.hp-ai-ico {
+  align-self: center;
+  flex: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-left: 0.45rem;
+  color: #059669;
+}
+.hp-ai-form input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 0.95rem;
+  color: #0f172a;
+}
+.hp-ai-form input::placeholder {
+  color: #94a3b8;
+}
+.hp-ai-go {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding-inline: 1.1rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: linear-gradient(180deg, #22c55e, #059669);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.hp-ai-go:disabled {
+  opacity: 0.75;
+  cursor: progress;
+}
+.hp-ai-go:focus-visible,
+.hp-ai-chips button:focus-visible,
+.hp-ai-view:focus-visible {
+  outline: 2px solid #047857;
+  outline-offset: 2px;
+}
+.hp-ai-chips {
+  grid-area: chips;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.hp-ai-chips button {
+  flex: none;
+  padding: 0.32rem 0.7rem;
+  border: 1px solid #d1fae5;
+  border-radius: 999px;
+  background: #f0fdf4;
+  color: #065f46;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.hp-ai-chips button:hover {
+  border-color: #6ee7b7;
+}
+.hp-ai-chips button.is-on {
+  border-color: #059669;
+  background: #059669;
+  color: #fff;
+}
+.hp-ai-out {
+  grid-area: out;
+  min-width: 0;
+}
+.hp-ai-out:empty {
+  display: none;
+}
+.hp-ai-result {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #d1fae5;
+  border-radius: 0.85rem;
+  background: #f7fffb;
+}
+.hp-ai-understood {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #065f46;
+}
+.hp-ai-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hp-ai-tags li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  max-width: 100%;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid #bbf7d0;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.8rem;
+}
+.hp-ai-tags span {
+  color: #64748b;
+  white-space: nowrap;
+}
+.hp-ai-tags b {
+  overflow: hidden;
+  color: #0f172a;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hp-ai-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.hp-ai-count {
+  font-size: 0.92rem;
+  color: #064e3b;
+}
+.hp-ai-view {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.45rem 0.95rem;
+  border-radius: 0.7rem;
+  background: #059669;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+.hp-ai-view:hover {
+  background: #047857;
+}
+.hp-ai-note {
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.75rem;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 0.84rem;
+}
+.hp-ai-note.is-warn {
+  background: #fffbeb;
+  color: #78350f;
+}
+.hp-ai-note a {
+  color: #047857;
+  font-weight: 700;
+}
+
+/* Tablet: stack the copy above the input so the field keeps a usable width. */
+html[data-device="tablet"] .hp-ai {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "head"
+    "form"
+    "chips"
+    "out";
+}
+
+/* Phone (category home): compact card, single-row scrollable chips, no modal. */
+.hp-ai--phone {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "head"
+    "form"
+    "chips"
+    "out";
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 1rem;
+}
+.hp-ai--phone .hp-ai-title {
+  font-size: 0.98rem;
+}
+.hp-ai--phone .hp-ai-sub {
+  font-size: 0.76rem;
+}
+.hp-ai--phone .hp-ai-form {
+  height: 2.9rem;
+}
+.hp-ai--phone .hp-ai-ico {
+  display: none;
+}
+.hp-ai--phone .hp-ai-form input {
+  padding-left: 0.45rem;
+  font-size: 16px;
+}
+.hp-ai--phone .hp-ai-go {
+  padding-inline: 0.75rem;
+  font-size: 0.82rem;
+}
+.hp-ai--phone .hp-ai-chips {
+  flex-wrap: nowrap;
+  margin-inline: -0.75rem;
+  padding: 0 0.75rem 0.15rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.hp-ai--phone .hp-ai-chips::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .hp-ai {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "head"
+      "form"
+      "chips"
+      "out";
+  }
+}
+@media (max-width: 360px) {
+  .hp-ai--phone .hp-ai-go span {
+    font-size: 0.78rem;
+  }
+  .hp-ai--phone .hp-ai-go {
+    padding-inline: 0.6rem;
+  }
+}

@@ -17,6 +17,7 @@ import { childSummary } from "@/components/home/HomeCategoryRail";
 import { useApp } from "@/context/AppContext";
 import { NotificationPanel } from "@/components/NotificationPanel";
 import { Logo } from "@/components/Logo";
+import { SmartSearch } from "@/components/home/SmartSearch";
 
 function labelOf(t: (key: string, vars?: Record<string, string | number>) => string, cat: Category) {
   return catName(t, cat.id, cat.name).trim() || cat.name;
@@ -103,6 +104,8 @@ export function MobileCategoryHome() {
           autoComplete="off"
         />
       </form>
+
+      {!cursor && !query ? <SmartSearch variant="phone" /> : null}
 
       {cursor && !query ? (
         <div className="m-cat-level">

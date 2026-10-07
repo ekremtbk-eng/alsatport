@@ -5,6 +5,7 @@ import { FileText, Headphones, MapPin, Search, ShieldCheck } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SearchSuggest } from "@/components/SearchSuggest";
+import { SmartSearch } from "@/components/home/SmartSearch";
 import { useI18n } from "@/context/I18nContext";
 import { TURKEY_CITIES } from "@/data/turkey";
 import { HOME_HERO_CATEGORIES, HOME_POPULAR_SEARCHES } from "@/data/homeHubs";
@@ -104,6 +105,7 @@ export function HomeHero() {
             </li>
           </ul>
         </div>
+        <SmartSearch />
         <form className="hp-hero-search" onSubmit={goSearch}>
           <label className="hp-hero-cat">
             <span className="sr-only">{t("nav.categories")}</span>
