@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LayoutGrid, List, SlidersHorizontal, X } from "lucide-react";
 import { FilterPanel } from "@/components/FilterPanel";
 import { FilterSheet } from "@/components/FilterSheet";
+import { EstateFilterDialog } from "@/components/EstateFilterDialog";
 import { ListingCard } from "@/components/ListingCard";
 import { ListingGrid } from "@/components/ListingGrid";
 import { ServiceListingRow, serviceRating } from "@/components/ServiceListingRow";
@@ -210,28 +211,43 @@ export function ListingBrowse({
     "trim",
   ]);
 
-  function commit(nextState: FilterState, nextSort = sort, nextView = view, nextPage = 1) {
+  /** Filter changes push a history entry so back/forward walk through them; typing and view tweaks replace. */
+  function commit(nextState: FilterState, nextSort = sort, nextView = view, nextPage = 1, mode: "push" | "replace" = "push") {
     const qs = mergeFilterQuery(searchParams, nextState, {
       sira: nextSort,
       gorunum: nextView,
       sayfa: nextPage,
     });
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    const href = qs ? `${pathname}?${qs}` : pathname;
+    if (mode === "push") router.push(href, { scroll: false });
+    else router.replace(href, { scroll: false });
   }
 
   function setFilter(key: string, value: string) {
     const estate = (filterCat ?? category) && rootOf(filterCat ?? category!).id === "emlak";
-    const fromSchema = fields.some((f) => f.key === key || f.pairKey === key);
-    if (!user && !BASIC.has(key) && !fromSchema && !estate) {
+    const field = fields.find((f) => f.key === key || f.pairKey === key);
+    if (!user && !BASIC.has(key) && !field && !estate) {
       requireAuth("filter");
       return;
     }
+    const typing = field?.kind === "range" || field?.kind === "text";
     setFilters((prev) => {
       const next = applyFilterChange(prev, key, value);
-      commit(next);
+      commit(next, sort, view, 1, typing ? "replace" : "push");
       return next;
     });
   }
+
+  const estateCat = category && !category.filter && rootOf(category).id === "emlak" ? category : null;
+  const [advOpen, setAdvOpen] = useState(false);
+  const estateCountQuery = (draft: FilterState) => {
+    const qs = new URLSearchParams(mergeFilterQuery(searchParams, draft));
+    qs.delete("filter");
+    qs.delete("cat");
+    if (estateCat) qs.set("kategori", estateCat.id);
+    qs.set("count", "1");
+    return qs.toString();
+  };
 
   const sidebarCats = useMemo(() => (category ? [] : categories), [category]);
 
@@ -268,6 +284,7 @@ export function ListingBrowse({
       navRoot={panelCat ? rootOf(panelCat) : undefined}
       catCounts={catCounts}
       listings={variant === "sheet" ? scopedListings : listings}
+      onAdvanced={variant === "aside" && estateCat ? () => setAdvOpen(true) : undefined}
       wordDraft={wordDraft}
       onWordDraft={setWordDraft}
       onPickCategory={
@@ -328,6 +345,10 @@ export function ListingBrowse({
         }}
         activeFilters={active}
         onFilter={() => {
+          if (estateCat) {
+            setAdvOpen(true);
+            return;
+          }
           setSheetCat(category ?? undefined);
           setSheetOpen(true);
         }}
@@ -366,15 +387,18 @@ export function ListingBrowse({
       <FilterChips
         fields={fields}
         state={filters}
-        onRemove={(key) => {
+        onRemove={(key, value) => {
           setFilters((prev) => {
-            const next = applyFilterChange(prev, key, "");
+            const rest = value != null ? (prev[key] ?? "").split(",").filter((v) => v && v !== value).join(",") : "";
+            const next = applyFilterChange(prev, key, rest);
             const field = fields.find((f) => f.key === key);
-            if (field?.pairKey) next[field.pairKey] = "";
+            if (field?.pairKey && value == null) next[field.pairKey] = "";
+            if (key === "keyword") setWordDraft("");
             commit(next);
             return next;
           });
         }}
+        clearLabelKey={estateCat ? "flt.clearAll" : undefined}
         onClear={() => {
           setFilters(emptyFilterState());
           setWordDraft("");
@@ -546,6 +570,21 @@ export function ListingBrowse({
       <FilterSheet open={sheetOpen} onClose={() => setSheetOpen(false)} label={t("cat.filter")}>
         {filterPanel("sheet")}
       </FilterSheet>
+      {estateCat ? (
+        <EstateFilterDialog
+          open={advOpen}
+          fields={fields}
+          state={filters}
+          countQuery={estateCountQuery}
+          onClose={() => setAdvOpen(false)}
+          onApply={(next) => {
+            setAdvOpen(false);
+            setFilters(next);
+            setWordDraft(next.keyword ?? "");
+            commit(next);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

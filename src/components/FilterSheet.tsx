@@ -7,11 +7,13 @@ export function FilterSheet({
   open,
   onClose,
   label,
+  className = "",
   children,
 }: {
   open: boolean;
   onClose?: () => void;
   label: string;
+  className?: string;
   children: React.ReactNode;
 }) {
   const [mounted, setMounted] = useState(false);
@@ -109,7 +111,7 @@ export function FilterSheet({
   return createPortal(
     <div
       ref={rootRef}
-      className="filter-sheet fixed inset-0 z-[140] flex flex-col overflow-hidden overscroll-none"
+      className={`filter-sheet fixed inset-0 z-[140] flex flex-col overflow-hidden overscroll-none ${className}`}
       role="dialog"
       aria-modal="true"
       aria-label={label}

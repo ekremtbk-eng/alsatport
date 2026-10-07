@@ -2,13 +2,26 @@ import type { Category } from "@/data/categories";
 import { findCategory, hrefForCategory, isBeautyJobsCategory, isRenoCategory, isServiceTreeCategory, listingMatchesCategory, parentOf, rootOf, visibleChildren } from "@/data/categories";
 import type { Listing } from "@/data/store";
 import {
+  BALCONY,
   CREDIT,
   DRIVES,
   ENGINE_POWERS,
+  ESTATE_ACCESS,
+  ESTATE_EXTERIOR,
+  ESTATE_HOUSING,
+  ESTATE_INTERIOR,
+  ESTATE_NEIGHBORHOOD,
+  ESTATE_TRANSPORT,
+  ESTATE_VIEW,
+  FACADES,
   FILTER_VEHICLE_FEATURES,
   FLOORS,
+  KITCHEN_TYPES,
   PARKING,
+  PROPERTY_TYPES,
   YES_NO,
+  estateDealFromCategoryId,
+  estateHomeTypeFromCategoryId,
   motoGearProductFromId,
 } from "@/data/listingSchema";
 import {
@@ -27,6 +40,7 @@ import {
   DASHCAM_CH,
   DASHCAM_RES,
   DEAL_TYPES,
+  DEAL_TYPES_HOME,
   DEAL_TYPES_OFFICE,
   DEED_STATUS,
   FLOOR_COUNTS,
@@ -162,12 +176,31 @@ export type FilterField = {
   primary?: boolean;
   /** Compare against the listing's spec value as a whole; text-blob matching only for listings lacking the spec. */
   exact?: boolean;
+  /** Only the listing's own spec (selects/ranges/text) or feature list (multi) decides; no title/text fallback. */
+  strict?: boolean;
+  /** Select that accepts several comma-separated options (OR); rendered as a checklist. */
+  multiPick?: boolean;
+  /** Section in the advanced estate filter dialog. */
+  group?: EstateFilterGroup;
   currencyTabs?: boolean;
   ui?: "chips";
   chipKind?: "tutorSubject" | "tutorLevel" | "tutorPlace";
 };
 
 export type FilterState = Record<string, string>;
+
+export const ESTATE_FILTER_GROUPS = [
+  "basic",
+  "building",
+  "interior",
+  "exterior",
+  "location",
+  "transport",
+  "view",
+  "finance",
+  "other",
+] as const;
+export type EstateFilterGroup = (typeof ESTATE_FILTER_GROUPS)[number];
 
 const CITIES = TURKEY_CITIES.map((c) => c.name);
 const SERVICE_TYPES = ["Keşif", "Montaj", "Tamir", "Nakliye", "Bakım"];
@@ -367,6 +400,105 @@ function hid(id: string, ...needles: string[]) {
   return needles.some((n) => id.includes(n));
 }
 
+/**
+ * Estate filters mirror what "İlan Ver" saves (spec labels from `estateFields`, feature groups from `ESTATE_GROUPS`),
+ * so every control here filters on stored data. Land, commercial and housing nodes get their own sets.
+ */
+function estateFilterFields(id: string): FilterField[] {
+  const land = hid(id, "arsa");
+  const office = !land && (hid(id, "isyeri") || hid(id, "turistik") || (hid(id, "emlak-bina") && !hid(id, "konut")));
+  const home = !land && !office;
+  const dealFixed = Boolean(estateDealFromCategoryId(id));
+  const typeFixed = Boolean(estateHomeTypeFromCategoryId(id));
+
+  const tag = (group: EstateFilterGroup, field: FilterField, primary = false): FilterField => ({
+    ...field,
+    group,
+    ...(primary ? { primary: true } : {}),
+  });
+  const pick = (key: string, labelKey: string, options: string[], specKeys: string[], group: EstateFilterGroup, primary = false) =>
+    tag(group, sel(key, labelKey, options, specKeys, { strict: true, multiPick: true }), primary);
+  const span = (minKey: string, maxKey: string, labelKey: string, specKeys: string[], group: EstateFilterGroup, suffix?: string, primary = false) =>
+    range(minKey, maxKey, labelKey, specKeys, suffix).map((f) => tag(group, { ...f, strict: true }, primary));
+  const feats = (key: string, labelKey: string, options: string[], group: EstateFilterGroup) =>
+    tag(group, { key, kind: "multi", labelKey, options, strict: true });
+
+  const out: FilterField[] = [
+    tag("location", { key: "city", kind: "city", labelKey: "post.city", options: CITIES, searchable: true, preferOpen: true }),
+    tag("location", { key: "district", kind: "district", labelKey: "post.district", dependsOn: "city", searchable: true }),
+    tag("location", {
+      key: "neighborhood",
+      kind: "select",
+      labelKey: "post.neighborhood",
+      specKeys: ["Mahalle"],
+      dependsOn: "district",
+      optionSource: "neighborhoods",
+      searchable: true,
+    }),
+    ...range("priceMin", "priceMax", "flt.price", [], "₺", true).map((f) => tag("basic", f, true)),
+  ];
+
+  if (land) {
+    out.push(
+      ...span("sqmMin", "sqmMax", "flt.sqmLand", ["m²", "m2", "Metrekare"], "basic", "m²", true),
+      pick("zoning", "flt.zoning", ZONING, ["İmar durumu", "İmar"], "basic", true),
+    );
+    if (!dealFixed) out.push(pick("deal", "flt.deal", DEAL_TYPES, ["İlan tipi", "Tip"], "basic", true));
+    out.push(
+      pick("kimden", "flt.kimden", LISTING_FROM, ["Kimden"], "basic", true),
+      pick("swap", "flt.swap", SWAP_YN, ["Takas"], "finance"),
+      feats("hoodFeat", "flt.feat.hood", ESTATE_NEIGHBORHOOD, "location"),
+      feats("transitFeat", "flt.feat.transit", ESTATE_TRANSPORT, "transport"),
+      tag("other", { key: "urgent", kind: "toggle", labelKey: "cat.filter-urgent" }),
+    );
+    return out;
+  }
+
+  out.push(
+    ...span("sqmMin", "sqmMax", "flt.sqmGross", ["m²", "m2", "Brüt m²", "Brut", "Metrekare"], "basic", "m²", true),
+    ...span("sqmNetMin", "sqmNetMax", "flt.sqmNet", ["Net m²"], "basic", "m²", true),
+  );
+  if (home) out.push(pick("rooms", "post.rooms", ROOMS, ["Oda", "Oda sayısı", "Rooms"], "basic", true));
+  if (!dealFixed) {
+    out.push(pick("deal", "flt.deal", office ? DEAL_TYPES_OFFICE : id === "emlak" ? DEAL_TYPES : DEAL_TYPES_HOME, ["İlan tipi", "Tip"], "basic"));
+  }
+  if (home && !typeFixed) out.push(pick("homeType", "flt.homeType", PROPERTY_TYPES, ["Emlak tipi"], "basic"));
+  out.push(pick("bath", "flt.bath", BATHS, ["Banyo", "Bath"], "basic"));
+  if (home) out.push(pick("kitchen", "flt.kitchen", KITCHEN_TYPES, ["Mutfak"], "basic"));
+  out.push(
+    pick("kimden", "flt.kimden", LISTING_FROM, ["Kimden"], "basic", true),
+    pick("age", "post.age", BUILDING_AGES, ["Bina yaşı", "Building age"], "building", true),
+    pick("floorCount", "flt.floorCount", FLOOR_COUNTS, ["Kat sayısı"], "building", true),
+    pick("floor", "post.floor", FLOORS, ["Kat", "Bulunduğu kat", "Floor"], "building", true),
+    pick("heat", "post.heat", HEATING, ["Isıtma", "Isınma", "Heating"], "building", true),
+    pick("elevator", "flt.elevator", YES_NO, ["Asansör"], "building"),
+    pick("parking", "flt.parking", PARKING, ["Otopark"], "building"),
+    pick("site", "flt.site", CREDIT, ["Site içerisinde", "Site"], "building"),
+  );
+  if (home) out.push(tag("building", { key: "siteName", kind: "text", labelKey: "flt.siteName", specKeys: ["Site adı"], strict: true }));
+  out.push(...span("duesMin", "duesMax", "flt.dues", ["Aidat"], "building", "₺"));
+  if (home) out.push(feats("housingFeat", "flt.feat.housing", ESTATE_HOUSING, "building"));
+  out.push(pick("balcony", "flt.balcony", BALCONY, ["Balkon"], "interior"));
+  if (home) out.push(pick("furnished", "flt.furnished", FURNISHED_YN, ["Eşyalı", "Eşya"], "interior"));
+  out.push(
+    feats("inFeat", "flt.feat.in", ESTATE_INTERIOR, "interior"),
+    feats("outFeat", "flt.feat.out", ESTATE_EXTERIOR, "exterior"),
+    pick("facade", "flt.facade", FACADES, ["Cephe"], "location"),
+    feats("hoodFeat", "flt.feat.hood", ESTATE_NEIGHBORHOOD, "location"),
+    feats("transitFeat", "flt.feat.transit", ESTATE_TRANSPORT, "transport"),
+    feats("viewFeat", "flt.feat.view", ESTATE_VIEW, "view"),
+  );
+  if (home) out.push(pick("usage", "flt.usage", USAGE_STATUS, ["Kullanım durumu", "Kullanım"], "finance"));
+  out.push(
+    pick("deed", "flt.deed", DEED_STATUS, ["Tapu durumu", "Tapu"], "finance"),
+    pick("credit", "flt.credit", CREDIT, ["Krediye uygun", "Kredi"], "finance"),
+    pick("swap", "flt.swap", SWAP_YN, ["Takas"], "finance"),
+    feats("accessFeat", "flt.feat.access", ESTATE_ACCESS, "other"),
+    tag("other", { key: "urgent", kind: "toggle", labelKey: "cat.filter-urgent" }),
+  );
+  return out;
+}
+
 function fieldsForCategoryNode(cat: Category): FilterField[] {
   const root = rootOf(cat).id;
   const id = cat.id;
@@ -405,88 +537,7 @@ function fieldsForCategoryNode(cat: Category): FilterField[] {
     return [...vehicleCore(segment), ...extra];
   }
 
-  if (root === "emlak") {
-    const neighborhood: FilterField = {
-      key: "neighborhood",
-      kind: "select",
-      labelKey: "post.neighborhood",
-      specKeys: ["Mahalle"],
-      dependsOn: "district",
-      optionSource: "neighborhoods",
-      searchable: true,
-    };
-    const address: FilterField[] = [
-      { key: "city", kind: "city", labelKey: "post.city", options: CITIES, searchable: true, preferOpen: true },
-      { key: "district", kind: "district", labelKey: "post.district", dependsOn: "city", searchable: true },
-      neighborhood,
-      ...range("priceMin", "priceMax", "flt.price", [], "₺", true),
-    ];
-    const dealOffice = [sel("deal", "flt.deal", DEAL_TYPES_OFFICE, ["İlan tipi", "Tip"], { preferOpen: true })];
-    const home = [
-      sel("rooms", "post.rooms", ROOMS, ["Oda", "Oda sayısı", "Rooms"], { preferOpen: true }),
-      ...range("sqmMin", "sqmMax", "flt.sqmGross", ["m²", "m2", "Brüt m²", "Brut", "Metrekare"], undefined, true),
-      ...range("sqmNetMin", "sqmNetMax", "flt.sqmNet", ["Net m²", "Net"], undefined, true),
-      sel("age", "post.age", BUILDING_AGES, ["Bina yaşı", "Yaş", "Building age"]),
-      sel("floorCount", "flt.floorCount", FLOOR_COUNTS, ["Kat sayısı"]),
-      sel("floor", "post.floor", FLOORS, ["Kat", "Floor", "Bulunduğu kat"]),
-      sel("heat", "post.heat", HEATING, ["Isıtma", "Isınma", "Heating"]),
-      sel("bath", "flt.bath", BATHS, ["Banyo", "Bath"]),
-      sel("balcony", "flt.balcony", ["Var", "Yok", "Fransız", "Teras"], ["Balkon"]),
-      sel("elevator", "flt.elevator", YES_NO, ["Asansör"]),
-      sel("parking", "flt.parking", PARKING, ["Otopark"]),
-      sel("furnished", "flt.furnished", FURNISHED_YN, ["Eşyalı", "Eşya"]),
-      sel("usage", "flt.usage", USAGE_STATUS, ["Kullanım durumu", "Kullanım"]),
-      sel("site", "flt.site", CREDIT, ["Site içerisinde", "Site"]),
-      sel("credit", "flt.credit", CREDIT, ["Krediye uygun", "Kredi"]),
-      sel("deed", "flt.deed", DEED_STATUS, ["Tapu durumu", "Tapu"]),
-      sel("kimden", "flt.kimden", LISTING_FROM, ["Kimden"]),
-      { key: "urgent", kind: "toggle" as const, labelKey: "cat.filter-urgent" },
-    ];
-    if (hid(id, "arsa")) {
-      return [
-        ...address,
-        sel("deal", "flt.deal", DEAL_TYPES, ["İlan tipi", "Tip"], { preferOpen: true }),
-        ...range("sqmMin", "sqmMax", "flt.sqmGross", ["m²", "m2", "Metrekare"]),
-        sel("zoning", "flt.zoning", ZONING, ["İmar", "Ada"]),
-        sel("kimden", "flt.kimden", LISTING_FROM, ["Kimden"]),
-        { key: "urgent", kind: "toggle", labelKey: "cat.filter-urgent" },
-      ];
-    }
-    if (hid(id, "isyeri")) {
-      return [
-        ...address,
-        ...dealOffice,
-        ...range("sqmMin", "sqmMax", "flt.sqmGross", ["m²", "m2", "Brüt m²", "Metrekare"]),
-        ...range("sqmNetMin", "sqmNetMax", "flt.sqmNet", ["Net m²", "Net"]),
-        sel("heat", "post.heat", HEATING, ["Isıtma"]),
-        sel("age", "post.age", BUILDING_AGES, ["Bina yaşı"]),
-        sel("floorCount", "flt.floorCount", FLOOR_COUNTS, ["Kat sayısı"]),
-        sel("floor", "post.floor", FLOORS, ["Kat"]),
-        sel("kimden", "flt.kimden", LISTING_FROM, ["Kimden"]),
-        { key: "urgent", kind: "toggle", labelKey: "cat.filter-urgent" },
-      ];
-    }
-    if (hid(id, "emlak-bina") && !hid(id, "konut")) {
-      return [
-        ...address,
-        ...dealOffice,
-        ...range("sqmMin", "sqmMax", "flt.sqmGross", ["m²", "m2"]),
-        sel("age", "post.age", BUILDING_AGES, ["Bina yaşı"]),
-        sel("floorCount", "flt.floorCount", FLOOR_COUNTS, ["Kat sayısı"]),
-        sel("kimden", "flt.kimden", LISTING_FROM, ["Kimden"]),
-        { key: "urgent", kind: "toggle", labelKey: "cat.filter-urgent" },
-      ];
-    }
-    if (hid(id, "proje")) {
-      return [
-        ...address,
-        sel("rooms", "post.rooms", ROOMS, ["Oda"]),
-        ...range("sqmMin", "sqmMax", "flt.sqmGross", ["m²", "m2"]),
-        sel("kimden", "flt.kimden", LISTING_FROM, ["Kimden"]),
-      ];
-    }
-    return [...address, ...home];
-  }
+  if (root === "emlak") return estateFilterFields(id);
 
   if (root === "shopping") {
     const catalogBrands = extraBrandsFor(cat);
@@ -1264,9 +1315,14 @@ export function listingMatchesDynamicFilters(listing: Listing, state: FilterStat
     if (field.kind === "text") {
       if (field.key === "keyword") continue;
       const wanted = state[field.key];
+      if (wanted && field.strict) {
+        const own = specOf(listing, field.specKeys);
+        if (!own || !norm(own).includes(norm(wanted))) return false;
+        continue;
+      }
       if (wanted && !listingMatchesTextQuery(listing, wanted)) return false;
     }
-    if (field.key === "posted") continue;
+    if (field.key === "posted" || field.key === "neighborhood") continue;
     if (field.key === "paint" && state.paint) {
       const parts = listing.chassis ? Object.values(listing.chassis) : [];
       if (!parts.length) return false;
@@ -1278,6 +1334,13 @@ export function listingMatchesDynamicFilters(listing: Listing, state: FilterStat
     if (field.kind === "select") {
       const wanted = state[field.key];
       if (!wanted) continue;
+      if (field.strict) {
+        const own = specOf(listing, field.specKeys);
+        if (!own) return false;
+        const mine = norm(own);
+        if (!wanted.split(",").some((w) => w && norm(w) === mine)) return false;
+        continue;
+      }
       if (field.exact) {
         const wants = wanted.split(",").filter(Boolean);
         const own = specOf(listing, field.specKeys);
@@ -1318,6 +1381,10 @@ export function listingMatchesDynamicFilters(listing: Listing, state: FilterStat
         continue;
       }
       const bag = new Set((listing.features ?? []).map((x) => x.toLocaleLowerCase("tr")));
+      if (field.strict) {
+        if (!wanted.every((w) => bag.has(w.toLocaleLowerCase("tr")))) return false;
+        continue;
+      }
       const ok = wanted.every((w) => bag.has(w.toLocaleLowerCase("tr")) || textMatch(listing.specs.map((s) => s.label).join(" "), w));
       if (!ok) return false;
     }

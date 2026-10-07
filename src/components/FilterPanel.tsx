@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronLeft, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, Settings2, X } from "lucide-react";
 import { useState } from "react";
 import { CategoryDrill } from "@/components/CategoryDrill";
 import { SearchSelect } from "@/components/SearchSelect";
@@ -198,7 +198,7 @@ function FieldControl({
       />
     );
   }
-  if (field.kind === "multi" || field.key === "kimden") {
+  if (field.kind === "multi" || field.key === "kimden" || field.multiPick) {
     const selected = new Set((state[field.key] ?? "").split(",").filter(Boolean));
     const options = field.options ?? resolvedOptions(field, state);
     return (
@@ -356,7 +356,10 @@ export function FilterPanel({
   onSearch,
   onPickCategory,
   navRoot,
+  onAdvanced,
 }: {
+  /** Opens the advanced estate dialog; the sidebar then shows only fields marked `primary`. */
+  onAdvanced?: () => void;
   fields: FilterField[];
   state: FilterState;
   resultCount: number;
@@ -403,8 +406,14 @@ export function FilterPanel({
     if (field.kind === "range" && field.key.endsWith("Max")) return false;
     return true;
   });
-  const isPrimary = (f: FilterField) => PRIMARY_FIELD_KEYS.has(f.key) || Boolean(f.primary);
-  const primaryFields = extraFields.filter(isPrimary);
+  const advanced = Boolean(onAdvanced) && fields.some((f) => f.group);
+  const isPrimary = (f: FilterField) => (advanced ? Boolean(f.primary) : PRIMARY_FIELD_KEYS.has(f.key) || Boolean(f.primary));
+  const primaryFields = extraFields.filter((f) => isPrimary(f) && !(advanced && f.key === "kimden"));
+  const kimdenField = advanced ? extraFields.find((f) => f.key === "kimden" && f.primary) : undefined;
+  const advancedCount = advanced
+    ? extraFields.filter((f) => f.group && !f.primary && (state[f.key] || (f.pairKey && state[f.pairKey]))).length +
+      (state.keyword ? 1 : 0)
+    : 0;
   const restFields = extraFields.filter((f) => !isPrimary(f));
   const activeCount = countActiveFilters(state);
   const pluginFields = restFields.filter((f) => f.preferOpen || PLUGIN_FIELD_KEYS.has(f.key));
@@ -450,34 +459,40 @@ export function FilterPanel({
     );
   }
 
-  const primary = (
-    <>
-      {primaryFields.map((field) => {
-        const title = fieldTitle(t, field.labelKey);
-        const value =
-          field.key === "priceMin" ? (priceSummary ? `${priceSummary} TL` : undefined)
-          : field.key === "kimden" ? kimdenSummary || undefined
-          : field.kind === "range"
-            ? [state[field.key], field.pairKey ? state[field.pairKey] : ""].filter(Boolean).join(" – ") || undefined
-            : state[field.key] || undefined;
-        return (
-          <details key={field.key} className="flt-acc flt-acc-sheet" open={Boolean(value)}>
-            <summary className="flt-acc-sum">
-              <span className="flt-acc-title">{title}</span>
-              {value ? <span className="flt-acc-val">{value}</span> : null}
-              <ChevronDown className="flt-acc-chev h-4 w-4" />
-            </summary>
-            <div className="flt-acc-body">
-              <FieldControl field={field} fields={fields} state={state} onChange={onChange} hideLabel listings={listings} />
-            </div>
-          </details>
-        );
-      })}
-    </>
-  );
+  const primaryAcc = (field: FilterField) => {
+    const title = fieldTitle(t, field.labelKey);
+    const value =
+      field.key === "priceMin" ? (priceSummary ? `${priceSummary} TL` : undefined)
+      : field.key === "kimden" ? kimdenSummary.replaceAll(",", ", ") || undefined
+      : field.kind === "range"
+        ? [state[field.key], field.pairKey ? state[field.pairKey] : ""].filter(Boolean).join(" – ") || undefined
+        : state[field.key]?.replaceAll(",", ", ") || undefined;
+    return (
+      <details key={field.key} className="flt-acc flt-acc-sheet" open={Boolean(value)}>
+        <summary className="flt-acc-sum">
+          <span className="flt-acc-title">{title}</span>
+          {value ? <span className="flt-acc-val">{value}</span> : null}
+          <ChevronDown className="flt-acc-chev h-4 w-4" />
+        </summary>
+        <div className="flt-acc-body">
+          <FieldControl field={field} fields={fields} state={state} onChange={onChange} hideLabel listings={listings} />
+        </div>
+      </details>
+    );
+  };
+
+  const primary = <>{primaryFields.map(primaryAcc)}</>;
+
+  const advancedButton = advanced ? (
+    <button type="button" className="flt-more-btn flt-adv-btn" onClick={onAdvanced} aria-haspopup="dialog">
+      <Settings2 className="h-4 w-4" aria-hidden />
+      <span>{t("flt.adv.more")}</span>
+      {advancedCount > 0 ? <span className="flt-adv-n">· {advancedCount}</span> : null}
+    </button>
+  ) : undefined;
 
   const plugins =
-    pluginFields.length > 0 ? (
+    !advanced && pluginFields.length > 0 ? (
       <>
         {pluginFields.map((field) => (
           <details key={field.key} className="flt-acc flt-acc-sheet">
@@ -494,7 +509,7 @@ export function FilterPanel({
     ) : null;
 
   const extra =
-    moreFields.length > 0 ? (
+    !advanced && moreFields.length > 0 ? (
       <>{moreFields.map((field) => renderExtraField(field, fields, state, onChange, t, listings))}</>
     ) : null;
 
@@ -556,7 +571,9 @@ export function FilterPanel({
         mappedOnly={state.mappedOnly === "1"}
         draft={draft}
         includeDesc={state.includeDesc === "1"}
-        more={more}
+        more={advanced ? false : more}
+        afterPosted={kimdenField ? primaryAcc(kimdenField) : undefined}
+        moreButton={advancedButton}
         compact={variant === "sheet"}
         resultCount={resultCount}
         onCity={(v) => onChange("city", v)}

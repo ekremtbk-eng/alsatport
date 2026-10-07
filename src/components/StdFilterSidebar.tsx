@@ -73,7 +73,12 @@ export function StdFilterSidebar({
   onSearch,
   onClear,
   tail,
+  afterPosted,
+  moreButton,
 }: {
+  afterPosted?: ReactNode;
+  /** Replaces the inline "more filters" toggle (e.g. a button that opens a dialog). */
+  moreButton?: ReactNode;
   cats?: ReactNode;
   primary?: ReactNode;
   extra?: ReactNode;
@@ -168,6 +173,8 @@ export function StdFilterSidebar({
         </div>
       </SheetAcc>
 
+      {afterPosted}
+
       {more ? (
         <>
           <SheetAcc title={t("acil.map")} open={mappedOnly}>
@@ -196,11 +203,11 @@ export function StdFilterSidebar({
         </>
       ) : null}
 
-      {hasMore || !more ? (
+      {moreButton ?? (hasMore || !more ? (
         <button type="button" className="flt-more-btn" onClick={onMore}>
           {more ? t("flt.lessBtn") : `+ ${t("flt.moreBtn")}`}
         </button>
-      ) : null}
+      ) : null)}
     </>
   );
 

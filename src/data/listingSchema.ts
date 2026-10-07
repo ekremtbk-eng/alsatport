@@ -183,6 +183,7 @@ export const YES_NO = ["Var", "Yok"];
 export const PARKING = ["Açık Otopark", "Kapalı Otopark", "Açık & Kapalı", "Yok"];
 export const CREDIT = ["Evet", "Hayır"];
 export const BALCONY = ["Var", "Yok", "Fransız", "Teras"];
+export const KITCHEN_TYPES = ["Açık (Amerikan)", "Kapalı"];
 export const FLOORS = [
   "Bodrum",
   "Zemin",
@@ -593,12 +594,14 @@ function estateFields(kind: "home" | "land" | "office", categoryId = ""): AttrFi
     ? []
     : [f("deal", "İlan tipi", "select", { options: kind === "land" ? DEAL_TYPES : dealOpts, required: true })];
   const kimden = f("kimden", "Kimden", "select", { options: LISTING_FROM, specLabel: "Kimden" });
+  const swap = f("swap", "Takas", "select", { options: SWAP_YN, specLabel: "Takas" });
   if (kind === "land") {
     return [
       ...deal,
       f("sqm", "m²", "number", { required: true }),
       f("zoning", "İmar durumu", "select", { options: ZONING }),
       kimden,
+      swap,
     ];
   }
   const core: AttrField[] = [
@@ -614,19 +617,23 @@ function estateFields(kind: "home" | "land" | "office", categoryId = ""): AttrFi
     f("floor", "Bulunduğu kat", "select", { options: FLOORS, specLabel: "Kat" }),
     f("heating", "Isıtma", "select", { options: HEATING }),
     f("bath", "Banyo sayısı", "select", { options: BATHS, specLabel: "Banyo" }),
+    f("kitchen", "Mutfak", "select", { options: KITCHEN_TYPES, specLabel: "Mutfak" }),
     f("balcony", "Balkon", "select", { options: BALCONY }),
     f("elevator", "Asansör", "select", { options: YES_NO }),
     f("parking", "Otopark", "select", { options: PARKING }),
     f("furnished", "Eşyalı", "select", { options: FURNISHED_YN, specLabel: "Eşyalı" }),
     f("usage", "Kullanım durumu", "select", { options: USAGE_STATUS, specLabel: "Kullanım durumu" }),
     f("site", "Site içerisinde", "select", { options: CREDIT, specLabel: "Site içerisinde" }),
+    f("siteName", "Site adı", "text", { specLabel: "Site adı" }),
+    f("dues", "Aidat (TL)", "number", { specLabel: "Aidat" }),
     f("credit", "Krediye uygun", "select", { options: CREDIT }),
     f("deed", "Tapu durumu", "select", { options: DEED_STATUS, specLabel: "Tapu durumu" }),
+    swap,
     kimden,
     f("facade", "Cephe", "select", { options: FACADES }),
   ];
   if (kind === "office") {
-    return core.filter((x) => !["rooms", "furnished", "usage"].includes(x.key));
+    return core.filter((x) => !["rooms", "furnished", "usage", "kitchen", "siteName"].includes(x.key));
   }
   return core;
 }

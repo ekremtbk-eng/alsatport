@@ -21,11 +21,19 @@ const FROM_URL: Record<string, string> = {
   seri: "trim",
 };
 
+const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+const KEY_RE = /^[A-Za-z][A-Za-z0-9]{0,31}$/;
+
+export function isSafeFilterKey(key: string) {
+  return KEY_RE.test(key) && !UNSAFE_KEYS.has(key);
+}
+
 export function filtersFromSearchParams(params: URLSearchParams, extra?: FilterState): FilterState {
   const state: FilterState = { ...(extra ?? {}) };
   for (const [rawKey, value] of params.entries()) {
     if (!value || RESERVED.has(rawKey) || META.has(rawKey)) continue;
     const key = FROM_URL[rawKey] ?? rawKey;
+    if (!isSafeFilterKey(key)) continue;
     state[key] = value;
   }
   return state;
@@ -48,8 +56,10 @@ const SERVER_STD_KEYS = new Set(["city", "district", "neighborhood", "posted", "
 export function serverFilterState(params: URLSearchParams, fields: FilterField[]): FilterState {
   const allowed = new Set(SERVER_STD_KEYS);
   const numeric = new Set<string>();
+  const choices = new Map<string, Set<string>>();
   for (const f of fields) {
     allowed.add(f.key);
+    if ((f.kind === "multi" || f.multiPick) && f.options?.length && !f.optionSource) choices.set(f.key, new Set(f.options));
     if (f.kind === "range") {
       numeric.add(f.key);
       if (f.pairKey) {
@@ -60,11 +70,17 @@ export function serverFilterState(params: URLSearchParams, fields: FilterField[]
   }
   const state: FilterState = {};
   for (const [key, raw] of Object.entries(filtersFromSearchParams(params))) {
-    if (!allowed.has(key)) continue;
-    const value = raw.trim().slice(0, 200);
+    if (!allowed.has(key) || !isSafeFilterKey(key)) continue;
+    const opts = choices.get(key);
+    const value = raw.trim().slice(0, opts ? 1200 : 200);
     if (!value) continue;
     if (numeric.has(key)) {
       if (/^\d{1,12}$/.test(value)) state[key] = value;
+      continue;
+    }
+    if (opts) {
+      const kept = [...new Set(value.split(",").map((v) => v.trim()))].filter((v) => opts.has(v)).slice(0, 40);
+      if (kept.length) state[key] = kept.join(",");
       continue;
     }
     state[key] = value;

@@ -162,6 +162,7 @@ export const listingQuerySchema = z.object({
   status: z.enum(["active", "passive"]).optional(),
   sellerId: z.preprocess((v) => (v === "" || v == null ? undefined : v), z.string().regex(UUID_RE).optional()),
   mine: z.enum(["0", "1"]).optional(),
+  count: z.enum(["1"]).optional(),
 });
 
 /** Identity, numbering, lifetime and promotion flags are always assigned on the server. */

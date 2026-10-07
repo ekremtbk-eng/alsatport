@@ -15,6 +15,7 @@ import { parseSearch, readJson } from "@/lib/security/parseBody";
 import { listingCreateBodySchema, listingQuerySchema } from "@/lib/security/schemas";
 import { filterFieldsForCategory, listingMatchesDynamicFilters } from "@/lib/categoryFilters";
 import { serverFilterState } from "@/lib/filterUrl";
+import { isPublicListing } from "@/lib/categoryCounts";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -44,9 +45,9 @@ export async function GET(req: Request) {
     priceMax: Number.isFinite(priceMax) ? priceMax : undefined,
     posted: query.posted,
     status: query.status,
-    viewerId: claims?.sub,
+    viewerId: query.count === "1" ? undefined : claims?.sub,
     sellerId: query.sellerId,
-    mine: mine && !!claims?.sub,
+    mine: mine && !!claims?.sub && query.count !== "1",
   });
   let result = listings;
   if (catHit && !catHit.filter) {
@@ -54,6 +55,7 @@ export async function GET(req: Request) {
     const state = serverFilterState(url.searchParams, fields);
     if (Object.keys(state).length) result = listings.filter((l) => listingMatchesDynamicFilters(l, state, fields));
   }
+  if (query.count === "1") return NextResponse.json({ ok: true, count: result.filter(isPublicListing).length });
   return NextResponse.json({ ok: true, listings: result.map(hideSellerPhone) });
 }
 

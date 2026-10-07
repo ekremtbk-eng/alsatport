@@ -82,7 +82,10 @@ const GENERIC_OPTIONS = new Set([
   "bos", "zemin", "giris", "bahce", "bodrum", "cati", "kadin", "erkek", "karisik", "disi",
 ]);
 /** Fields whose options are mostly numbers or layout words; they are never filled from free text. */
-const SKIP_FIELDS = new Set(["floor", "floorCount", "bath", "balcony", "equip", "shopOpts", "keyword", "urgent", "posted", "elevator"]);
+const SKIP_FIELDS = new Set([
+  "floor", "floorCount", "bath", "balcony", "equip", "shopOpts", "keyword", "urgent", "posted", "elevator",
+  "facade", "kitchen", "swap", "siteName",
+]);
 /** Strong per-category options that also pick the category (e.g. "iPhone" → phones, "Buzağı" → cattle). */
 const INDEX_FIELDS = new Set(["brand", "species", "breed", "subject"]);
 /** When an indexed option exists in several branches, the first listed branch wins. */
