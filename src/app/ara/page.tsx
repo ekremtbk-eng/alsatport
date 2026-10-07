@@ -1,199 +1,44 @@
-"use client";
+import type { Metadata } from "next";
+import { findCategory, hrefForCategory } from "@/data/categories";
+import { pageMetadata } from "@/lib/seo";
+import { SearchPageClient } from "./SearchPageClient";
 
-import { useMemo, useState, Suspense, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Bookmark, BookmarkCheck } from "lucide-react";
-import { useApp } from "@/context/AppContext";
-import { catName, useI18n } from "@/context/I18nContext";
-import {
-  categoryShortcuts,
-  findCategory,
-  hrefForCategory,
-  hrefForJobCategory,
-  hrefForRenoCategory,
-  inferCategoryFromQuery,
-  isBeautyJobsCategory,
-  isServiceTreeCategory,
-  isServiceTreeLanding,
-  listingMatchesCategory,
-  searchCategories,
-} from "@/data/categories";
-import { listingMatchesFilter, listingMatchesTextQuery, parseListingFilter } from "@/lib/listingQuery";
-import { isPublicListing } from "@/lib/categoryCounts";
-import { ListingBrowse } from "@/components/ListingBrowse";
-import { useAuthModal } from "@/context/AuthModalContext";
-import Link from "next/link";
-import { apiGet } from "@/lib/security/client";
-import { listingCategoryChain } from "@/lib/listingFacts";
-import { BreadcrumbNav } from "@/components/BreadcrumbNav";
-import type { Listing } from "@/data/store";
+type Ctx = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
-function SearchInner() {
-  const params = useSearchParams();
-  const router = useRouter();
-  const q = (params.get("q") ?? "").trim();
-  const city = (params.get("city") ?? "").trim() || undefined;
-  const catSlug = (params.get("kategori") ?? params.get("cat") ?? "").trim();
-  const resolvedCat = catSlug ? findCategory(catSlug) : undefined;
-  const filter = parseListingFilter(params.get("filter")) ?? resolvedCat?.filter;
-  const {
-    listings,
-    saveSearch,
-    removeSavedSearch,
-    savedSearches,
-    isSearchSaved,
-  } = useApp();
-  const { t } = useI18n();
-  const { requireAuth } = useAuthModal();
-  const [hint, setHint] = useState("");
-  const [remote, setRemote] = useState<Listing[] | null>(null);
-  const [loading, setLoading] = useState(true);
+const SEARCH_TITLE = "İlan ara · AlsatPort";
+const SEARCH_DESCRIPTION = "AlsatPort'ta kelime, il, ilçe ve kategoriye göre ilan arayın.";
+const VIEW_ONLY = new Set(["gorunum"]);
 
-  useEffect(() => {
-    setRemote(null);
-    setLoading(true);
-    const qs = new URLSearchParams();
-    if (q) qs.set("q", q);
-    if (city) qs.set("city", city);
-    if (resolvedCat && !resolvedCat.filter) qs.set("kategori", resolvedCat.id);
-    else if (catSlug && !resolvedCat) qs.set("kategori", catSlug);
-    let cancelled = false;
-    void apiGet<{ ok?: boolean; listings?: Listing[] }>(`/api/listings?${qs.toString()}`)
-      .then((res) => {
-        if (!cancelled) {
-          const list = Array.isArray(res.listings) ? res.listings : null;
-          setRemote(list);
-          setLoading(false);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [q, city, catSlug, resolvedCat]);
-
-  useEffect(() => {
-    if (filter !== "urgent" && filter !== "h48") return;
-    const next = new URLSearchParams();
-    if (q) next.set("q", q);
-    if (city) next.set("city", city);
-    if (catSlug) next.set("kategori", catSlug);
-    const qs = next.toString();
-    const dest = filter === "urgent" ? "/acil" : "/son-48-saat";
-    router.replace(qs ? `${dest}?${qs}` : dest);
-  }, [filter, q, city, catSlug, router]);
-  const saved = isSearchSaved(q, city);
-  const savedRow = savedSearches.find(
-    (s) =>
-      s.query.trim().toLocaleLowerCase("tr") === q.toLocaleLowerCase("tr") &&
-      (s.city || "") === (city || ""),
-  );
-  const filterCat = categoryShortcuts.find((c) => c.filter === filter);
-  const inferred = !catSlug && !filter ? inferCategoryFromQuery(q) : undefined;
-  const pickedCat = resolvedCat ?? filterCat ?? inferred;
-  const catHits = q ? searchCategories(q).slice(0, 8) : [];
-
-  useEffect(() => {
-    if (pickedCat && isBeautyJobsCategory(pickedCat)) {
-      router.replace(hrefForJobCategory(pickedCat));
-    } else if (pickedCat && isServiceTreeCategory(pickedCat) && !isServiceTreeLanding(pickedCat)) {
-      router.replace(hrefForRenoCategory(pickedCat));
-    }
-  }, [pickedCat, router]);
-
-  const baseList = useMemo(() => {
-    const source = remote ?? listings;
-    const needle = q.toLocaleLowerCase("tr");
-    return source.filter((l) => {
-      if (!isPublicListing(l)) return false;
-      if (!listingMatchesFilter(l, filter)) return false;
-      if (pickedCat && !pickedCat.filter && !listingMatchesCategory(l, pickedCat)) return false;
-      if (city && l.city !== city) return false;
-      if (!needle) return true;
-      return listingMatchesTextQuery(l, q);
-    });
-  }, [listings, remote, q, city, filter, pickedCat]);
-
-  function onSave() {
-    if (!requireAuth("member")) return;
-    if (!q && !city) {
-      setHint(t("search.hint.type"));
-      return;
-    }
-    if (saved && savedRow) {
-      removeSavedSearch(savedRow.id);
-      setHint(t("search.hint.out"));
-      return;
-    }
-    saveSearch({ query: q, city });
-    setHint(t("search.hint.in"));
-  }
-
-  const heading = pickedCat ? catName(t, pickedCat.id, pickedCat.name) : t("common.search");
-  const crumbItems = pickedCat
-    ? [
-        { href: "/", label: t("nav.home") },
-        ...listingCategoryChain(pickedCat.id).map((c, i, arr) => ({
-          href: i === arr.length - 1 ? undefined : hrefForCategory(c),
-          label: catName(t, c.id, c.name),
-        })),
-      ]
-    : [
-        { href: "/", label: t("nav.home") },
-        { label: q ? `"${q}"` : t("common.search") },
-      ];
-
-  return (
-    <div className="mx-auto max-w-[1400px] px-3 py-4 lg:px-5">
-      <BreadcrumbNav items={crumbItems} className="hub-crumb mb-3" />
-      <ListingBrowse
-        category={pickedCat}
-        listings={baseList}
-        loading={loading}
-        emptyText={t("search.noneFilters")}
-        heading={
-          <div className="browse-pagehead justify-between">
-                <h1 className="text-lg font-extrabold tracking-tight text-ink">
-                  {city && pickedCat ? t("search.headingCity", { city, name: heading }) : heading}
-                </h1>
-            <button
-              type="button"
-              onClick={onSave}
-              className={`btn-ghost h-10 px-4 text-sm ${saved ? "!border-lime/40 !bg-lime/10 !text-lime" : ""}`}
-            >
-              {saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
-              {saved ? t("common.saved") : t("common.saveSearch")}
-            </button>
-            {hint ? <p className="w-full text-xs font-medium text-ink">{hint}</p> : null}
-          </div>
-        }
-        extra={
-          catHits.length > 0 ? (
-            <div className="browse-extra-cats mb-3 flex gap-2 overflow-auto no-scrollbar">
-              {catHits.map((c) => (
-                <Link key={c.id} href={hrefForCategory(c)} className="shortcut-chip">
-                  {catName(t, c.id, c.name)}
-                </Link>
-              ))}
-            </div>
-          ) : null
-        }
-      />
-    </div>
-  );
+function first(v: string | string[] | undefined) {
+  return (Array.isArray(v) ? v[0] : v)?.trim() ?? "";
 }
 
-function SearchFallback() {
-  const { t } = useI18n();
-  return <div className="p-8 text-ink">{t("common.loading")}</div>;
+/**
+ * `/ara?kategori=<slug>` is the canonical listing page of a leaf category. Keyword searches,
+ * filter/sort combinations and unknown categories stay crawlable for links but out of the index.
+ */
+export async function generateMetadata({ searchParams }: Ctx): Promise<Metadata> {
+  const sp = await searchParams;
+  const keys = Object.keys(sp).filter((k) => first(sp[k]) && !VIEW_ONLY.has(k));
+  if (!keys.length) {
+    return pageMetadata({ title: SEARCH_TITLE, description: SEARCH_DESCRIPTION, path: "/ara" });
+  }
+  const slug = first(sp.kategori) || first(sp.cat);
+  const cat = slug ? findCategory(slug) : undefined;
+  if (!cat || cat.filter) {
+    return pageMetadata({ title: SEARCH_TITLE, description: SEARCH_DESCRIPTION, path: "/ara", index: false, follow: true });
+  }
+  const path = hrefForCategory(cat);
+  const categoryOnly = keys.length === 1 && (keys[0] === "kategori" || keys[0] === "cat");
+  return pageMetadata({
+    title: `${cat.name} ilanları · AlsatPort`,
+    description: `${cat.name} ilanları AlsatPort'ta. Türkiye genelinde güncel ilanlara göz atın.`,
+    path,
+    index: categoryOnly,
+    follow: true,
+  });
 }
 
 export default function SearchPage() {
-  return (
-    <Suspense fallback={<SearchFallback />}>
-      <SearchInner />
-    </Suspense>
-  );
+  return <SearchPageClient />;
 }

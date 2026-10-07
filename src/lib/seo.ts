@@ -55,6 +55,8 @@ export function pageMetadata(input: {
   description: string;
   path: string;
   index?: boolean;
+  /** Only used when `index` is false: lets crawlers follow links on a page kept out of the index. */
+  follow?: boolean;
   images?: { url: string; alt?: string; width?: number; height?: number }[];
   type?: "website" | "article";
   priceAmount?: number;
@@ -74,7 +76,7 @@ export function pageMetadata(input: {
     title: input.title,
     description: input.description,
     alternates: { canonical: url },
-    robots: index ? { index: true, follow: true } : { index: false, follow: false },
+    robots: index ? { index: true, follow: true } : { index: false, follow: input.follow ?? false },
     openGraph: {
       title: input.title,
       description: input.description,
@@ -100,6 +102,24 @@ export function pageMetadata(input: {
         : {}),
     },
   };
+}
+
+const CORPORATE_DESCRIPTIONS: Record<string, string> = {
+  hakkimizda: "AlSatPort hakkında: Türkiye genelinde emlak, vasıta, ikinci el ve hizmet ilanları platformu.",
+  "dunden-bugune": "AlSatPort platform özeti: kuruluştan bugüne ürün ve hizmet gelişimi.",
+  sayilarla: "Sayılarla AlSatPort: kategoriler, şehirler ve platform istatistikleri.",
+  surdurulebilirlik: "AlSatPort sürdürülebilirlik yaklaşımı: ikinci el ekonomisi ve sorumlu tüketim.",
+  "insan-kaynaklari": "AlSatPort insan kaynakları ve açık pozisyonlar.",
+  haberler: "AlSatPort haberleri, duyuruları ve platform güncellemeleri.",
+  iletisim: "AlSatPort iletişim bilgileri ve destek kanalları.",
+};
+
+export function corporatePageMetadata(slug: string, label: string, path: string) {
+  return pageMetadata({
+    title: `${label} · Kurumsal · AlsatPort`,
+    description: CORPORATE_DESCRIPTIONS[slug] ?? `AlSatPort kurumsal: ${label}.`,
+    path,
+  });
 }
 
 export function categoryPath(slug: string) {

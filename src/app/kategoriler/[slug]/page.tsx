@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/JsonLd";
-import { findCategory, visibleChildren } from "@/data/categories";
+import { findCategory, hrefForCategory, visibleChildren } from "@/data/categories";
 import { categoryJsonLd, categoryPath, pageMetadata } from "@/lib/seo";
 import { CategoryDetailClient } from "./CategoryDetailClient";
 
@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: Ctx): Promise<Metadata> {
   return pageMetadata({
     title,
     description,
-    path: categoryPath(decoded),
+    path: cat ? hrefForCategory(cat) : categoryPath(decoded),
     index: Boolean(cat),
   });
 }

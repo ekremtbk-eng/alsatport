@@ -4,6 +4,7 @@ import { isUuid } from "@/lib/ids";
 import { isBlockedLiveAnimalListing } from "@/lib/liveAnimalPolicy";
 import { findListingRecord, toClientListing } from "@/lib/listings/store";
 import { isLiveRow } from "@/lib/listings/lifecycle";
+import { isDemoListingRow, isServiceCategoryId } from "@/lib/seoIndexing";
 import { findCategory } from "@/data/categories";
 import { listingJsonLd, pageMetadata, absoluteAssetUrl } from "@/lib/seo";
 import { formatMoney } from "@/i18n/config";
@@ -35,6 +36,8 @@ export async function generateMetadata({ params }: Ctx): Promise<Metadata> {
     title,
     description,
     path: `/ilan/${id}`,
+    index: !isDemoListingRow(row) && !isServiceCategoryId(row.categoryId),
+    follow: true,
     images: listing.images.slice(0, 4).map((url) => ({
       url: absoluteAssetUrl(url),
       alt: listing.title,
@@ -51,7 +54,7 @@ export default async function ListingDetailPage({ params }: Ctx) {
   let schema: ReturnType<typeof listingJsonLd> | null = null;
   if (isUuid(id)) {
     const row = await findListingRecord(id);
-    if (row && isLiveRow(row)) {
+    if (row && isLiveRow(row) && !isDemoListingRow(row)) {
       const listing = toClientListing(row);
       if (!isBlockedLiveAnimalListing(listing)) {
         const cat = findCategory(listing.categoryId);

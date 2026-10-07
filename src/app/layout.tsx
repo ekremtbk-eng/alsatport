@@ -58,7 +58,6 @@ export const metadata: Metadata = {
     title: LEGAL_BRAND,
     statusBarStyle: "default",
   },
-  alternates: { canonical: origin, languages: { "tr-TR": origin } },
   robots: {
     index: true,
     follow: true,

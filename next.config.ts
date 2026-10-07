@@ -13,6 +13,38 @@ const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
 ];
 
+/** Auth, account and utility screens: never indexed even if a URL leaks into a crawl. */
+const NOINDEX_PATHS = [
+  "/giris",
+  "/kayit",
+  "/welcome",
+  "/sifre-unuttum",
+  "/sifre-sifirla",
+  "/eposta-dogrula",
+  "/hesap-tamamla",
+  "/profil",
+  "/profil/:path*",
+  "/mesajlar",
+  "/mesajlar/:path*",
+  "/favoriler",
+  "/bildirimler",
+  "/bildirim-ayarlari",
+  "/ilanlarim",
+  "/ilanlarim/:path*",
+  "/ilan-ver",
+  "/ilan-ver/:path*",
+  "/odeme",
+  "/odeme/:path*",
+  "/karsilastir",
+  "/qr",
+  "/qr/:path*",
+  "/admin",
+  "/admin/:path*",
+  "/paketler",
+];
+/** Public but thin/duplicate pages: links are followed, the page itself stays out of the index. */
+const NOINDEX_FOLLOW_PATHS = ["/satici/:path*", "/ustalar-hizmetler/firma/:path*"];
+
 const flag = (on: unknown) => (on ? "1" : "");
 const has = (...names: string[]) => names.every((n) => (process.env[n] ?? "").trim() !== "");
 const smtpPass = has("SMTP_PASS") || has("SMTP_PASSWORD") || has("MAIL_PASS");
@@ -75,6 +107,14 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: securityHeaders,
       },
+      ...NOINDEX_PATHS.map((source) => ({
+        source,
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      })),
+      ...NOINDEX_FOLLOW_PATHS.map((source) => ({
+        source,
+        headers: [{ key: "X-Robots-Tag", value: "noindex, follow" }],
+      })),
     ];
   },
   async redirects() {
