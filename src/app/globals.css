@@ -12337,6 +12337,30 @@ html[data-device="phone"] .hp-pop-mobile {
   color: #86efac;
   opacity: 1;
 }
+.ft-ugc {
+  margin: 0.65rem 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 0.6rem;
+  font-size: 0.72rem;
+  font-weight: 450;
+  line-height: 1.6;
+  color: #a7bcb3;
+  text-align: center;
+  text-wrap: pretty;
+  overflow-wrap: break-word;
+}
+html[data-device="phone"] .ft-ugc {
+  font-size: 0.75rem;
+  line-height: 1.55;
+  text-align: start;
+}
+@media (max-width: 767.98px) {
+  html:not([data-device]) .ft-ugc {
+    font-size: 0.75rem;
+    line-height: 1.55;
+    text-align: start;
+  }
+}
 
 @media (max-width: 767.98px) {
   .ft-inner {

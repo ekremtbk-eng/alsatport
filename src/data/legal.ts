@@ -30,6 +30,10 @@ export const LEGAL_CONTROLLER_MISSING: string[] = [
 export const LEGAL_CONTROLLER_READY = LEGAL_CONTROLLER_MISSING.length === 0;
 export const LEGAL_CONTROLLER_WARNING = "Yayına alınmadan önce gerçek veri sorumlusu bilgileri girilmelidir.";
 
+/** Approved legal wording: shown verbatim in every locale. */
+export const LEGAL_UGC_NOTICE =
+  "AlsatPort üzerinde yayımlanan ilanlar, açıklamalar, görseller ve diğer tüm içerikler kullanıcılar tarafından oluşturulmaktadır. Bu içeriklerin doğruluğu, güncelliği, güvenilirliği ve yürürlükteki mevzuata uygunluğu, ilgili ilan sahibi veya kullanıcıların sorumluluğundadır. AlsatPort, aracılık hizmeti sunan bir platform olup, kullanıcı kaynaklı içeriklerden doğabilecek hata, eksiklik veya aykırılıklardan, yasal zorunluluklar saklı kalmak kaydıyla sorumlu tutulamaz.";
+
 /** ISO date (YYYY-MM-DD) of the last legal-text revision. */
 export const LEGAL_LAST_UPDATED = env(process.env.LEGAL_LAST_UPDATED) || "2026-10-06";
 

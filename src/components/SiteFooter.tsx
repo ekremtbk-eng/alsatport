@@ -7,7 +7,7 @@ import { KvkkLink } from "@/components/LegalNoticeModal";
 import { useI18n } from "@/context/I18nContext";
 import { Logo } from "@/components/Logo";
 import { SupportMailLink } from "@/components/SupportMailLink";
-import { LEGAL_INSTAGRAM } from "@/data/legal";
+import { LEGAL_INSTAGRAM, LEGAL_UGC_NOTICE } from "@/data/legal";
 
 export function SiteFooter() {
   const { openPrefs } = useCookies();
@@ -46,6 +46,9 @@ export function SiteFooter() {
           </nav>
           <SupportMailLink />
         </div>
+        <p className="ft-ugc" lang="tr">
+          {LEGAL_UGC_NOTICE}
+        </p>
       </div>
     </footer>
   );
