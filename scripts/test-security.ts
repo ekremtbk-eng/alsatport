@@ -408,6 +408,26 @@ async function main() {
     r = await call("GET", "/api/admin/reports?status=bogus", mfa);
     check("A11", "Admin reports rejects unknown status filter", r.status === 400, `status ${r.status}`);
 
+    r = await call("POST", "/api/admin/test-email", sr, {});
+    check("A12", "Test mail denied for non-admin", r.status === 403, `status ${r.status}`);
+    r = await call("POST", "/api/admin/test-email", mfa, {});
+    check("A13", "Test mail requires fresh step-up", r.status === 403 && r.json.error === "auth.err.stepUp", `status ${r.status} ${String(r.json.error)}`);
+    r = await call("POST", "/api/admin/test-email", null, {}, { cookie: fresh.cookie });
+    check("A14", "Test mail requires CSRF token", r.status === 403 && r.json.error === "auth.err.csrf", `status ${r.status} ${String(r.json.error)}`);
+    r = await call("POST", "/api/admin/test-email", fresh, { to: "someone-else@example.com" });
+    await new Promise((res) => setTimeout(res, 800));
+    const mailAudit = await prisma.auditLog.findFirst({
+      where: { actorId: admin.id, action: { startsWith: "admin.test_mail" } },
+      orderBy: { createdAt: "desc" },
+    });
+    // Local runs have no mail transport, so the authorised call reaches the sender and reports 503.
+    check(
+      "A15",
+      "Test mail passes gates, ignores supplied address, audits without it",
+      r.status === 503 && r.json.error === "auth.err.mail" && !!mailAudit && !JSON.stringify(mailAudit.payload).includes("@"),
+      `status ${r.status} audit=${mailAudit?.action ?? "none"}`,
+    );
+
     const errs = [await call("GET", "/api/listings/not-a-uuid"), await call("POST", "/api/auth/login", await guestCsrf(), "{bad json" as unknown)];
     check("A10", "Error responses leak no stack traces", errs.every((e) => !/at \w+ \(|node_modules|prisma\./i.test(e.text)));
   } finally {

@@ -73,6 +73,7 @@ function AdminConsole() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [q, setQ] = useState("");
   const [error, setError] = useState("");
+  const [mailNote, setMailNote] = useState("");
 
   const load = useCallback(async () => {
     setError("");
@@ -102,6 +103,18 @@ function AdminConsole() {
     const res = await guard(() => apiPatch<{ ok?: boolean; error?: string }>(`/api/admin/reports/${id}`, patch));
     if (!res.ok) setError(res.error ?? "auth.err.server");
     await load();
+  }
+
+  async function sendTestMail() {
+    setMailNote("");
+    const res = await guard(() =>
+      apiPost<{ ok?: boolean; error?: string; maskedEmail?: string; via?: string }>("/api/admin/test-email", {}),
+    );
+    if (!res.ok) {
+      setError(res.error ?? "auth.err.server");
+      return;
+    }
+    setMailNote(`Güvenlik bildirimi şablonu ${res.maskedEmail ?? "adresinize"} gönderildi (${res.via}).`);
   }
 
   async function searchUsers() {
@@ -161,6 +174,13 @@ function AdminConsole() {
         </div>
       ) : null}
       {error ? <p className="mt-3 text-sm font-semibold text-orange">{t(error)}</p> : null}
+      <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-card p-3 text-sm">
+        <span className="text-muted">Mail sistemi: kendi adresinize güvenlik bildirimi şablonuyla test e-postası gönderir.</span>
+        <button type="button" className="btn-ghost h-9 px-3 text-xs" onClick={() => void sendTestMail()}>
+          Test e-postası gönder
+        </button>
+        {mailNote ? <span className="font-semibold text-lime">{mailNote}</span> : null}
+      </div>
 
       <div className="mt-6 flex flex-wrap gap-2">
         {(["listings", "reports", "users", "business", "days"] as const).map((id) => (
