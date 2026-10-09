@@ -4,3 +4,4 @@
 .data
 data/auth-users.json
 data/abuse-signals.json
+android/
