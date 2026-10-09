@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { cache } from "react";
 import { JsonLd } from "@/components/JsonLd";
 import { isUuid } from "@/lib/ids";
@@ -15,6 +16,11 @@ import { ListingDetailClient } from "./ListingDetailClient";
 type Ctx = { params: Promise<{ id: string }> };
 
 const loadListingRow = cache(findListingRecord);
+
+/** In-memory demo ids only exist outside production (see data/store). */
+function isClientOnlyId(id: string) {
+  return process.env.NODE_ENV !== "production" && /^(podium|demo)-/.test(id);
+}
 
 export async function generateMetadata({ params }: Ctx): Promise<Metadata> {
   const { id } = await params;
@@ -57,8 +63,11 @@ export default async function ListingDetailPage({ params }: Ctx) {
   const { id } = await params;
   let schema: ReturnType<typeof listingJsonLd> | null = null;
   let initialListing: Listing | undefined;
+  if (!isUuid(id) && !isClientOnlyId(id)) notFound();
   if (isUuid(id)) {
     const row = await loadListingRow(id);
+    // Missing or soft-deleted. Existing non-live rows still render: owners/admins load them client-side.
+    if (!row) notFound();
     const listing = row && isLiveRow(row) ? toClientListing(row) : null;
     if (row && listing && !isBlockedLiveAnimalListing(listing)) {
       initialListing = hideSellerPhone(listing);

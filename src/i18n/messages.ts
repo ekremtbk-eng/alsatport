@@ -877,6 +877,13 @@ export const MESSAGES = pack({
   "verify.cta": ["Hesabımı kontrol et", "Check my account", "Konto prüfen", "تحقق من حسابي", "Проверить аккаунт"],
 
   "list.notfound": ["İlan bulunamadı.", "Listing not found.", "Anzeige nicht gefunden.", "الإعلان غير موجود.", "Объявление не найдено."],
+  "list.gone": [
+    "İlan bulunamadı veya yayından kaldırılmış.",
+    "This listing was not found or has been removed.",
+    "Die Anzeige wurde nicht gefunden oder entfernt.",
+    "الإعلان غير موجود أو تمت إزالته.",
+    "Объявление не найдено или снято с публикации.",
+  ],
   "list.desc": ["Açıklama", "Description", "Beschreibung", "الوصف", "Описание"],
   "list.no": ["İlan No", "Listing no.", "Anzeigen-Nr.", "رقم الإعلان", "Номер объявления"],
   "list.posted": ["İlan Tarihi", "Posted", "Datum", "تاريخ الإعلان", "Дата"],
