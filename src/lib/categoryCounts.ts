@@ -18,25 +18,44 @@ export function isPublicListing(listing: Listing) {
   return isActiveListing(listing) && !isBlockedLiveAnimalListing(listing) && listingHasCoverPhoto(listing);
 }
 
-export function buildLiveCategoryCounts(listings: Listing[]): Record<string, number> {
+/**
+ * Turns per-category listing totals into tree counts: each listing counts for its own category and every
+ * ancestor, so a root ("Vasıta") equals the sum of its subcategories. Every known category starts at 0.
+ */
+export function rollupCategoryCounts(totals: Iterable<readonly [categoryId: string, n: number]>): Record<string, number> {
   const map: Record<string, number> = {};
   for (const c of allCategoryNodes()) map[c.id] = 0;
-
-  const active = listings.filter(isPublicListing);
-  for (const listing of active) {
-    const cat = findCategory(listing.categoryId);
+  for (const [categoryId, n] of totals) {
+    if (!(n > 0)) continue;
+    const cat = findCategory(categoryId);
     if (!cat) {
-      map[listing.categoryId] = (map[listing.categoryId] ?? 0) + 1;
+      map[categoryId] = (map[categoryId] ?? 0) + n;
       continue;
     }
     const seen = new Set<string>();
     let node: Category | undefined = cat;
     while (node && !seen.has(node.id)) {
       seen.add(node.id);
-      map[node.id] = (map[node.id] ?? 0) + 1;
+      map[node.id] = (map[node.id] ?? 0) + n;
       node = parentOf(node);
     }
   }
+  return map;
+}
+
+/** Shortcut entries ("Acil", "Son 48 saat"…) are listing filters, not tree nodes; counted from loaded listings. */
+export function shortcutCounts(listings: Listing[]): Record<string, number> {
+  const active = listings.filter(isPublicListing);
+  const map: Record<string, number> = {};
+  for (const shortcut of categoryShortcuts) {
+    if (shortcut.filter) map[shortcut.id] = active.filter((l) => listingMatchesFilter(l, shortcut.filter)).length;
+  }
+  return map;
+}
+
+export function buildLiveCategoryCounts(listings: Listing[]): Record<string, number> {
+  const active = listings.filter(isPublicListing);
+  const map = rollupCategoryCounts(active.map((l) => [l.categoryId, 1] as const));
 
   for (const shortcut of categoryShortcuts) {
     if (!shortcut.filter) continue;

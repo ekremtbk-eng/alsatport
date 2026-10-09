@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import { catName, useI18n } from "@/context/I18nContext";
 import { useApp } from "@/context/AppContext";
 import {
-  catalogCount,
   categoryPath,
   formatListingCount,
   parentOf,
@@ -68,8 +67,7 @@ export function CategoryDrill({
   const path = cursor ? categoryPath(cursor) : [];
 
   function countFor(cat: Category) {
-    const live = liveCount(categoryCounts, cat);
-    return live > 0 ? live : catalogCount(cat);
+    return liveCount(categoryCounts, cat);
   }
 
   function choose(cat: Category) {

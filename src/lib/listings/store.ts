@@ -14,6 +14,7 @@ import { deleteStoredObject, isManagedStorageKey, storageKeyFromUrl } from "@/li
 import { resolveListingCoords, validListingCoords } from "@/lib/placeGeo";
 import { publicAccountName, verifiedBusinessName } from "@/lib/publicName";
 import { type ListingRef, isLiveRow, liveListingWhere, newPeriod } from "@/lib/listings/lifecycle";
+import { invalidateCategoryCounts } from "@/lib/listings/categoryCounts";
 import { enforcePetSpecs } from "@/lib/listings/petSpecPolicy";
 
 const storeSelect = { select: { status: true, slug: true, name: true, logoUrl: true } } as const;
@@ -459,6 +460,7 @@ export async function createListing(user: StoredUser, input: ListingInput) {
     });
     return created;
   });
+  invalidateCategoryCounts();
   return { listing: toClientListing(row), ref: listingRef(row) };
 }
 
@@ -570,6 +572,7 @@ export async function updateListingRecord(user: StoredUser, id: string, patch: R
       include: listingInclude,
     });
   });
+  invalidateCategoryCounts();
   return { listing: toClientListing(row), ref: listingRef(row), contentChanged, reactivated };
 }
 
@@ -597,6 +600,7 @@ export async function deleteListingRecord(user: StoredUser, id: string) {
     where: { id },
     data: { deletedAt: new Date(), status: "removed" },
   });
+  invalidateCategoryCounts();
   return { ok: true as const };
 }
 
@@ -618,6 +622,7 @@ export async function renewListingRecord(user: StoredUser, id: string) {
     data: { status: "active", soldAt: null, ...newPeriod() },
   });
   if (!moved.count) return { error: "listing.err.notRenewable" as const, status: 409 };
+  invalidateCategoryCounts();
   const row = await prisma.listing.findUniqueOrThrow({ where: { id }, include: listingInclude });
   return { listing: toClientListing(row), ref: listingRef(row) };
 }
@@ -636,6 +641,7 @@ export async function markListingSold(user: StoredUser, id: string) {
     data: { status: "sold", soldAt: new Date() },
   });
   if (!moved.count) return { error: "listing.err.notSellable" as const, status: 409 };
+  invalidateCategoryCounts();
   const row = await prisma.listing.findUniqueOrThrow({ where: { id }, include: listingInclude });
   return { listing: toClientListing(row), ref: listingRef(existing), wasLive };
 }
@@ -651,6 +657,7 @@ export async function resaleListingRecord(user: StoredUser, id: string) {
     data: { status: "active", soldAt: null, ...newPeriod() },
   });
   if (!moved.count) return { error: "listing.err.notSold" as const, status: 409 };
+  invalidateCategoryCounts();
   const row = await prisma.listing.findUniqueOrThrow({ where: { id }, include: listingInclude });
   return { listing: toClientListing(row), ref: listingRef(row) };
 }

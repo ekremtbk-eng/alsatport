@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import {
-  catalogCount,
   formatListingCount,
   hrefForCategory,
   parentOf,
@@ -35,8 +34,7 @@ export function FilterRenoTree({
   const selected = new Set(selectedIds);
 
   function countOf(cat: Category) {
-    const live = liveCount(categoryCounts, cat);
-    return live > 0 ? live : catalogCount(cat);
+    return liveCount(categoryCounts, cat);
   }
 
   return (

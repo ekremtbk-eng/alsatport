@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Filter, X } from "lucide-react";
 import {
-  catalogCount,
   findCategory,
   formatListingCount,
   hrefForCategory,
@@ -35,9 +34,7 @@ import type { Listing } from "@/data/store";
 
 function HubCount({ cat }: { cat: Category }) {
   const { categoryCounts } = useApp();
-  const live = liveCount(categoryCounts, cat);
-  const n = live > 0 ? live : catalogCount(cat);
-  return <span className="text-[11px] tabular-nums text-muted">({formatListingCount(n)})</span>;
+  return <span className="text-[11px] tabular-nums text-muted">({formatListingCount(liveCount(categoryCounts, cat))})</span>;
 }
 
 function HubNavLink({ cat }: { cat: Category }) {

@@ -29,7 +29,7 @@ import {
   type SavedSearch,
 } from "@/lib/notify";
 import { type AuthResult } from "@/lib/auth";
-import { buildLiveCategoryCounts } from "@/lib/categoryCounts";
+import { buildLiveCategoryCounts, shortcutCounts } from "@/lib/categoryCounts";
 import { isUuid } from "@/lib/ids";
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut, getCsrfToken, resetCsrfToken } from "@/lib/security/client";
 import { listingPatchForProfile, type ListingEntitlementPatch } from "@/lib/entitlements";
@@ -1199,7 +1199,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const unreadNotifications = notifications.filter((n) => !n.read).length;
 
-  const categoryCounts = useMemo(() => buildLiveCategoryCounts(listings), [listings]);
+  const [serverCategoryCounts, setServerCategoryCounts] = useState<Record<string, number> | null>(null);
+  useEffect(() => {
+    if (!hydrated) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      apiGet<{ ok?: boolean; counts?: Record<string, number> }>("/api/categories/counts")
+        .then((res) => {
+          if (!cancelled && res.ok && res.counts) setServerCategoryCounts(res.counts);
+        })
+        .catch(() => undefined);
+    }, 1500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [hydrated, listings]);
+
+  const categoryCounts = useMemo(
+    () =>
+      serverCategoryCounts
+        ? { ...serverCategoryCounts, ...shortcutCounts(listings) }
+        : buildLiveCategoryCounts(listings),
+    [serverCategoryCounts, listings],
+  );
 
   const value = useMemo(
     () => ({

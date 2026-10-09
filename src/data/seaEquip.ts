@@ -23,7 +23,6 @@ export const SEA_EQUIP_GROUPS: {
   slug: string;
   name: string;
   icon: string;
-  count: number;
   aliases?: string[];
   products: string[];
 }[] = [
@@ -32,7 +31,6 @@ export const SEA_EQUIP_GROUPS: {
     slug: "boya-bakim",
     name: "Boya & Bakım",
     icon: "paint",
-    count: 220,
     products: [
       "Bakım Kiti",
       "Epoksi & Fiber Tamir Seti",
@@ -51,7 +49,6 @@ export const SEA_EQUIP_GROUPS: {
     slug: "demirleme-rihtim",
     name: "Demirleme & Rıhtım",
     icon: "anchor",
-    count: 919,
     products: ["Demir", "Demir Zinciri", "Halat", "Iskaça", "Rıhtım Takozu", "Şamandıra", "Usturmaça", "Vinç"],
   },
   {
@@ -59,7 +56,6 @@ export const SEA_EQUIP_GROUPS: {
     slug: "deniz-motorlari",
     name: "Deniz Motorları",
     icon: "zap",
-    count: 4_087,
     aliases: ["deniz-motor"],
     products: ["Dıştan Takma Motor", "İçten Takma Motor", "Saildrive", "Jet Motor", "Çıkma Motor", "Yedek Motor"],
   },
@@ -68,7 +64,6 @@ export const SEA_EQUIP_GROUPS: {
     slug: "dumen-kumanda",
     name: "Dümen & Kumanda",
     icon: "compass",
-    count: 907,
     products: ["Dümen", "Dümen Pompası", "Kumanda", "Direksiyon Sistemi", "Trim Tab"],
   },
   {
@@ -76,7 +71,6 @@ export const SEA_EQUIP_GROUPS: {
     slug: "deniz-elektrik",
     name: "Elektrik",
     icon: "zap",
-    count: 2_192,
     products: ["Akü", "Şarj Cihazı", "İnvertör", "Kablo", "Pano", "Aydınlatma"],
   },
   {
@@ -84,7 +78,6 @@ export const SEA_EQUIP_GROUPS: {
     slug: "deniz-elektronik",
     name: "Elektronik",
     icon: "cpu",
-    count: 997,
     products: ["Telsiz", "AIS", "Otopilot", "Balık Bulucu", "Sensör"],
   },
   {
@@ -92,7 +85,6 @@ export const SEA_EQUIP_GROUPS: {
     slug: "deniz-giyim",
     name: "Giyim",
     icon: "shirt",
-    count: 26,
     products: ["Yağmurluk", "Polar", "Eldiven", "Ayakkabı", "Şapka"],
   },
   {
@@ -100,7 +92,6 @@ export const SEA_EQUIP_GROUPS: {
     slug: "deniz-guvenlik",
     name: "Güvenlik",
     icon: "shield",
-    count: 692,
     products: ["Can Yeleği", "Can Simidi", "Yangın Söndürücü", "Fişek", "EPIRB", "Can Salı"],
   },
   {
@@ -108,7 +99,6 @@ export const SEA_EQUIP_GROUPS: {
     slug: "guverte",
     name: "Güverte",
     icon: "sail",
-    count: 1_474,
     aliases: ["deniz-aksesuar"],
     products: ["Kürek", "SUP", "Tente", "Vinç", "Makara", "Olta"],
   },
@@ -117,7 +107,6 @@ export const SEA_EQUIP_GROUPS: {
     slug: "havalandirma",
     name: "Havalandırma",
     icon: "wind",
-    count: 345,
     products: ["Fan", "Klima", "Havalandırma Kapağı", "Mantar"],
   },
   {
@@ -125,7 +114,6 @@ export const SEA_EQUIP_GROUPS: {
     slug: "hirdavat-tesisat",
     name: "Hırdavat & Tesisat",
     icon: "wrench",
-    count: 416,
     products: ["Vana", "Hortum", "Pompa", "Paslanmaz Civata", "Conta"],
   },
   {
@@ -133,7 +121,6 @@ export const SEA_EQUIP_GROUPS: {
     slug: "kabin-kamara",
     name: "Kabin & Kamara",
     icon: "home",
-    count: 568,
     products: ["Yatak", "Mutfak", "Buzdolabı", "Koltuk", "Aydınlatma"],
   },
   {
@@ -141,7 +128,6 @@ export const SEA_EQUIP_GROUPS: {
     slug: "motor-aksami",
     name: "Motor Aksamı",
     icon: "cog",
-    count: 2_783,
     products: ["Pervane", "Şaft", "Impeller", "Yakıt Filtresi", "Devirdaim", "Conta Seti"],
   },
   {
@@ -149,7 +135,6 @@ export const SEA_EQUIP_GROUPS: {
     slug: "navigasyon",
     name: "Navigasyon",
     icon: "compass",
-    count: 1_111,
     aliases: ["deniz-elektronik-nav"],
     products: ["GPS", "Plotter", "Radar", "Pusula", "Harita"],
   },
