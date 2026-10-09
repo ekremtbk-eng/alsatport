@@ -21,6 +21,13 @@ function optionsOf(field: AttrField, attrs: Record<string, string>, segment: Veh
   return field.options ?? [];
 }
 
+/** Digits with at most one decimal comma (12,5); a typed dot becomes a comma. */
+function decimalInput(raw: string) {
+  const s = raw.replace(/\./g, ",").replace(/[^\d,]/g, "");
+  const i = s.indexOf(",");
+  return i < 0 ? s : `${s.slice(0, i + 1)}${s.slice(i + 1).replace(/,/g, "").slice(0, 2)}`;
+}
+
 function lockHint(dependsOn?: string) {
   if (dependsOn === "brand") return "Önce marka seçin";
   if (dependsOn === "model") return "Önce model seçin";
@@ -73,16 +80,22 @@ export function DynamicAttributeForm({
               <label key={field.key} className="block">
                 <span className="mb-1.5 block text-sm font-semibold text-ink">
                   {field.label}
+                  {field.unit ? ` (${field.unit})` : ""}
                   {field.required ? " *" : ""}
                 </span>
                 <input
                   value={attrs[field.key] ?? ""}
-                  inputMode={field.kind === "number" ? "numeric" : undefined}
+                  inputMode={field.kind === "number" ? (field.decimal ? "decimal" : "numeric") : undefined}
                   disabled={locked}
+                  maxLength={field.kind === "number" ? 12 : 120}
                   onChange={(e) =>
                     onChange(
                       field.key,
-                      field.kind === "number" ? e.target.value.replace(/\D/g, "") : e.target.value,
+                      field.kind !== "number"
+                        ? e.target.value
+                        : field.decimal
+                          ? decimalInput(e.target.value)
+                          : e.target.value.replace(/\D/g, ""),
                     )
                   }
                   placeholder={

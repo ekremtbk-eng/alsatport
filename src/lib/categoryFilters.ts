@@ -34,7 +34,6 @@ import {
   COLORS,
   COMPUTER_BRANDS,
   CONNECTIVITY,
-  DAMAGE_KINDS,
   DAMAGE_RECORDS,
   DASHCAM_BRANDS,
   DASHCAM_CH,
@@ -82,7 +81,6 @@ import {
   PHONE_BRANDS,
   PRODUCT_CONDITIONS,
   rangesOfModel,
-  RENT_PERIODS,
   ROOMS,
   SEA_NAV_BRANDS,
   STORAGES,
@@ -96,16 +94,10 @@ import {
   WATCH_BRANDS,
   YEARS,
   ZONING,
-  CYLINDERS,
-  COOLING_TYPES,
-  FAST_CHARGE,
-  PAYLOADS,
-  GVW,
-  AIRCRAFT_TYPES,
-  BERTHS,
 } from "@/data/listingOptions";
 import { TURKEY_CITIES, districtsOf } from "@/data/turkey";
 import { catalogForSegment } from "@/data/vehicleIndex";
+import { vehicleProfileSpec, type VehicleProfileSpec } from "@/data/vehicleProfiles";
 import type { VehicleModelLine } from "@/data/vehicleCatalog";
 import { mahallelerOf } from "@/data/regionProfiles";
 import { tutorLevelsFor, tutorSubjectsFor, TUTOR_PLACES } from "@/data/tutorOptions";
@@ -182,6 +174,8 @@ export type FilterField = {
   multiPick?: boolean;
   /** Section in the advanced estate filter dialog. */
   group?: EstateFilterGroup;
+  /** Range over a spec that may hold a decimal value (12,5 m). */
+  decimal?: boolean;
   currencyTabs?: boolean;
   ui?: "chips";
   chipKind?: "tutorSubject" | "tutorLevel" | "tutorPlace";
@@ -189,8 +183,25 @@ export type FilterField = {
 
 export type FilterState = Record<string, string>;
 
+/** Sections of the advanced filter dialog (emlak and the vasıta sub-categories); unused ones are hidden. */
 export const ESTATE_FILTER_GROUPS = [
   "basic",
+  "vehicle",
+  "tech",
+  "special",
+  "condition",
+  "safety",
+  "assist",
+  "vInterior",
+  "vExterior",
+  "media",
+  "comfort",
+  "equip",
+  "nav",
+  "deck",
+  "avionics",
+  "cabin",
+  "delivery",
   "building",
   "interior",
   "exterior",
@@ -339,6 +350,96 @@ function carFilterFields(segment: VehicleSegment): FilterField[] {
     sel("kimden", "flt.kimden", VEHICLE_FROM, ["Kimden"], { exact: true }),
     { key: "equip", kind: "multi", labelKey: "flt.equip", options: FILTER_VEHICLE_FEATURES },
   ];
+}
+
+/** Profile spec for a vasıta leaf other than Otomobil; null keeps the Otomobil / root filter set. */
+export function vehicleProfileSpecFor(cat?: Category | null): VehicleProfileSpec | null {
+  if (!cat || cat.id === "vasita" || rootOf(cat).id !== "vasita") return null;
+  return vehicleProfileSpec(vehicleProfileFromCategoryId(cat.id));
+}
+
+/** Categories that use the grouped advanced filter dialog (emlak and the vasıta profile categories). */
+export function hasAdvancedFilters(cat?: Category | null) {
+  if (!cat || cat.filter) return false;
+  return rootOf(cat).id === "emlak" || vehicleProfileSpecFor(cat) != null;
+}
+
+/**
+ * Filters for a vasıta profile category, generated from the same spec list as the "İlan Ver" form so every control
+ * filters on a value the form stores (spec label + older aliases, or the listing's feature list).
+ */
+function vehicleProfileFilterFields(spec: VehicleProfileSpec): FilterField[] {
+  const segment = spec.segment;
+  const out: FilterField[] = [
+    ...range("priceMin", "priceMax", "flt.price", [], "₺", true).map((f) => ({ ...f, group: "basic" as const, primary: true })),
+    { key: "city", kind: "city", labelKey: "post.city", options: CITIES, searchable: true, preferOpen: true, group: "location" },
+    { key: "district", kind: "district", labelKey: "post.district", dependsOn: "city", searchable: true, group: "location" },
+  ];
+  for (const def of spec.fields) {
+    const fl = def.filter;
+    if (!fl) continue;
+    const key = fl.key ?? def.key;
+    const labelKey = fl.labelKey ?? def.label;
+    const specKeys = [def.specLabel, ...(def.aliases ?? [])];
+    const mode = fl.mode ?? (def.kind === "number" ? "range" : def.kind === "text" ? "text" : "select");
+    const base: Partial<FilterField> = { group: fl.group, strict: true, ...(fl.primary ? { primary: true, preferOpen: true } : {}) };
+    if (mode === "range") {
+      const unit = def.unit || undefined;
+      out.push(
+        ...range(`${key}Min`, `${key}Max`, labelKey, specKeys, unit, Boolean(fl.primary)).map((f) => ({
+          ...f,
+          ...base,
+          ...(def.decimal ? { decimal: true } : {}),
+        })),
+      );
+      continue;
+    }
+    if (mode === "text") {
+      out.push({ key, kind: "text", labelKey, specKeys, ...base });
+      continue;
+    }
+    if (def.optionSource === "vehicleModels" || def.optionSource === "vehiclePackages") {
+      out.push({
+        key,
+        kind: "select",
+        labelKey,
+        specKeys,
+        ...base,
+        dependsOn: def.optionSource === "vehicleModels" ? "brand" : "model",
+        optionSource: def.optionSource,
+        catalogKind: segment,
+        searchable: true,
+      });
+      continue;
+    }
+    if (def.optionSource === "vehicleEngines") {
+      out.push({
+        key,
+        kind: "select",
+        labelKey,
+        specKeys,
+        ...base,
+        options: catalogValues(segment, (l) => l.engines).sort(engineOrder),
+        optionSource: "vehicleEngines",
+        catalogKind: segment,
+        searchable: true,
+      });
+      continue;
+    }
+    if (def.kind === "search") {
+      out.push({ key, kind: "select", labelKey, specKeys, ...base, options: def.options ?? [], catalogKind: segment, searchable: true });
+      continue;
+    }
+    out.push({ key, kind: "select", labelKey, specKeys, ...base, options: def.options ?? [], multiPick: true });
+  }
+  if (spec.chassis) {
+    out.push(sel("paint", "flt.paint", PAINT_FILTER_OPTIONS, [], { group: "condition", preferOpen: true }));
+  }
+  for (const g of spec.groups) {
+    out.push({ key: `${g.id}Feat`, kind: "multi", labelKey: g.title, options: g.items, strict: true, group: g.id });
+  }
+  out.push({ key: "urgent", kind: "toggle", labelKey: "cat.filter-urgent", group: "other" });
+  return out;
 }
 
 function vehicleCore(segment: VehicleSegment): FilterField[] {
@@ -504,37 +605,11 @@ function fieldsForCategoryNode(cat: Category): FilterField[] {
   const id = cat.id;
 
   if (root === "vasita") {
+    const spec = vehicleProfileSpecFor(cat);
+    if (spec) return vehicleProfileFilterFields(spec);
     const segment = vehicleSegmentFromCategoryId(id);
-    const profile = vehicleProfileFromCategoryId(id);
-    if (profile === "air") {
-      return [
-        sel("craft", "flt.craft", AIRCRAFT_TYPES, ["Tip", "Hava aracı"], { preferOpen: true }),
-        ...range("yearMin", "yearMax", "post.year", ["Yıl", "Year"]),
-        sel("kimden", "flt.kimden", VEHICLE_FROM, ["Kimden"]),
-      ];
-    }
-    const extra: FilterField[] = [];
-    if (profile === "ev") extra.push(sel("charge", "flt.charge", FAST_CHARGE, ["Şarj", "Hızlı şarj"]));
-    if (profile === "moto" || profile === "atv" || profile === "utv") {
-      extra.push(
-        sel("cylinders", "flt.cylinders", CYLINDERS, ["Silindir"]),
-        sel("cooling", "flt.cooling", COOLING_TYPES, ["Soğutma"]),
-      );
-    }
-    if (profile === "van" || profile === "ticari" || profile === "caravan") {
-      extra.push(
-        sel("payload", "flt.payload", PAYLOADS, ["Yük", "Kapasite", "İstihap"]),
-        sel("gvw", "flt.gvw", GVW, ["Azami", "Ağırlık", "GVW"]),
-      );
-    }
-    if (profile === "caravan") extra.push(sel("berths", "flt.berths", BERTHS, ["Yatak"]));
-    if (profile === "rental") extra.push(sel("rentPeriod", "flt.rentPeriod", RENT_PERIODS, ["Süre", "Dönem"]));
-    if (profile === "damaged") extra.push(sel("damageKind", "flt.damageKind", DAMAGE_KINDS, ["Hasar türü"]));
-    if (hid(id, "deniz")) {
-      return [...vehicleCore("deniz"), sel("cond", "post.cond", PRODUCT_CONDITIONS, ["Durum", "Condition"]), ...extra];
-    }
-    if (id !== "vasita" && (segment === "auto" || segment === "suv")) return [...carFilterFields(segment), ...extra];
-    return [...vehicleCore(segment), ...extra];
+    if (id !== "vasita" && (segment === "auto" || segment === "suv")) return carFilterFields(segment);
+    return vehicleCore(segment);
   }
 
   if (root === "emlak") return estateFilterFields(id);
@@ -967,7 +1042,7 @@ export function filterFieldsForCategory(cat?: Category | null): FilterField[] {
     if (proxy && proxy.id !== cat.id) return filterFieldsForCategory(proxy);
   }
   const extra = fieldsForCategoryNode(cat);
-  if (rootOf(cat).id === "emlak") {
+  if (rootOf(cat).id === "emlak" || vehicleProfileSpecFor(cat)) {
     return extra;
   }
   if (cat.id.startsWith("parts-moto") || isSeaEquipCategoryId(cat.id)) {
@@ -1006,10 +1081,7 @@ export function catalogBrandsForCategory(cat?: Category | null): string[] {
   if (!cat) return [];
   if (visibleChildren(cat).length) return [];
   const root = rootOf(cat).id;
-  if (root === "vasita") {
-    if (vehicleProfileFromCategoryId(cat.id) === "air") return [];
-    return brandNamesForSegment(vehicleSegmentFromCategoryId(cat.id));
-  }
+  if (root === "vasita") return brandNamesForSegment(vehicleSegmentFromCategoryId(cat.id));
   if (cat.brands?.length) return [...cat.brands];
   return extraBrandsFor(cat);
 }
@@ -1196,6 +1268,12 @@ function digits(raw?: string) {
   const d = raw.replace(/[^\d]/g, "");
   if (!d) return undefined;
   return Number(d);
+}
+
+/** First number in a spec, reading "," or "." followed by 1-2 digits as decimals ("12,5 m" → 12.5). */
+function decimalOf(raw?: string) {
+  const m = raw?.match(/\d+(?:[.,]\d{1,2}(?!\d))?/);
+  return m ? Number(m[0].replace(",", ".")) : undefined;
 }
 
 function listingYear(listing: Listing) {
@@ -1405,6 +1483,7 @@ export function listingMatchesDynamicFilters(listing: Listing, state: FilterStat
       else if (field.key.startsWith("hours")) value = digits(specOf(listing, field.specKeys));
       else if (field.key.startsWith("sqm")) value = digits(specOf(listing, field.specKeys));
       else if (field.key.startsWith("price")) value = listing.price;
+      else if (field.decimal) value = decimalOf(specOf(listing, field.specKeys));
       else value = digits(specOf(listing, field.specKeys));
       if (!inRange(value, min, max)) return false;
     }

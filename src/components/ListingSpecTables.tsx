@@ -28,6 +28,16 @@ const VEHICLE_TABLE = [
   "Ağırlık",
   "Silindir",
   "Soğutma",
+  "Motosiklet tipi",
+  "Motor tipi",
+  "Batarya kapasitesi",
+  "Tekne",
+  "Uzunluk",
+  "Motor markası",
+  "Motor sayısı",
+  "Tip",
+  "Saat",
+  "Karavan tipi",
   "Kimden",
 ];
 const SERVICE_TABLE = ["Hizmet yeri", "Çalışma", "Süre", "Garanti", "Deneyim", "Fatura", "Yer"];

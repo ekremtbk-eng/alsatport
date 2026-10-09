@@ -16,6 +16,7 @@ import { publicAccountName, verifiedBusinessName } from "@/lib/publicName";
 import { type ListingRef, isLiveRow, liveListingWhere, newPeriod } from "@/lib/listings/lifecycle";
 import { invalidateCategoryCounts } from "@/lib/listings/categoryCounts";
 import { enforcePetSpecs } from "@/lib/listings/petSpecPolicy";
+import { vehicleSpecError } from "@/lib/listings/vehicleSpecPolicy";
 
 const storeSelect = { select: { status: true, slug: true, name: true, logoUrl: true } } as const;
 
@@ -306,7 +307,10 @@ export type ListingInput = {
   status?: Listing["status"];
 };
 
-export function parseListingInput(body: Record<string, unknown> | null): ListingInput | { error: string } {
+export function parseListingInput(
+  body: Record<string, unknown> | null,
+  previous?: { categoryId: string; specs: Listing["specs"] },
+): ListingInput | { error: string } {
   if (!body) return { error: "auth.err.required" };
   const checked = listingCreateBodySchema.safeParse(body);
   if (!checked.success) return { error: "auth.err.required" };
@@ -341,6 +345,8 @@ export function parseListingInput(body: Record<string, unknown> | null): Listing
       : [],
   );
   if (pet.missingRequired) return { error: "post.needSchema" };
+  const vehicleError = vehicleSpecError(categoryId, pet.specs, previous);
+  if (vehicleError) return { error: vehicleError };
   return {
     id: typeof body.id === "string" ? sanitizeText(body.id, 80) : undefined,
     title,
@@ -499,6 +505,9 @@ export async function updateListingRecord(user: StoredUser, id: string, patch: R
     urgent: patch.urgent ?? existing.urgent,
     refurbished: patch.refurbished ?? existing.refurbished,
     status: patch.status ?? (existing.status === "active" ? "active" : "passive"),
+  }, {
+    categoryId: existing.categoryId,
+    specs: Array.isArray(existing.specs) ? (existing.specs as Listing["specs"]) : [],
   });
   if ("error" in parsed) return { error: parsed.error, status: 400 };
   if (imagesProvided) {

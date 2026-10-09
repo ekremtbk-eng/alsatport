@@ -8,8 +8,24 @@ import {
   VAN_CATALOG,
   type FleetBrand,
 } from "./vehicleFleets";
+import { AIR_CATALOG, ATV_CATALOG, CARAVAN_CATALOG, MOTO_EXTRA_CATALOG, UTV_CATALOG } from "./vehicleFleetsExtra";
 
-export type VehicleSegment = "auto" | "suv" | "ev" | "moto" | "van" | "ticari" | "deniz" | "atv";
+export type VehicleSegment =
+  | "auto"
+  | "suv"
+  | "ev"
+  | "moto"
+  | "van"
+  | "ticari"
+  | "deniz"
+  | "atv"
+  | "utv"
+  | "air"
+  | "caravan"
+  | "classic";
+
+/** Controlled escape value for brands/models missing from a catalog (never offered for Otomobil). */
+export const VEHICLE_OTHER = "Diğer";
 
 export type VehicleProfile =
   | "auto"
@@ -144,13 +160,29 @@ export function vehicleSegmentFromCategoryId(id?: string): VehicleSegment {
   if (!isVasitaScope(s)) return "auto";
   const profile = vehicleProfileFromCategoryId(id);
   if (profile === "moto") return "moto";
-  if (profile === "atv" || profile === "utv") return "atv";
+  if (profile === "atv") return "atv";
+  if (profile === "utv") return "utv";
+  if (profile === "air") return "air";
   if (profile === "deniz") return "deniz";
-  if (profile === "van" || profile === "caravan") return "van";
+  if (profile === "caravan") return "caravan";
+  if (profile === "classic") return "classic";
+  if (profile === "van") return "van";
   if (profile === "ticari") return "ticari";
   if (profile === "suv") return "suv";
   if (profile === "ev") return "ev";
   return "auto";
+}
+
+/** Appends the controlled "Diğer" model to every brand and a "Diğer" brand; packages stay empty for both. */
+function withOther(catalog: VehicleBrand[]): VehicleBrand[] {
+  const other = { name: VEHICLE_OTHER, packages: [], engines: [], bodies: [], ranges: [] } as VehicleModelLine;
+  const brands = catalog.map((b) => {
+    if (b.models.some((m) => m.name === VEHICLE_OTHER)) return b;
+    const models = [...b.models, other];
+    return { ...b, models, series: models.map((m) => ({ name: m.name, models: m.packages })) };
+  });
+  brands.push({ name: VEHICLE_OTHER, models: [other], series: [{ name: VEHICLE_OTHER, models: [] }] });
+  return brands;
 }
 
 export function catalogForSegment(segment: VehicleSegment = "auto"): VehicleBrand[] {
@@ -158,28 +190,42 @@ export function catalogForSegment(segment: VehicleSegment = "auto"): VehicleBran
   let cat: VehicleBrand[];
   switch (segment) {
     case "suv":
-      cat = subset(VEHICLE_BRANDS, (m) => m.bodies.some((b) => /suv|pickup|arazi/i.test(b)));
+      cat = withOther(subset(VEHICLE_BRANDS, (m) => m.bodies.some((b) => /suv|pickup|arazi/i.test(b))));
       break;
     case "ev":
-      cat = mergeCatalogs(
-        enhanceEv(subset(VEHICLE_BRANDS, (m) => m.engines.some((e) => /elektrik|kwh/i.test(e)))),
-        enhanceEv(asCatalog(EV_EXTRA_CATALOG)),
+      cat = withOther(
+        mergeCatalogs(
+          enhanceEv(subset(VEHICLE_BRANDS, (m) => m.engines.some((e) => /elektrik|kwh/i.test(e)))),
+          enhanceEv(asCatalog(EV_EXTRA_CATALOG)),
+        ),
       );
       break;
     case "moto":
-      cat = asCatalog(MOTO_CATALOG);
+      cat = withOther(mergeCatalogs(asCatalog(MOTO_CATALOG), asCatalog(MOTO_EXTRA_CATALOG)));
       break;
     case "atv":
-      cat = asCatalog(MOTO_CATALOG);
+      cat = withOther(asCatalog(ATV_CATALOG));
+      break;
+    case "utv":
+      cat = withOther(asCatalog(UTV_CATALOG));
+      break;
+    case "air":
+      cat = withOther(asCatalog(AIR_CATALOG));
+      break;
+    case "caravan":
+      cat = withOther(asCatalog(CARAVAN_CATALOG));
+      break;
+    case "classic":
+      cat = withOther(VEHICLE_BRANDS);
       break;
     case "van":
-      cat = asCatalog(VAN_CATALOG);
+      cat = withOther(asCatalog(VAN_CATALOG));
       break;
     case "ticari":
-      cat = asCatalog(TICARI_CATALOG);
+      cat = withOther(mergeCatalogs(asCatalog(TICARI_CATALOG), asCatalog(VAN_CATALOG)));
       break;
     case "deniz":
-      cat = asCatalog(DENIZ_CATALOG);
+      cat = withOther(asCatalog(DENIZ_CATALOG));
       break;
     default:
       cat = VEHICLE_BRANDS;
@@ -226,6 +272,26 @@ export function bodiesOfModel(brandName?: string, modelName?: string, segment: V
 export function rangesOfModel(brandName?: string, modelName?: string, segment: VehicleSegment = "auto") {
   if (!modelName) return [];
   return findLine(brandName, modelName, segment)?.ranges ?? [];
+}
+
+/**
+ * Server-side cascade check for a submitted vehicle: a catalog brand only accepts its own models, and a model with
+ * listed packages only accepts those. Values outside the catalog brand list are left to the caller (old listings).
+ */
+export function vehicleComboError(
+  segment: VehicleSegment,
+  input: { brand?: string; model?: string; trim?: string },
+): "model" | "trim" | null {
+  const b = findBrand(input.brand, segment);
+  if (!b) return null;
+  if (input.model) {
+    const line = findLine(input.brand, input.model, segment);
+    if (!line) return "model";
+    if (input.trim && line.packages.length && !line.packages.some((p) => p.toLocaleLowerCase("tr") === input.trim!.toLocaleLowerCase("tr"))) {
+      return "trim";
+    }
+  }
+  return null;
 }
 
 export function seriesOfBrand(brandName?: string, segment: VehicleSegment = "auto") {

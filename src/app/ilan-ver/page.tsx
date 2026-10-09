@@ -17,6 +17,9 @@ import { parseListingPrice } from "@/lib/listingPrice";
 import { reconcileEntitlements } from "@/lib/entitlements";
 import { EntitlementStatus } from "@/components/EntitlementStatus";
 import {
+  attrValueFromSpec,
+  dependentAttrKeys,
+  missingRequiredAttrs,
   emptyChassis,
   estateDealFromCategoryId,
   estateHomeTypeFromCategoryId,
@@ -159,7 +162,7 @@ export default function PostListingPage() {
     const nextAttrs: Record<string, string> = {};
     for (const f of sch.fields) {
       const hit = editing.specs.find((s) => s.label === f.specLabel || s.label === f.label);
-      if (hit) nextAttrs[f.key] = hit.value;
+      if (hit) nextAttrs[f.key] = sch.vehicleProfile ? attrValueFromSpec(f, hit.value) : hit.value;
     }
     setType(typeFromCategoryId(editing.categoryId));
     setCategoryId(editing.categoryId);
@@ -340,7 +343,8 @@ export default function PostListingPage() {
         engine: ["body", "range", "year"],
         body: ["year"],
       };
-      for (const child of cascade[key] ?? []) next[child] = "";
+      const children = schema.vehicleProfile ? dependentAttrKeys(schema, key) : (cascade[key] ?? []);
+      for (const child of children) next[child] = "";
       return next;
     });
   }
@@ -391,7 +395,9 @@ export default function PostListingPage() {
     if (!district) return t("post.needDist");
     const banned = moderateListingDraft({ title, description, categoryId, images });
     if (banned.blocked) return t(banned.reason ?? "mod.animal");
-    const missing = schema.fields.filter((f) => f.required && !attrs[f.key]?.trim());
+    const missing = schema.vehicleProfile
+      ? missingRequiredAttrs(schema, attrs)
+      : schema.fields.filter((f) => f.required && !attrs[f.key]?.trim());
     if (missing.length) return t("post.needSchema");
     return "";
   }

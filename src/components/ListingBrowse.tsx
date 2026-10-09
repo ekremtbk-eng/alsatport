@@ -33,6 +33,7 @@ import {
   countActiveFilters,
   emptyFilterState,
   filterFieldsForCategory,
+  hasAdvancedFilters,
   listingMatchesDynamicFilters,
   type FilterState,
 } from "@/lib/categoryFilters";
@@ -238,7 +239,7 @@ export function ListingBrowse({
     });
   }
 
-  const estateCat = category && !category.filter && rootOf(category).id === "emlak" ? category : null;
+  const estateCat = category && hasAdvancedFilters(category) ? category : null;
   const [advOpen, setAdvOpen] = useState(false);
   const estateCountQuery = (draft: FilterState) => {
     const qs = new URLSearchParams(mergeFilterQuery(searchParams, draft));
@@ -573,6 +574,7 @@ export function ListingBrowse({
       {estateCat ? (
         <EstateFilterDialog
           open={advOpen}
+          titleKey={rootOf(estateCat).id === "vasita" ? "flt.adv.titleVehicle" : undefined}
           fields={fields}
           state={filters}
           countQuery={estateCountQuery}

@@ -22,6 +22,8 @@ type T = (key: string, vars?: Record<string, string | number>) => string;
 /** Keys the dialog owns besides the schema fields; everything else in the URL state is left untouched. */
 const EXTRA_KEYS: Partial<Record<EstateFilterGroup, string[]>> = { basic: ["posted"], other: ["keyword"] };
 
+const LOCK_HINTS: Record<string, string> = { district: "flt.districtFirst", brand: "flt.brandFirst", model: "flt.modelFirst" };
+
 function fold(s: string) {
   return s.toLocaleLowerCase("tr").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
@@ -160,7 +162,7 @@ function FieldBlock({
         value={draft[field.key] ?? ""}
         options={options}
         disabled={locked}
-        placeholder={locked ? t(field.dependsOn === "district" ? "flt.districtFirst" : "flt.cityFirst") : t("flt.any")}
+        placeholder={locked ? t(LOCK_HINTS[field.dependsOn ?? ""] ?? "flt.cityFirst") : t("flt.any")}
         anyLabel={t("flt.any")}
         onChange={(v) => set(field.key, v)}
       />
@@ -211,10 +213,12 @@ export function EstateFilterDialog({
   countQuery,
   onApply,
   onClose,
+  titleKey = "flt.adv.title",
 }: {
   open: boolean;
   fields: FilterField[];
   state: FilterState;
+  titleKey?: string;
   /** Query string for `/api/listings` (with `count=1`) for a draft state; the same filter path as the results. */
   countQuery: (draft: FilterState) => string;
   onApply: (next: FilterState) => void;
@@ -341,7 +345,7 @@ export function EstateFilterDialog({
       : t("flt.adv.showAny");
 
   return (
-    <FilterSheet open={open} onClose={onClose} label={t("flt.adv.title")} className="is-adv">
+    <FilterSheet open={open} onClose={onClose} label={t(titleKey)} className="is-adv">
       <div className="adv" data-step={needle ? "options" : step}>
         <header className="adv-head">
           <button
@@ -353,7 +357,7 @@ export function EstateFilterDialog({
             <ArrowLeft className="h-5 w-5" aria-hidden />
           </button>
           <div className="adv-head-txt">
-            <h2>{t("flt.adv.title")}</h2>
+            <h2>{t(titleKey)}</h2>
             <p aria-live="polite">{count != null && !counting ? t("flt.adv.resultN", { n: count.toLocaleString("tr-TR") }) : "\u00a0"}</p>
           </div>
           <button type="button" className="adv-x" aria-label={t("common.close")} onClick={onClose}>

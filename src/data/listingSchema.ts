@@ -76,8 +76,15 @@ import {
   ZONING,
   kimdenOptionsForRoot,
   VEHICLE_FROM,
+  bodiesOfModel,
+  enginesOfModel,
+  modelsOfBrand,
+  packagesOfModel,
+  rangesOfModel,
 } from "@/data/listingOptions";
 import { TUTOR_PLACES, tutorLevelsFor, tutorSubjectsFor } from "@/data/tutorOptions";
+import { VEHICLE_EXTERIOR, VEHICLE_INTERIOR, VEHICLE_MEDIA, VEHICLE_SAFETY } from "@/data/vehicleEquipment";
+import { vehicleProfileSpec, type VehicleSpecDef } from "@/data/vehicleProfiles";
 import { PET_CAGE_BRANDS, PET_FOOD_BRANDS } from "@/data/filterCatalog";
 import {
   LIVESTOCK_FROM,
@@ -109,6 +116,10 @@ export type AttrField = {
   optionSource?: CascadeSource;
   catalogKind?: VehicleSegment;
   searchable?: boolean;
+  /** Shown after number values (km, kWh, ₺ …); the stored spec keeps it so detail pages read naturally. */
+  unit?: string;
+  /** Number field that accepts one decimal separator (e.g. 12,5 m). */
+  decimal?: boolean;
 };
 
 export type FeatureGroup = {
@@ -123,7 +134,25 @@ export type ListingSchema = {
   fields: AttrField[];
   groups: FeatureGroup[];
   catalogKind?: VehicleSegment;
+  /** Built from `vehicleProfiles`: field changes clear only fields that depend on them. */
+  vehicleProfile?: boolean;
 };
+
+/** Keys whose options depend (directly or through a chain) on `key`; they are cleared when `key` changes. */
+export function dependentAttrKeys(schema: ListingSchema, key: string) {
+  const out: string[] = [];
+  const queue = [key];
+  while (queue.length) {
+    const parent = queue.shift();
+    for (const field of schema.fields) {
+      if (field.dependsOn === parent && !out.includes(field.key)) {
+        out.push(field.key);
+        queue.push(field.key);
+      }
+    }
+  }
+  return out;
+}
 
 export type ChassisStatus = "original" | "painted" | "changed" | "local";
 
@@ -202,99 +231,7 @@ export const FLOORS = [
   "Çatı",
 ];
 
-export const VEHICLE_SAFETY = [
-  "ABS",
-  "ESP",
-  "ASR",
-  "Hava Yastığı (Sürücü)",
-  "Hava Yastığı (Yolcu)",
-  "Hava Yastığı (Yan)",
-  "Hava Yastığı (Perde)",
-  "Isofix",
-  "Çocuk Kilidi",
-  "Yokuş Kalkış Desteği",
-  "Yokuş İniş Desteği",
-  "Şerit Takip Sistemi",
-  "Şerit Değiştirme Asistanı",
-  "Kör Nokta Uyarı",
-  "Yorgunluk Tespiti",
-  "Hız Sabitleyici",
-  "Adaptif Cruise Control",
-  "Çarpışma Önleyici",
-  "Park Asistanı",
-  "Geri Görüş Kamerası",
-  "Ön Radar",
-  "Arka Radar",
-  "360° Kamera",
-  "Immobilizer",
-  "Alarm",
-  "Merkezi Kilit",
-];
-
-export const VEHICLE_INTERIOR = [
-  "Deri Koltuk",
-  "Kumaş Koltuk",
-  "Alcantara",
-  "Elektrikli Koltuk",
-  "Isıtmalı Koltuk",
-  "Havalandırmalı Koltuk",
-  "Bellekli Koltuk",
-  "Masajlı Koltuk",
-  "Deri Direksiyon",
-  "Isıtmalı Direksiyon",
-  "Ahşap Kaplama",
-  "Kumaş / Deri Mix",
-  "Elektrikli Camlar",
-  "Otomatik Klima",
-  "Klima",
-  "Start-Stop",
-  "Keyless Go",
-  "Yağmur Sensörü",
-  "Far Sensörü",
-  "Head-Up Display",
-  "Kol Dayama",
-  "Arka Kol Dayama",
-  "Katlanır Koltuk",
-  "3. Sıra Koltuk",
-];
-
-export const VEHICLE_EXTERIOR = [
-  "Xenon Far",
-  "LED Far",
-  "LED Stop",
-  "Sis Farı",
-  "Adaptif Far",
-  "Alaşım Jant",
-  "Çelik Jant",
-  "Sunroof",
-  "Panoramik Cam Tavan",
-  "Elektrikli Ayna",
-  "Isıtmalı Ayna",
-  "Katlanır Ayna",
-  "Park Sensörü (Ön)",
-  "Park Sensörü (Arka)",
-  "Çeki Demiri",
-  "Spoiler",
-  "Cam Tavan",
-  "Gündüz Farı",
-];
-
-export const VEHICLE_MEDIA = [
-  "Dokunmatik Ekran",
-  "Navigasyon",
-  "Bluetooth",
-  "USB",
-  "AUX",
-  "Apple CarPlay",
-  "Android Auto",
-  "CD Çalar",
-  "DVD",
-  "TV",
-  "Hoparlör Sistemi",
-  "Harman Kardon",
-  "Bang & Olufsen",
-  "Kablosuz Şarj",
-];
+export { VEHICLE_EXTERIOR, VEHICLE_INTERIOR, VEHICLE_MEDIA, VEHICLE_SAFETY };
 
 export const ESTATE_INTERIOR = [
   "ADSL",
@@ -1129,6 +1066,60 @@ function petSchema(id: string): ListingSchema {
   return { family: "urun", chassis: false, fields, groups: [] };
 }
 
+function attrFromVehicleDef(def: VehicleSpecDef, segment: VehicleSegment): AttrField {
+  const catalog = def.kind === "search" || def.kind === "cascade";
+  return f(def.key, def.label, def.kind, {
+    specLabel: def.specLabel,
+    ...(def.options ? { options: def.options } : {}),
+    ...(def.required ? { required: true } : {}),
+    ...(def.dependsOn ? { dependsOn: def.dependsOn } : {}),
+    ...(def.optionSource ? { optionSource: def.optionSource } : {}),
+    ...(catalog ? { catalogKind: segment, searchable: true } : {}),
+    ...(def.unit ? { unit: def.unit } : {}),
+    ...(def.decimal ? { decimal: true } : {}),
+  });
+}
+
+/** Numeric part of a stored number spec ("77 kWh" → "77", "12,5 m" → "12,5"); used when editing a listing. */
+export function numberAttrValue(field: Pick<AttrField, "decimal">, raw: string) {
+  const s = raw.trim();
+  if (field.decimal) {
+    const m = s.match(/\d+(?:[.,]\d+)?/);
+    return m ? m[0].replace(".", ",") : "";
+  }
+  return s.replace(/\D/g, "");
+}
+
+/** Value to prefill the edit form from a stored spec. */
+export function attrValueFromSpec(field: AttrField, value: string) {
+  return field.kind === "number" ? numberAttrValue(field, value) : value;
+}
+
+/**
+ * Required fields still empty. A catalog cascade whose options are empty for the current selection (e.g. a model
+ * without listed packages, or "Diğer") is not required, so the form can always be completed.
+ */
+export function missingRequiredAttrs(schema: ListingSchema, attrs: Record<string, string>) {
+  return schema.fields.filter((field) => {
+    if (!field.required || attrs[field.key]?.trim()) return false;
+    if (field.kind === "cascade" && field.optionSource) {
+      const kind = field.catalogKind ?? schema.catalogKind ?? "auto";
+      const opts =
+        field.optionSource === "vehicleModels"
+          ? modelsOfBrand(attrs.brand, kind)
+          : field.optionSource === "vehiclePackages"
+            ? packagesOfModel(attrs.brand, attrs.model, kind)
+            : field.optionSource === "vehicleEngines"
+              ? enginesOfModel(attrs.brand, attrs.model, kind)
+              : field.optionSource === "vehicleBodies"
+                ? bodiesOfModel(attrs.brand, attrs.model, kind)
+                : rangesOfModel(attrs.brand, attrs.model, kind);
+      if (!opts.length) return false;
+    }
+    return true;
+  });
+}
+
 function withKimden(schema: ListingSchema, root: string): ListingSchema {
   if (schema.fields.some((field) => field.key === "kimden")) return schema;
   return {
@@ -1157,6 +1148,17 @@ function buildSchemaForCategoryId(categoryId: string): ListingSchema {
   if (root === "vasita") {
     const segment = vehicleSegmentFromCategoryId(id);
     const profile = vehicleProfileFromCategoryId(id);
+    const spec = id === "vasita" ? null : vehicleProfileSpec(profile);
+    if (spec) {
+      return {
+        family: "vasita",
+        chassis: spec.chassis,
+        fields: spec.fields.map((def) => attrFromVehicleDef(def, spec.segment)),
+        groups: spec.groups.map((g) => ({ id: g.id, title: g.title, items: g.items })),
+        catalogKind: spec.segment,
+        vehicleProfile: true,
+      };
+    }
     const chassis = !["moto", "atv", "utv", "deniz", "air"].includes(profile);
     const groups =
       profile === "deniz" || profile === "air"
@@ -1476,7 +1478,13 @@ export function specsFromAttrs(schema: ListingSchema, attrs: Record<string, stri
     const raw = attrs[field.key]?.trim();
     if (!raw) continue;
     const kmDigits = field.key === "km" ? raw.replace(/\D/g, "") : "";
-    const value = kmDigits ? `${Number(kmDigits).toLocaleString("tr-TR")} km` : raw;
+    let value = kmDigits ? `${Number(kmDigits).toLocaleString("tr-TR")} km` : raw;
+    if (!kmDigits && field.kind === "number" && field.unit !== undefined) {
+      const n = numberAttrValue(field, raw);
+      if (!n) continue;
+      const shown = field.decimal ? n : Number(n).toLocaleString("tr-TR", { useGrouping: field.unit === "₺" || field.unit === "kg" });
+      value = field.unit ? `${shown} ${field.unit}` : shown;
+    }
     specs.push({ label: field.specLabel, value });
   }
   return specs;
@@ -1500,7 +1508,28 @@ export function specsWithChassis(
 export function highlightSpecs(specs: { label: string; value: string }[], family: ListingSchema["family"]) {
   const order =
     family === "vasita"
-      ? ["Yıl", "Km", "Yakıt", "Vites", "Motor gücü", "Motor", "Motor hacmi", "Menzil", "Batarya", "Şarj", "Yük", "Kimden"]
+      ? [
+          "Tip",
+          "Tekne",
+          "Karavan tipi",
+          "Yıl",
+          "Km",
+          "Saat",
+          "Uzunluk",
+          "Yakıt",
+          "Vites",
+          "Motor gücü",
+          "Motor",
+          "Motor hacmi",
+          "Batarya kapasitesi",
+          "Menzil",
+          "Batarya",
+          "Şarj",
+          "Günlük fiyat",
+          "Hasar türü",
+          "Yük",
+          "Kimden",
+        ]
         : family === "emlak"
           ? ["m²", "Oda", "Kat", "Isıtma", "Bina yaşı", "Cephe", "Kimden"]
         : family === "hizmet"
