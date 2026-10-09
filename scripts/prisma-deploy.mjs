@@ -59,7 +59,9 @@ if (onVercel) {
   run("node ./node_modules/tsx/dist/cli.mjs prisma/seed.ts");
 }
 
-if (process.env.SEED_DEMO_LISTINGS === "1") {
+if (onVercel && vercelEnv === "production") {
+  console.log("[prisma-deploy] Demo seed disabled in production.");
+} else if (process.env.SEED_DEMO_LISTINGS === "1") {
   console.log("[prisma-deploy] SEED_DEMO_LISTINGS=1: running demo seed…");
   run("node ./node_modules/tsx/dist/cli.mjs prisma/seed-demo.ts");
 } else {

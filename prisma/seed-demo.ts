@@ -2,6 +2,10 @@ import { createHash, randomBytes } from "node:crypto";
 import { Prisma, PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
+if (process.env.VERCEL_ENV === "production") {
+  console.error("seed-demo: refused. Demo data is never seeded in production.");
+  process.exit(1);
+}
 if (process.env.SEED_DEMO_LISTINGS !== "1") {
   console.error("seed-demo: refused. Set SEED_DEMO_LISTINGS=1 explicitly to create demo sellers/listings.");
   process.exit(1);
