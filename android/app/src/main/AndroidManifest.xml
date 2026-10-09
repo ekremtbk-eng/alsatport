@@ -18,6 +18,7 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:usesCleartextTraffic="false"
         android:theme="@style/Theme.AlsatPort"
+        android:manageSpaceActivity="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
         tools:targetApi="36">
 
         <meta-data
@@ -83,6 +84,18 @@
                 <data android:scheme="https" />
                 <data android:host="alsatport.com" />
             </intent-filter>
+        </activity>
+
+        <!--
+            android-browser-helper's LauncherActivity always publishes a "site settings" shortcut that targets this
+            activity, but the library does not declare it; without this entry the app crashes on start.
+        -->
+        <activity
+            android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity"
+            android:exported="false">
+            <meta-data
+                android:name="android.support.customtabs.trusted.MANAGE_SPACE_URL"
+                android:value="@string/start_url" />
         </activity>
 
         <!-- Hands the splash image to the browser; nothing else is shared. -->
