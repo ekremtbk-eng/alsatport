@@ -13,6 +13,7 @@ import { CookieConsent } from "@/components/CookieConsent";
 import { FlashToast } from "@/components/FlashToast";
 import { LegalNoticeModal } from "@/components/LegalNoticeModal";
 import { JsonLd } from "@/components/JsonLd";
+import { PwaRegister } from "@/components/pwa/PwaRegister";
 import { LEGAL_BRAND } from "@/data/legal";
 import { REDUCED_MOTION_BOOT } from "@/lib/reducedMotion";
 import {
@@ -112,7 +113,7 @@ export default async function RootLayout({
         <script
           nonce={nonce}
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var p=JSON.parse(localStorage.getItem("alsatport-i18n-v1")||"{}");var m={tr:"tr",en:"en",de:"de",ar:"ar",ru:"ru"};if(p.locale&&m[p.locale]){document.documentElement.lang=m[p.locale];document.documentElement.dir=p.locale==="ar"?"rtl":"ltr";}}catch(e){}try{var w=window.innerWidth;var c=window.matchMedia("(pointer: coarse)").matches||(navigator.maxTouchPoints||0)>0;var d=w<768?"phone":(w<1024||(c&&w<1280)?"tablet":"desktop");var h=document.documentElement;h.dataset.device=d;h.classList.add("is-"+d);}catch(e){}${REDUCED_MOTION_BOOT}})();`,
+            __html: `(function(){try{var p=JSON.parse(localStorage.getItem("alsatport-i18n-v1")||"{}");var m={tr:"tr",en:"en",de:"de",ar:"ar",ru:"ru"};if(p.locale&&m[p.locale]){document.documentElement.lang=m[p.locale];document.documentElement.dir=p.locale==="ar"?"rtl":"ltr";}}catch(e){}try{var w=window.innerWidth;var c=window.matchMedia("(pointer: coarse)").matches||(navigator.maxTouchPoints||0)>0;var d=w<768?"phone":(w<1024||(c&&w<1280)?"tablet":"desktop");var h=document.documentElement;h.dataset.device=d;h.classList.add("is-"+d);}catch(e){}try{window.addEventListener("beforeinstallprompt",function(e){e.preventDefault();window.__apInstall=e;window.dispatchEvent(new Event("ap-installable"));});window.addEventListener("appinstalled",function(){window.__apInstall=null;window.__apInstalled=true;window.dispatchEvent(new Event("ap-installable"));});}catch(e){}${REDUCED_MOTION_BOOT}})();`,
           }}
         />
         <AppProvider>
@@ -124,6 +125,7 @@ export default async function RootLayout({
               <FlashToast />
               <CookieConsent />
               <LegalNoticeModal />
+              <PwaRegister />
             </LegalNoticeProvider>
           </CookieProvider>
           </I18nProvider>

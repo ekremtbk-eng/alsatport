@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Instagram } from "lucide-react";
 import { useCookies } from "@/context/CookieContext";
+import { FooterApps } from "@/components/FooterApps";
 import { KvkkLink } from "@/components/LegalNoticeModal";
 import { useI18n } from "@/context/I18nContext";
 import { Logo } from "@/components/Logo";
 import { SupportMailLink } from "@/components/SupportMailLink";
-import { LEGAL_INSTAGRAM, LEGAL_UGC_NOTICE } from "@/data/legal";
+import { LEGAL_UGC_NOTICE } from "@/data/legal";
 
 export function SiteFooter() {
   const { openPrefs } = useCookies();
@@ -25,12 +25,8 @@ export function SiteFooter() {
             <Link href="/kurumsal/hakkimizda">{t("corp.nav.hakkimizda")}</Link>
             <Link href="/kurumsal/iletisim">{t("corp.nav.iletisim")}</Link>
           </nav>
-          <div className="ft-social">
-            <a href={LEGAL_INSTAGRAM} target="_blank" rel="noopener noreferrer" aria-label="Instagram">
-              <Instagram className="h-4 w-4" />
-            </a>
-          </div>
         </div>
+        <FooterApps />
         <div className="ft-legal">
           <p>{t("footer.copy")}</p>
           <nav aria-label={t("footer.legal")}>

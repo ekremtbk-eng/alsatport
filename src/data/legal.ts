@@ -47,5 +47,16 @@ export function legalUpdatedLabel() {
 
 export const LEGAL_INSTAGRAM = "https://www.instagram.com/alsatport";
 
+export type SocialId = "facebook" | "instagram" | "x" | "linkedin" | "youtube";
+
+/** Resmi hesaplar. `url: null` = hesap henüz yok; footer bağlantı üretmez. Yalnızca doğrulanmış adres girin. */
+export const SOCIAL_ACCOUNTS: readonly { id: SocialId; label: string; url: string | null }[] = [
+  { id: "facebook", label: "Facebook", url: null },
+  { id: "instagram", label: "Instagram", url: LEGAL_INSTAGRAM },
+  { id: "x", label: "X", url: null },
+  { id: "linkedin", label: "LinkedIn", url: null },
+  { id: "youtube", label: "YouTube", url: null },
+];
+
 /** Kurumsal sameAs profilleri (JSON-LD Organization) — yalnızca doğrulanmış resmi hesap. */
-export const LEGAL_SOCIAL = [LEGAL_INSTAGRAM] as const;
+export const LEGAL_SOCIAL = SOCIAL_ACCOUNTS.flatMap((a) => (a.url ? [a.url] : []));

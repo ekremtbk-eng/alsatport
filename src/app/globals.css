@@ -12846,7 +12846,7 @@ html[data-device="phone"] .hp-pop-mobile {
 }
 .ft-bar {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 1rem 1.5rem;
   margin: 0;
@@ -12884,6 +12884,294 @@ html[data-device="phone"] .hp-pop-mobile {
 .ft-social a:hover {
   background: rgba(255, 255, 255, 0.2);
   color: #86efac;
+}
+.ft-apps {
+  display: grid;
+  grid-template-columns: minmax(0, 14rem) minmax(0, 1fr);
+  gap: 1.25rem 2.25rem;
+  margin: 0.85rem 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 1.05rem;
+}
+.ft-h {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a7f3d0;
+}
+.ft-h-lg {
+  font-size: 1.08rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #ffffff;
+}
+.ft-soc-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.7rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ft-soc {
+  display: grid;
+  width: 2.4rem;
+  height: 2.4rem;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+.ft-soc svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+a.ft-soc:hover,
+a.ft-soc:focus-visible {
+  background: #00c853;
+  border-color: #00c853;
+  color: #ffffff;
+  transform: translateY(-2px);
+}
+a.ft-soc:focus-visible,
+.ft-web-btn:focus-visible,
+.ft-target-btn:focus-visible {
+  outline: 2px solid #86efac;
+  outline-offset: 2px;
+}
+.ft-soc.is-soon {
+  opacity: 0.42;
+  cursor: default;
+}
+.ft-get-head p {
+  margin: 0.25rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #cbd5e1;
+}
+.ft-web {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-top: 0.8rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(134, 239, 172, 0.28);
+  background: linear-gradient(135deg, rgba(0, 200, 83, 0.17) 0%, rgba(255, 255, 255, 0.04) 100%);
+}
+.ft-web-ico {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+  border-radius: 0.8rem;
+  box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.5);
+}
+.ft-web-text {
+  flex: 1;
+  min-width: 0;
+}
+.ft-web-text strong {
+  display: block;
+  font-size: 0.9rem;
+  color: #ffffff;
+}
+.ft-web-text span {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: #cbd5e1;
+}
+.ft-web-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: #00c853;
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.ft-web-btn:hover {
+  background: #00b84c;
+  transform: translateY(-1px);
+}
+.ft-web-btn svg {
+  width: 1rem;
+  height: 1rem;
+}
+.ft-web-btn.is-done {
+  background: rgba(255, 255, 255, 0.14);
+}
+.ft-help {
+  margin: 0.55rem 0 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: #e2e8f0;
+}
+.ft-all-h {
+  margin: 1rem 0 0.55rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a7f3d0;
+}
+.ft-groups {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+.ft-group {
+  min-width: 0;
+  padding: 0.65rem 0.7rem 0.6rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+.ft-group.is-current {
+  border-color: rgba(0, 200, 83, 0.55);
+  background: rgba(0, 200, 83, 0.1);
+}
+.ft-group h4 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+.ft-you {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #00c853;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #ffffff;
+  white-space: nowrap;
+}
+.ft-group ul {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ft-target {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+.ft-target-ico {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 0.55rem;
+  background: #ffffff;
+  color: #111827;
+}
+.ft-target-ico svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+.ft-target-text {
+  flex: 1;
+  min-width: 0;
+}
+.ft-target-text strong {
+  display: block;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  color: #ffffff;
+  overflow-wrap: anywhere;
+}
+.ft-target-text small {
+  display: block;
+  font-size: 0.68rem;
+  line-height: 1.3;
+  color: #9fb3aa;
+}
+.ft-soon,
+.ft-target-btn {
+  flex-shrink: 0;
+  padding: 0.16rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.64rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.ft-soon {
+  border: 1px solid rgba(167, 243, 208, 0.35);
+  color: #a7f3d0;
+}
+.ft-target-btn {
+  background: #00c853;
+  color: #ffffff;
+  text-decoration: none;
+}
+html[data-device="tablet"] .ft-apps {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (max-width: 1023.98px) {
+  html:not([data-device]) .ft-apps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+html[data-device="phone"] .ft-apps {
+  grid-template-columns: minmax(0, 1fr);
+}
+html[data-device="phone"] .ft-groups {
+  grid-template-columns: minmax(0, 1fr);
+}
+html[data-device="phone"] .ft-web {
+  flex-wrap: wrap;
+}
+html[data-device="phone"] .ft-web-btn {
+  width: 100%;
+}
+@media (max-width: 767.98px) {
+  html:not([data-device]) .ft-groups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html:not([data-device]) .ft-web {
+    flex-wrap: wrap;
+  }
+  html:not([data-device]) .ft-web-btn {
+    width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ft-soc,
+  .ft-web-btn {
+    transition: none;
+  }
+  a.ft-soc:hover,
+  .ft-web-btn:hover {
+    transform: none;
+  }
 }
 .ft-legal {
   display: flex;
