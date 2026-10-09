@@ -129,6 +129,13 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       { source: "/magazalar/:path+", destination: "/magazalar", permanent: true },
+      { source: "/kategoriler/yepy", destination: "/kategoriler/ikinci-el", statusCode: 301 },
+      {
+        source: "/ara",
+        has: [{ type: "query", key: "kategori", value: "yepy" }],
+        destination: "/ara?kategori=ikinci-el",
+        statusCode: 301,
+      },
     ];
   },
 };

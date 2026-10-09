@@ -464,15 +464,13 @@ export const categories: Category[] = [
   node("shopping", "ikinci-el", "İkinci El ve Sıfır Alışveriş", "bag", {
     circular: true,
     seeAll: true,
+    // Retired subcategory id/slug: stored listings and old links resolve to this category (old URLs 301 in next.config).
+    aliases: ["shopping-yepy", "yepy"],
     children: [
       ...shoppingTree(),
       node("shopping-other", "diger-her-sey", "Diğer Her Şey", "grid", {
         parentId: "shopping",
         aliases: ["other"],
-      }),
-      node("shopping-yepy", "yepy", "Yepy", "refresh", {
-        parentId: "shopping",
-        circular: true,
       }),
     ],
   }),

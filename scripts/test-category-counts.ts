@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { PrismaClient, type ListingStatus } from "@prisma/client";
-import { allCategoryNodes, categories, walkCategories, type Category } from "@/data/categories";
+import { allCategoryNodes, categories, findCategory, walkCategories, type Category } from "@/data/categories";
 import { SEA_EQUIP_GROUPS } from "@/data/seaEquip";
 import { buildLiveCategoryCounts, rollupCategoryCounts } from "@/lib/categoryCounts";
 import type { Listing } from "@/data/store";
@@ -60,6 +60,10 @@ function unitTests() {
   const literal = /\bcount:\s*[\d_]{2,}/;
   const dataHits = walk("src/data").filter((f) => literal.test(readFileSync(f, "utf8")));
   check("S3", "No numeric `count:` literals in src/data", dataHits.length === 0, dataHits.join(", "));
+  check("Y1", "No visible 'Yepy' category node (name or slug)", nodes.every((c) => !/yepy/i.test(c.name) && !/yepy/i.test(c.slug)));
+  check("Y2", "Retired Yepy id/slug resolve to İkinci El ve Sıfır Alışveriş",
+    findCategory("yepy")?.id === "shopping" && findCategory("shopping-yepy")?.id === "shopping" &&
+      findCategory("shopping")?.name === "İkinci El ve Sıfır Alışveriş");
   const fallback = walk("src").filter((f) => readFileSync(f, "utf8").includes("catalogCount"));
   check("S4", "catalogCount fallback removed everywhere", fallback.length === 0, fallback.join(", "));
   const fake = walk("src").filter((f) => /788[._]?867|376[._]?575|114[._]?477|1[._]?189[._]?745/.test(readFileSync(f, "utf8")));
@@ -105,7 +109,7 @@ async function dbTests() {
   const roots = categories.filter((c) => c.id !== "pets");
   const mismatch: string[] = [];
   for (const root of roots) {
-    const ids = descendants(root).map((c) => c.id);
+    const ids = descendants(root).flatMap((c) => [c.id, ...(c.aliases ?? [])]);
     const n = await prisma.listing.count({ where: { ...publicCountWhere(), categoryId: { in: ids } } });
     if (n !== before.counts[root.id]) mismatch.push(`${root.id}:${before.counts[root.id]}≠${n}`);
   }
@@ -113,7 +117,10 @@ async function dbTests() {
     mismatch.slice(0, 3).join(" ") || `vasita=${before.counts.vasita}`);
   const direct: Record<string, number> = {};
   const rows = await prisma.listing.groupBy({ by: ["categoryId"], where: publicCountWhere(), _count: { _all: true } });
-  for (const row of rows) direct[row.categoryId] = row._count._all;
+  for (const row of rows) {
+    const id = findCategory(row.categoryId)?.id ?? row.categoryId;
+    direct[id] = (direct[id] ?? 0) + row._count._all;
+  }
   const badTree = treeConsistent(before.counts, Object.fromEntries(Object.entries(direct).filter(([k]) => !k.startsWith("pets"))));
   check("D2", "DB counts are tree-consistent outside Hayvanlar", badTree.filter((b) => !b.startsWith("pets")).length === 0,
     badTree.filter((b) => !b.startsWith("pets")).slice(0, 3).join(" "));
