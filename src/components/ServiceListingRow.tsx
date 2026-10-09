@@ -48,17 +48,23 @@ export function ServiceListingRow({
             </span>
           </span>
           <span className="svc-row-rate">
-            <span className="svc-row-rate-n">
-              {formatListingCount(count)} {t("rev.count")}
-            </span>
-            <span className="svc-stars" aria-hidden>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <Star
-                  key={n}
-                  className={`h-3.5 w-3.5 ${n <= Math.round(avg) ? "svc-star-on" : "svc-star-off"}`}
-                />
-              ))}
-            </span>
+            {count > 0 ? (
+              <>
+                <span className="svc-row-rate-n">
+                  {formatListingCount(count)} {t("rev.count")}
+                </span>
+                <span className="svc-stars" aria-hidden>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <Star
+                      key={n}
+                      className={`h-3.5 w-3.5 ${n <= Math.round(avg) ? "svc-star-on" : "svc-star-off"}`}
+                    />
+                  ))}
+                </span>
+              </>
+            ) : (
+              <span className="svc-row-rate-n">{t("rev.none")}</span>
+            )}
           </span>
         </span>
         <span className="svc-row-desc">{listing.description}</span>

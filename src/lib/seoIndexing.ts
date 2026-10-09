@@ -3,7 +3,7 @@ import { findCategory, flattenCategories, isServiceTreeCategory } from "@/data/c
 
 /** Same markers the listing-lifecycle migration uses to recognise seeded demo listings. */
 const DEMO_LISTING_NO_PREFIX = "APD-";
-const DEMO_SELLER_EMAIL_SUFFIX = "@demo.alsatport.com";
+export const DEMO_SELLER_EMAIL_SUFFIX = "@demo.alsatport.com";
 
 export function isDemoListingRow(row: { listingNo: string; seller?: { email: string } | null }) {
   if (row.listingNo.startsWith(DEMO_LISTING_NO_PREFIX)) return true;
@@ -21,7 +21,7 @@ export function nonDemoListingWhere(): Prisma.ListingWhereInput {
 
 /**
  * Service listings are shown on the service-provider profile page, which is noindex because it
- * carries generated reviews; their /ilan URL only forwards there.
+ * carries generated price ranges and service areas; their /ilan URL only forwards there.
  */
 export function isServiceCategoryId(categoryId: string) {
   return isServiceTreeCategory(findCategory(categoryId));

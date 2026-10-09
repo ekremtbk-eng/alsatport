@@ -11,7 +11,6 @@ import { SearchSuggest } from "./SearchSuggest";
 import { UserMenu } from "./UserMenu";
 import { useI18n } from "@/context/I18nContext";
 import { AuthGateLink } from "@/components/AuthGateLink";
-import { LiveVisitorsBadge } from "@/components/home/LiveVisitorsBadge";
 import { SiteSitelinksNav } from "@/components/SiteSitelinksNav";
 import { HOME_HERO_CATEGORIES } from "@/data/homeHubs";
 import { CategoryMegaMenu } from "@/components/CategoryMegaMenu";
@@ -96,7 +95,6 @@ export function Header() {
         <div className="hdr-inner">
           <span className="hdr-tr">{t("acil.turkey")}</span>
           <div className="hdr-utility-actions">
-            <LiveVisitorsBadge compact />
             <LanguageSwitcher bar />
             {!isPhone ? notifBtn : null}
             {!isPhone ? <UserMenu utility /> : null}

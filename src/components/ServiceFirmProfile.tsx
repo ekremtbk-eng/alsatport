@@ -18,10 +18,7 @@ import { ProtectedPhoto } from "@/components/ProtectedPhoto";
 import { StarRating } from "@/components/StarRating";
 import { useSellerReviews } from "@/components/useSellerReviews";
 import { summarizeReviews } from "@/data/reviews";
-import {
-  buildFirmProfile,
-  syntheticFirmReviews,
-} from "@/lib/serviceFirm";
+import { buildFirmProfile } from "@/lib/serviceFirm";
 import { loadRegionCoords, regionVersion, type RegionCoords } from "@/lib/regionClient";
 import { reviewAuthorLabel } from "@/lib/publicName";
 
@@ -34,10 +31,9 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
   const stored = reviewsFor(listing.sellerId);
   const apiReviews = live.reviews.length ? live.reviews : stored;
   const profile = useMemo(() => buildFirmProfile(listing, apiReviews), [listing, apiReviews]);
-  const shownReviews = apiReviews.length
-    ? apiReviews
-    : syntheticFirmReviews(listing, profile.rating.avg, profile.rating.count);
-  const rating = apiReviews.length ? summarizeReviews(apiReviews) : profile.rating;
+  const shownReviews = apiReviews;
+  const rating = summarizeReviews(apiReviews);
+  const rated = rating.count > 0;
 
   const [aboutOpen, setAboutOpen] = useState(false);
   const [tab, setTab] = useState<"services" | "districts" | "prices" | "news" | "qa">("services");
@@ -158,14 +154,20 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
         <div>
           <h1>{listing.title}</h1>
           <p className="firm-stars-line">
-            <span className="svc-stars" aria-hidden>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <Star key={n} className={`h-4 w-4 ${n <= Math.round(rating.avg) ? "svc-star-on" : "svc-star-off"}`} />
-              ))}
-            </span>
-            <span>
-              {formatListingCount(rating.count)} {t("rev.count")}
-            </span>
+            {rated ? (
+              <>
+                <span className="svc-stars" aria-hidden>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <Star key={n} className={`h-4 w-4 ${n <= Math.round(rating.avg) ? "svc-star-on" : "svc-star-off"}`} />
+                  ))}
+                </span>
+                <span>
+                  {formatListingCount(rating.count)} {t("rev.count")}
+                </span>
+              </>
+            ) : (
+              <span>{t("rev.none")}</span>
+            )}
           </p>
         </div>
         <div className="firm-badges">
@@ -194,19 +196,21 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
               <span className="firm-badge-ico is-24">7/24</span>
             </span>
           ) : null}
-          <span className="firm-badge">
-            <span className="firm-badge-ico is-rate">
-              <span>
-                {rating.avg.toLocaleString("tr-TR", { minimumFractionDigits: rating.avg % 1 ? 1 : 0, maximumFractionDigits: 1 })}
-                /5
-              </span>
-              <span className="firm-mini-stars">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <Star key={n} className={`h-2.5 w-2.5 ${n <= Math.round(rating.avg) ? "svc-star-on" : "svc-star-off"}`} />
-                ))}
+          {rated ? (
+            <span className="firm-badge">
+              <span className="firm-badge-ico is-rate">
+                <span>
+                  {rating.avg.toLocaleString("tr-TR", { minimumFractionDigits: rating.avg % 1 ? 1 : 0, maximumFractionDigits: 1 })}
+                  /5
+                </span>
+                <span className="firm-mini-stars">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <Star key={n} className={`h-2.5 w-2.5 ${n <= Math.round(rating.avg) ? "svc-star-on" : "svc-star-off"}`} />
+                  ))}
+                </span>
               </span>
             </span>
-          </span>
+          ) : null}
         </div>
       </header>
 
@@ -318,25 +322,34 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
               <h2>{t("firm.reviews")}</h2>
             </div>
             <div className="firm-rev-score">
-              <div className="firm-rev-circle">
-                <strong>
-                  {rating.avg.toLocaleString("tr-TR", {
-                    minimumFractionDigits: rating.avg % 1 ? 1 : 0,
-                    maximumFractionDigits: 1,
-                  })}
-                </strong>
-                <span>/5</span>
-              </div>
-              <div>
-                <span className="svc-stars">
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <Star key={n} className={`h-4 w-4 ${n <= Math.round(rating.avg) ? "svc-star-on" : "svc-star-off"}`} />
-                  ))}
-                </span>
-                <p>
-                  {t("firm.revTotal", { n: formatListingCount(rating.count) })}
-                </p>
-              </div>
+              {rated ? (
+                <>
+                  <div className="firm-rev-circle">
+                    <strong>
+                      {rating.avg.toLocaleString("tr-TR", {
+                        minimumFractionDigits: rating.avg % 1 ? 1 : 0,
+                        maximumFractionDigits: 1,
+                      })}
+                    </strong>
+                    <span>/5</span>
+                  </div>
+                  <div>
+                    <span className="svc-stars">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <Star key={n} className={`h-4 w-4 ${n <= Math.round(rating.avg) ? "svc-star-on" : "svc-star-off"}`} />
+                      ))}
+                    </span>
+                    <p>
+                      {t("firm.revTotal", { n: formatListingCount(rating.count) })}
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <p>{t("rev.none")}</p>
+                  <p>{t("rev.first")}</p>
+                </div>
+              )}
               <button type="button" className="firm-rev-cta" onClick={openReview}>
                 {t("firm.reviewCta")}
               </button>
@@ -439,17 +452,19 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
             ) : null}
           </section>
 
-          <section className="firm-checks">
-            <h2>{t("firm.checks")}</h2>
-            <ul>
-              {profile.checks.map((c) => (
-                <li key={c.label}>
-                  <Check className="h-4 w-4" />
-                  {c.label}
-                </li>
-              ))}
-            </ul>
-          </section>
+          {profile.checks.length ? (
+            <section className="firm-checks">
+              <h2>{t("firm.checks")}</h2>
+              <ul>
+                {profile.checks.map((c) => (
+                  <li key={c.label}>
+                    <Check className="h-4 w-4" />
+                    {c.label}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
         </aside>
       </div>
 

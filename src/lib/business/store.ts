@@ -2,6 +2,7 @@ import "server-only";
 import type { BusinessAccount, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { liveListingWhere } from "@/lib/listings/lifecycle";
+import { DEMO_SELLER_EMAIL_SUFFIX } from "@/lib/seoIndexing";
 import { hideSellerPhone, listingInclude, toClientListing } from "@/lib/listings/store";
 import { sanitizeMultiline, sanitizeText } from "@/lib/security/sanitize";
 import { deleteStoredObject, isOwnBusinessImage, storageKeyFromUrl } from "@/lib/storage/media";
@@ -417,6 +418,24 @@ export async function listPublicStores(filters: { categoryId?: string; city?: st
   });
   const counts = await storeCounts(rows.map((r) => r.userId));
   return rows.map((r) => toPublicStore(r, counts));
+}
+
+/** Admin-approved businesses whose owner is not banned; seeded demo accounts never count. */
+export function verifiedBusinessWhere(): Prisma.BusinessAccountWhereInput {
+  return {
+    status: "approved",
+    user: { bannedAt: null, NOT: { email: { endsWith: DEMO_SELLER_EMAIL_SUFFIX, mode: "insensitive" } } },
+  };
+}
+
+const VERIFIED_COUNT_TTL_MS = 5 * 60_000;
+let verifiedCount: { n: number; at: number } | null = null;
+
+export async function countVerifiedBusinesses(): Promise<number> {
+  if (verifiedCount && Date.now() - verifiedCount.at < VERIFIED_COUNT_TTL_MS) return verifiedCount.n;
+  const n = await prisma.businessAccount.count({ where: verifiedBusinessWhere() });
+  verifiedCount = { n, at: Date.now() };
+  return n;
 }
 
 export async function storeSitemapRows() {

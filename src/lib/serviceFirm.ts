@@ -53,6 +53,14 @@ function moneyRange(base: number, spread: number) {
   return `${fmt(a)} - ${fmt(b)}`;
 }
 
+/** Fields of the business application an admin reviews before approval (tax number is checksum-validated). */
+const BUSINESS_REVIEWED_FIELDS: FirmCheck[] = [
+  { label: "Ticari Ünvanı" },
+  { label: "Yetkili Adı Soyadı" },
+  { label: "Vergi Dairesi" },
+  { label: "Vergi Numarası" },
+];
+
 function ancestors(cat: Category) {
   const chain: Category[] = [];
   let cur: Category | undefined = cat;
@@ -72,17 +80,10 @@ function groupFrom(cat: Category): FirmServiceGroup | null {
   };
 }
 
-export function serviceRating(listing: Listing, reviews: SellerReview[]) {
+/** Only real reviews count; a firm without reviews has { avg: 0, count: 0 }. */
+export function serviceRating(_listing: Listing, reviews: SellerReview[]) {
   const { avg, count } = summarizeReviews(reviews);
-  if (count) return { avg, count };
-  let h = 2166136261;
-  const key = `${listing.sellerId}:${listing.id}`;
-  for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619);
-  h >>>= 0;
-  return {
-    avg: Math.round((3.6 + (h % 14) / 10) * 10) / 10,
-    count: 8 + (h % 2350),
-  };
+  return { avg, count };
 }
 
 export function buildFirmProfile(listing: Listing, reviews: SellerReview[]): FirmProfile {
@@ -166,18 +167,7 @@ export function buildFirmProfile(listing: Listing, reviews: SellerReview[]): Fir
         ]
       : [];
 
-  const allChecks: FirmCheck[] = [
-    { label: "İsim, Soyisim" },
-    { label: "Ticari Ünvanı" },
-    { label: "Vergi Dairesi" },
-    { label: "Cep Telefonu" },
-    { label: "Vergi Numarası" },
-    { label: "E-Posta Adresi" },
-    { label: "Sabit Telefon" },
-    { label: "Adres Bilgileri" },
-  ];
-  const checkCount = 5 + (n % 5);
-  const checks = allChecks.slice(0, checkCount);
+  const checks: FirmCheck[] = listing.sellerBusiness ? BUSINESS_REVIEWED_FIELDS : [];
 
   const about = [
     listing.description.trim(),
@@ -210,79 +200,4 @@ export function buildFirmProfile(listing: Listing, reviews: SellerReview[]): Fir
 export function isServiceListing(listing: { categoryId: string } | null | undefined) {
   if (!listing) return false;
   return isServiceTreeCategory(findCategory(listing.categoryId));
-}
-
-const REVIEWERS = [
-  ["Caner", "K."],
-  ["Ümit", "T."],
-  ["Ebru", "T."],
-  ["Bora", "T."],
-  ["Zeynep", "H."],
-  ["Murat", "S."],
-  ["Gül", "H."],
-  ["Manuel", "H."],
-  ["Selman", "G."],
-  ["Mücahit", "A."],
-  ["İlknur", "K."],
-  ["Ebru", "V."],
-  ["Ömer", "Ç."],
-  ["Hüseyin", "D."],
-  ["Muharrem Günay", "Y."],
-  ["Ergun", "D."],
-  ["Selcuk", "S."],
-  ["Yunus", "Ö."],
-  ["Gökhan", "C."],
-  ["Erdal", "D."],
-  ["Meral", "B."],
-  ["Tuba", "D."],
-  ["Mutlu", "B."],
-  ["Furkan", "Y."],
-];
-
-const MONTHS = [
-  "Ocak",
-  "Şubat",
-  "Mart",
-  "Nisan",
-  "Mayıs",
-  "Haziran",
-  "Temmuz",
-  "Ağustos",
-  "Eylül",
-  "Ekim",
-  "Kasım",
-  "Aralık",
-];
-
-const SNIPPETS = [
-  "Harika bir iş çıkardı ustamız gönül rahatlığıyla tercih edebilirsiniz",
-  "Ustam eline emeğine sağlık. Kendi evini yapar gibi özenerek işini ustasından pek kalmadı günümüzde. İşçiliği, fiyatları ve güler yüzüyle gönül rahatlığıyla iletişim geçebilirsiniz.",
-  "Usta eşiyle beraber 15m2 lik duvarını sistemli ve temiz bir şekilde çalışarak çok kısa sürede teslim etti. Teşekkürler",
-  "Hızlı, temiz ve kusursuz işçilik. İşin büyüğü, küçüğü diye ayırt etmeden hizmet etmek odaklı çalışan bir ekip.",
-  "işimde temiz titiz dakik aldığım hizmetten memnun kaldım teşekkür ediyorum",
-  "İşini çok düzgün yapmasının yanında , işin yapılacağı zamanın belirlenmesinde ve yerine getirilmesinde güvenilirliği titizlik tadında değer.",
-  "Çok memnun kaldım belirtği saatte geldi ve sorunsuz bir şekilde hizmet verdi teşekkür ederim",
-  "Temiz ve usta işçilik güldelle tavsiye ediyorum.",
-  "Ankaralı selim ustanın işinden gayet memnun kaldık verdiği taahhütleri zamanında eksiksiz ve hatasızla yaptı kendisine teşekkür eder. İyilerinden başarlar dilerim.",
-  "Kaliteli malzeme ve profesyonel işçilik çalışıyor kendisine teşekkür ediyorum.",
-];
-
-export function syntheticFirmReviews(listing: Listing, avg: number, count: number): SellerReview[] {
-  const n = Math.min(12, Math.max(4, Math.min(count, 12)));
-  const seed = hash(listing.id);
-  return Array.from({ length: n }, (_, i) => {
-    const who = REVIEWERS[(seed + i * 7) % REVIEWERS.length];
-    const stars = i === 1 && avg < 4.5 ? Math.max(1, Math.round(avg) - 1) : Math.min(5, Math.max(1, Math.round(avg)));
-    return {
-      id: `syn-${listing.id}-${i}`,
-      sellerId: listing.sellerId,
-      listingId: listing.id,
-      authorId: `syn-${i}`,
-      authorName: `${who[0]} ${who[1]}`,
-      authorAvatar: "",
-      rating: stars,
-      text: SNIPPETS[(seed + i * 3) % SNIPPETS.length],
-      createdAt: `${MONTHS[(seed + i) % 12]} ${2023 + ((seed + i) % 3)}`,
-    };
-  });
 }

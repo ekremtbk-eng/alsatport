@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
-import { findCategory, hrefForCategory } from "@/data/categories";
+import { useEffect, useMemo, useState } from "react";
+import { findCategory, formatListingCount, hrefForCategory } from "@/data/categories";
 import { TURKEY_CITIES, districtsOf } from "@/data/turkey";
 import { useI18n } from "@/context/I18nContext";
 import { servicesSearchHref, SERVICE_PORTAL_TABS } from "@/components/ServicesPortalNav";
@@ -57,6 +57,20 @@ const HERO =
 export function ServicesHome() {
   const { t } = useI18n();
   const router = useRouter();
+  const [verifiedFirms, setVerifiedFirms] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/stats/businesses")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { verifiedBusinesses?: number } | null) => {
+        const n = j?.verifiedBusinesses;
+        if (!cancelled && typeof n === "number" && n > 0) setVerifiedFirms(n);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [q, setQ] = useState("");
   const [city, setCity] = useState("Ankara");
   const [district, setDistrict] = useState("");
@@ -71,7 +85,9 @@ export function ServicesHome() {
         <div className="svc-home-hero-inner">
           <h1>{t("svc.hero")}</h1>
           <p>
-            {t("svc.heroSub")}
+            {verifiedFirms > 0
+              ? t("svc.heroSub", { n: formatListingCount(verifiedFirms) })
+              : t("svc.heroSubPlain")}
           </p>
           <form
             className="svc-home-search"
