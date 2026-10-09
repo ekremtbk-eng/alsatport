@@ -428,9 +428,36 @@ async function main() {
       `status ${r.status} audit=${mailAudit?.action ?? "none"}`,
     );
 
+    const daySlug = `sectest-${TAG}`;
+    const dayBody = {
+      slug: daySlug,
+      name: "Security test day",
+      kind: "ozel",
+      month: 1,
+      day: 1,
+      year: 2099,
+      active: false,
+      eyebrow: "Security test",
+      title: "Security test",
+      body: "Security regression test row",
+      closing: "Security test",
+    };
+    r = await call("POST", "/api/admin/special-days", sr, dayBody);
+    check("A16", "Special day create denied for non-admin", r.status === 403, `status ${r.status}`);
+    r = await call("POST", "/api/admin/special-days", mfa, dayBody);
+    const staleDay = await prisma.specialDay.count({ where: { slug: daySlug } });
+    check("A17", "Special day create requires fresh step-up", r.status === 403 && r.json.error === "auth.err.stepUp" && staleDay === 0, `status ${r.status} ${String(r.json.error)}`);
+    r = await call("POST", "/api/admin/special-days", null, dayBody, { cookie: fresh.cookie });
+    check("A18", "Special day create requires CSRF token", r.status === 403 && r.json.error === "auth.err.csrf", `status ${r.status} ${String(r.json.error)}`);
+    r = await call("POST", "/api/admin/special-days", fresh, dayBody);
+    const created = await prisma.specialDay.count({ where: { slug: daySlug } });
+    check("A19", "Special day create with step-up succeeds", r.status === 200 && created === 1, `status ${r.status} rows=${created}`);
+    await prisma.specialDay.deleteMany({ where: { slug: daySlug } });
+
     const errs = [await call("GET", "/api/listings/not-a-uuid"), await call("POST", "/api/auth/login", await guestCsrf(), "{bad json" as unknown)];
     check("A10", "Error responses leak no stack traces", errs.every((e) => !/at \w+ \(|node_modules|prisma\./i.test(e.text)));
   } finally {
+    await prisma.specialDay.deleteMany({ where: { slug: `sectest-${TAG}` } });
     await prisma.message.deleteMany({ where: { conversationId: convo.id } });
     await prisma.conversation.deleteMany({ where: { id: convo.id } });
     await prisma.listing.deleteMany({ where: { id: listing.id } });

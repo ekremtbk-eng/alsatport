@@ -7,18 +7,12 @@ export const LEGAL_SERVICES = {
   recaptcha: on(process.env.LEGAL_SVC_RECAPTCHA),
   resend: on(process.env.LEGAL_SVC_RESEND),
   smtp: on(process.env.LEGAL_SVC_SMTP),
-  smtpHost: process.env.LEGAL_SVC_SMTP_HOST ?? "",
+  smtpProvider: process.env.LEGAL_SVC_SMTP_PROVIDER ?? "",
   blob: on(process.env.LEGAL_SVC_BLOB),
   sightengine: on(process.env.LEGAL_SVC_SIGHTENGINE),
   neon: on(process.env.LEGAL_SVC_NEON),
   vercel: on(process.env.LEGAL_SVC_VERCEL),
 };
-
-export function smtpProviderName(host: string) {
-  if (/titan/i.test(host)) return "Titan (Titan Email)";
-  if (/hostinger/i.test(host)) return "Hostinger";
-  return host;
-}
 
 export type LegalProcessor = {
   name: string;
@@ -81,7 +75,7 @@ export function legalProcessors(): LegalProcessor[] {
   }
   if (s.smtp) {
     out.push({
-      name: smtpProviderName(s.smtpHost),
+      name: s.smtpProvider || "E-posta sunucusu sağlayıcısı",
       purpose: "Doğrulama kodu, şifre sıfırlama ve bilgilendirme e-postalarının gönderilmesi (e-posta sunucusu)",
       data: "E-posta adresi ve e-postanın içeriği",
       location: "E-posta barındırma hizmeti",

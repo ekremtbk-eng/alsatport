@@ -108,7 +108,7 @@ export function SpecialDaysPanel() {
     };
     const res = editId
       ? await apiPatch<{ ok?: boolean; error?: string }>(`/api/admin/special-days/${editId}`, payload)
-      : await apiPost<{ ok?: boolean; error?: string }>("/api/admin/special-days", payload);
+      : await guard(() => apiPost<{ ok?: boolean; error?: string }>("/api/admin/special-days", payload));
     if (!res.ok) {
       setError(res.error ?? "auth.err.required");
       return;

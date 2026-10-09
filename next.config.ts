@@ -51,6 +51,14 @@ const flag = (on: unknown) => (on ? "1" : "");
 const has = (...names: string[]) => names.every((n) => (process.env[n] ?? "").trim() !== "");
 const smtpPass = has("SMTP_PASS") || has("SMTP_PASSWORD") || has("MAIL_PASS");
 
+/** Display name of the mail provider; the SMTP host itself stays server-only (src/lib/mail/config.ts). */
+function smtpProviderName() {
+  const host = (process.env.SMTP_HOST ?? "").trim() || "smtp.hostinger.com";
+  if (/titan/i.test(host)) return "Titan (Titan Email)";
+  if (/hostinger/i.test(host)) return "Hostinger";
+  return "E-posta sunucusu sağlayıcısı";
+}
+
 /** Public legal identity + which processors are configured (booleans only, never secrets). */
 const legalEnv: Record<string, string> = {
   LEGAL_DATA_CONTROLLER_NAME: process.env.LEGAL_DATA_CONTROLLER_NAME ?? "",
@@ -65,7 +73,7 @@ const legalEnv: Record<string, string> = {
   LEGAL_SVC_RECAPTCHA: flag(has("NEXT_PUBLIC_RECAPTCHA_SITE_KEY", "RECAPTCHA_SECRET_KEY")),
   LEGAL_SVC_RESEND: flag(has("RESEND_API_KEY")),
   LEGAL_SVC_SMTP: flag(smtpPass),
-  LEGAL_SVC_SMTP_HOST: smtpPass ? (process.env.SMTP_HOST ?? "").trim() || "smtp.hostinger.com" : "",
+  LEGAL_SVC_SMTP_PROVIDER: smtpPass ? smtpProviderName() : "",
   LEGAL_SVC_BLOB: flag(has("BLOB_READ_WRITE_TOKEN")),
   LEGAL_SVC_SIGHTENGINE: flag(has("SIGHTENGINE_API_USER", "SIGHTENGINE_API_SECRET")),
   LEGAL_SVC_NEON: flag(/neon\.tech/i.test(process.env.DATABASE_URL ?? "")),

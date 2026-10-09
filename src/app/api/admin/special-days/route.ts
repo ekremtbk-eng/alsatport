@@ -52,7 +52,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const blocked = await requireMutatingRequest(req);
   if (blocked) return blocked;
-  const auth = await requireAdmin();
+  const auth = await requireAdmin({ stepUp: true });
   if ("error" in auth) return auth.error;
   const parsed = specialDayBodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
