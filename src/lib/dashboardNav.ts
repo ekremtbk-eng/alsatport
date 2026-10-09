@@ -34,6 +34,7 @@ export type DashPanelId = (typeof DASH_PANELS)[number];
 
 export type DashNode =
   | { kind: "item"; id: DashPanelId; labelKey: string }
+  | { kind: "link"; id: string; href: string; labelKey: string }
   | { kind: "group"; id: string; labelKey: string; children: DashNode[] };
 
 /** Wallet / escrow / payment panels: kept in code for PayTR, hidden while payments are paused. */
@@ -46,6 +47,7 @@ export function isPanelHidden(id: DashPanelId) {
 function pruneHidden(nodes: DashNode[]): DashNode[] {
   return nodes.flatMap((n): DashNode[] => {
     if (n.kind === "item") return isPanelHidden(n.id) ? [] : [n];
+    if (n.kind === "link") return [n];
     const children = pruneHidden(n.children);
     return children.length ? [{ ...n, children }] : [];
   });
@@ -133,6 +135,7 @@ const FULL_DASH_NAV: DashNode[] = [
         ],
       },
       { kind: "item", id: "qr", labelKey: "acct.qr.h" },
+      { kind: "link", id: "marka-kiti", href: "/marka-kiti", labelKey: "brandkit.nav" },
     ],
   },
 ];
@@ -154,6 +157,7 @@ export function dashHref(id: DashPanelId) {
 
 export function groupContains(node: DashNode, panel: DashPanelId): boolean {
   if (node.kind === "item") return node.id === panel;
+  if (node.kind === "link") return false;
   return node.children.some((c) => groupContains(c, panel));
 }
 

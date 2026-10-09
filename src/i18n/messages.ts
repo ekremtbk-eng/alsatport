@@ -2040,6 +2040,7 @@ export const MESSAGES = pack({
   "dash.safe": ["Güvenli İşlemlerim", "My secure deals", "Meine sicheren Transaktionen", "معاملاتي الآمنة", "Мои безопасные сделки"],
   "dash.safe.empty": ["Aktif güvenli işlem yok.", "No active secure deals.", "Keine aktiven Transaktionen.", "لا توجد معاملات نشطة.", "Нет активных сделок."],
   "dash.notifs": ["Bildirimler", "Notifications", "Benachrichtigungen", "الإشعارات", "Уведомления"],
+  "brandkit.nav": ["Marka Kiti", "Brand kit", "Markenkit", "حزمة العلامة التجارية", "Брендбук"],
   "dash.g.account": ["Hesabım ve Ayarlar", "My account and settings", "Konto und Einstellungen", "حسابي والإعدادات", "Аккаунт и настройки"],
   "dash.g.info": ["Hesap Bilgilerim", "Account details", "Kontodaten", "بيانات الحساب", "Данные аккаунта"],
   "dash.info.personal": ["Kişisel bilgilerim", "Personal information", "Persönliche Daten", "المعلومات الشخصية", "Личные данные"],

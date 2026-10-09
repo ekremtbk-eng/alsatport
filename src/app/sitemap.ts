@@ -29,6 +29,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: "/ara", priority: 0.7, changeFrequency: "daily" },
     { path: "/magazalar", priority: 0.6, changeFrequency: "daily" },
     ...CORPORATE_NAV.map((n) => ({ path: n.href, priority: 0.5, changeFrequency: "monthly" as const })),
+    { path: "/marka-kiti", priority: 0.4, changeFrequency: "monthly" },
     { path: "/kvkk", priority: 0.3, changeFrequency: "yearly" },
     { path: "/gizlilik-politikasi", priority: 0.4, changeFrequency: "yearly" },
     { path: "/kullanim-kosullari", priority: 0.4, changeFrequency: "yearly" },

@@ -24,6 +24,7 @@ export function SiteFooter() {
             <Link href="/kurumsal-hesap">{t("footer.business")}</Link>
             <Link href="/kurumsal/hakkimizda">{t("corp.nav.hakkimizda")}</Link>
             <Link href="/kurumsal/iletisim">{t("corp.nav.iletisim")}</Link>
+            <Link href="/marka-kiti">{t("brandkit.nav")}</Link>
           </nav>
         </div>
         <FooterApps />

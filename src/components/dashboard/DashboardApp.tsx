@@ -26,6 +26,7 @@ import {
   Mail,
   Menu,
   MessageCircle,
+  Palette,
   Receipt,
   Settings,
   Shield,
@@ -88,6 +89,7 @@ const DASH_ICONS: Record<string, LucideIcon> = {
   pazarlama: Mail,
   hareket: Accessibility,
   qr: QrCode,
+  "marka-kiti": Palette,
 };
 
 function DashIcon({ id }: { id: string }) {
@@ -196,6 +198,16 @@ function DashTree({
                 <DashIcon id={node.id} />
                 <span className="dash-nav-item-label">{t(node.labelKey)}</span>
               </button>
+            </li>
+          );
+        }
+        if (node.kind === "link") {
+          return (
+            <li key={node.id}>
+              <Link href={node.href} className={`dash-nav-item depth-${depth}`} data-nav={node.id}>
+                <DashIcon id={node.id} />
+                <span className="dash-nav-item-label">{t(node.labelKey)}</span>
+              </Link>
             </li>
           );
         }
