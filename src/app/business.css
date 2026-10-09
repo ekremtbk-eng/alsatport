@@ -1040,6 +1040,103 @@ html[data-device="phone"] .auth-gate.has-biz .auth-biz-mini {
   font-size: 0.75rem;
   font-weight: 700;
 }
+.biz-fx {
+  margin: 0.9rem 0 0;
+  padding: 0.75rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--color-line);
+  min-width: 0;
+}
+.biz-fx legend {
+  padding: 0;
+  margin-bottom: 0.5rem;
+  color: #1f2937;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+.biz-fx-modes,
+.biz-fx-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  margin-bottom: 0.5rem;
+}
+.biz-fx-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: #1f2937;
+}
+.biz-fx-days {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.biz-fx-days li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  max-width: 28rem;
+}
+.biz-fx-times {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.biz-fx-times .dash-input {
+  width: 7.5rem;
+}
+.biz-fx-districts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.3rem 0.75rem;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+.biz-fx-price {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+.biz-fx-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+.biz-fx-item > textarea,
+.biz-fx-qa {
+  flex: 1;
+  min-width: 0;
+}
+.biz-fx-qa {
+  display: grid;
+  gap: 0.4rem;
+}
+.biz-fx-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.6rem;
+  color: #b91c1c;
+  background: #fef2f2;
+}
+@media (max-width: 640px) {
+  .biz-fx-price {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    padding-bottom: 0.6rem;
+    border-bottom: 1px dashed var(--color-line);
+  }
+}
 .biz-form-actions {
   display: flex;
   flex-wrap: wrap;

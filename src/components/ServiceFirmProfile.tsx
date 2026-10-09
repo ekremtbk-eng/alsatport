@@ -18,25 +18,47 @@ import { ProtectedPhoto } from "@/components/ProtectedPhoto";
 import { StarRating } from "@/components/StarRating";
 import { useSellerReviews } from "@/components/useSellerReviews";
 import { summarizeReviews } from "@/data/reviews";
-import { buildFirmProfile } from "@/lib/serviceFirm";
+import { buildFirmProfile, type FirmPriceRow } from "@/lib/serviceFirm";
+import type { PublicFirm } from "@/lib/business/firmProfile";
 import { loadRegionCoords, regionVersion, type RegionCoords } from "@/lib/regionClient";
 import { reviewAuthorLabel } from "@/lib/publicName";
 
+type FirmTab = "services" | "hours" | "districts" | "prices" | "news" | "qa";
+
 export function ServiceFirmProfile({ listing }: { listing: Listing }) {
   const { user, reviewsFor } = useApp();
-  const { t, formatMoney } = useI18n();
+  const { t, formatMoney, locale } = useI18n();
   const { requireAuth } = useAuthModal();
   const router = useRouter();
   const live = useSellerReviews(listing.sellerId);
   const stored = reviewsFor(listing.sellerId);
   const apiReviews = live.reviews.length ? live.reviews : stored;
-  const profile = useMemo(() => buildFirmProfile(listing, apiReviews), [listing, apiReviews]);
+  const [firm, setFirm] = useState<PublicFirm | null>(null);
+  const profile = useMemo(() => buildFirmProfile(listing, apiReviews, firm), [listing, apiReviews, firm]);
   const shownReviews = apiReviews;
   const rating = summarizeReviews(apiReviews);
   const rated = rating.count > 0;
+  const isOwner = !!user && user.id === listing.sellerId;
+
+  useEffect(() => {
+    if (!listing.sellerBusiness) {
+      setFirm(null);
+      return;
+    }
+    let alive = true;
+    void fetch(`/api/stores/by-seller/${encodeURIComponent(listing.sellerId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { firm?: PublicFirm | null } | null) => {
+        if (alive) setFirm(data?.firm ?? null);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [listing.sellerBusiness, listing.sellerId]);
 
   const [aboutOpen, setAboutOpen] = useState(false);
-  const [tab, setTab] = useState<"services" | "districts" | "prices" | "news" | "qa">("services");
+  const [tab, setTab] = useState<FirmTab>("services");
   const [slide, setSlide] = useState(0);
   const [showAllReviews, setShowAllReviews] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -71,12 +93,31 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
   const visibleReviews = showAllReviews ? shownReviews : shownReviews.slice(0, 4);
 
   const tabs = [
-    { id: "services" as const, label: t("firm.tab.services"), show: profile.groups.length > 0 },
+    {
+      id: "services" as const,
+      label: t("firm.tab.services"),
+      show: !!profile.category || profile.details.length > 0 || profile.features.length > 0,
+    },
+    { id: "hours" as const, label: t("firm.tab.hours"), show: !!profile.hours || !!profile.hoursNote },
     { id: "districts" as const, label: t("firm.tab.districts"), show: profile.districts.length > 0 },
     { id: "prices" as const, label: t("firm.tab.prices"), show: profile.prices.length > 0 },
     { id: "news" as const, label: t("firm.tab.news"), show: profile.announcements.length > 0 },
     { id: "qa" as const, label: t("firm.tab.qa"), show: profile.qa.length > 0 },
   ].filter((x) => x.show);
+  const activeTab: FirmTab | undefined = tabs.some((x) => x.id === tab) ? tab : tabs[0]?.id;
+  const missingExtras =
+    !profile.hours || !profile.districts.length || !profile.announcements.length || !profile.qa.length || !firm?.priceList.length;
+
+  const firmPrices = !!firm?.priceList.length;
+  function priceText(row: FirmPriceRow) {
+    const range = row.max
+      ? `${formatMoney(row.min)} – ${formatMoney(row.max)}`
+      : firmPrices
+        ? t("firm.price.from", { v: formatMoney(row.min) })
+        : formatMoney(row.min);
+    return row.unit ? `${range} / ${row.unit}` : range;
+  }
+  const dateText = (at: number) => new Date(at).toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric" });
 
   function revealPhone() {
     if (!requireAuth("member")) return;
@@ -178,19 +219,19 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
               </span>
             </span>
           ) : null}
-          {profile.open ? (
+          {profile.open === true ? (
             <span className="firm-badge">
               <span className="firm-badge-ico is-open">
                 <Home />
               </span>
               <span className="firm-badge-cap">{t("firm.open")}</span>
             </span>
-          ) : (
+          ) : profile.open === false ? (
             <span className="firm-badge">
               <span className="firm-badge-ico is-closed">{t("firm.closedShort")}</span>
               <span className="firm-badge-cap">{t("firm.closed")}</span>
             </span>
-          )}
+          ) : null}
           {profile.hours24 ? (
             <span className="firm-badge">
               <span className="firm-badge-ico is-24">7/24</span>
@@ -221,101 +262,164 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
           title={listing.title}
           priceLabel={formatMoney(listing.price)}
           imageUrl={listing.images[0] || listing.sellerAvatar}
-          description={listing.description || profile.about}
+          description={profile.about}
           kind="firm"
         />
       </div>
 
       <div className="firm-grid">
         <div className="firm-col">
-          <section className="firm-about">
-            <ProtectedPhoto src={listing.images[0] || listing.sellerAvatar} alt="" />
-            <div>
-              <h2>{t("firm.about")}</h2>
-              <p>
-                {aboutText}{" "}
-                {aboutLong ? (
-                  <button type="button" className="firm-more" onClick={() => setAboutOpen((v) => !v)}>
-                    {aboutOpen ? t("firm.less") : t("firm.more")}
-                  </button>
-                ) : null}
-              </p>
-            </div>
-          </section>
+          {isOwner && (missingExtras || !profile.about) ? (
+            <p className="firm-owner-hint">
+              {listing.sellerBusiness ? t("firm.owner.hint") : t("firm.owner.hintListing")}{" "}
+              <Link href={listing.sellerBusiness ? "/isletme-paneli" : `/ilan-ver?edit=${listing.id}`}>
+                {listing.sellerBusiness ? t("firm.owner.panel") : t("firm.owner.edit")}
+              </Link>
+            </p>
+          ) : null}
 
-          <section className="firm-tabs-wrap">
-            <div className="firm-tabs" role="tablist">
-              {tabs.map((row) => (
-                <button
-                  key={row.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === row.id}
-                  className={tab === row.id ? "is-on" : ""}
-                  onClick={() => setTab(row.id)}
-                >
-                  {row.label}
-                </button>
-              ))}
-            </div>
-            <div className="firm-tab-body">
-              {tab === "services" ? (
-                <div className="firm-svc-groups">
-                  {profile.groups.map((g) => (
-                    <div key={g.title} className="firm-svc-group">
-                      <p className="firm-svc-title">
-                        <Check className="h-4 w-4" /> {g.title}
-                      </p>
-                      <ul>
-                        {g.items.map((it) => (
-                          <li key={it.href + it.name}>
-                            <Link href={it.href}>{it.name}</Link>
+          {profile.about ? (
+            <section className="firm-about">
+              <ProtectedPhoto src={listing.images[0] || listing.sellerAvatar} alt="" />
+              <div>
+                <h2>{t("firm.about")}</h2>
+                <p>
+                  {aboutText}{" "}
+                  {aboutLong ? (
+                    <button type="button" className="firm-more" onClick={() => setAboutOpen((v) => !v)}>
+                      {aboutOpen ? t("firm.less") : t("firm.more")}
+                    </button>
+                  ) : null}
+                </p>
+              </div>
+            </section>
+          ) : null}
+
+          {tabs.length ? (
+            <section className="firm-tabs-wrap">
+              <div className="firm-tabs" role="tablist">
+                {tabs.map((row) => (
+                  <button
+                    key={row.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === row.id}
+                    className={activeTab === row.id ? "is-on" : ""}
+                    onClick={() => setTab(row.id)}
+                  >
+                    {row.label}
+                  </button>
+                ))}
+              </div>
+              <div className="firm-tab-body">
+                {activeTab === "services" ? (
+                  <div className="firm-svc-groups">
+                    {profile.category ? (
+                      <div className="firm-svc-group">
+                        <p className="firm-svc-title">
+                          <Check className="h-4 w-4" /> {t("firm.svc.category")}
+                        </p>
+                        <ul>
+                          <li>
+                            <Link href={profile.category.href}>{profile.category.name}</Link>
                           </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-              {tab === "districts" ? (
-                <ul className="firm-dist">
-                  {profile.districts.map((d) => (
-                    <li key={d}>{d}</li>
-                  ))}
-                </ul>
-              ) : null}
-              {tab === "prices" ? (
-                <ul className="firm-prices">
-                  {profile.prices.map((row, i) => (
-                    <li key={i}>
-                      <div>
-                        <p>{row.title}</p>
-                        <span>{row.service}</span>
+                        </ul>
                       </div>
-                      <strong>{row.price}</strong>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              {tab === "news" ? (
-                <ul className="firm-news">
-                  {profile.announcements.map((a) => (
-                    <li key={a}>{a}</li>
-                  ))}
-                </ul>
-              ) : null}
-              {tab === "qa" ? (
-                <ul className="firm-qa">
-                  {profile.qa.map((item) => (
-                    <li key={item.q}>
-                      <p className="firm-q">{item.q}</p>
-                      <p>{item.a}</p>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          </section>
+                    ) : null}
+                    {profile.details.length ? (
+                      <dl className="firm-details">
+                        {profile.details.map((d) => (
+                          <div key={d.label}>
+                            <dt>{d.label}</dt>
+                            <dd>{d.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    ) : null}
+                    {profile.features.length ? (
+                      <div className="firm-svc-group">
+                        <p className="firm-svc-title">
+                          <Check className="h-4 w-4" /> {t("firm.svc.features")}
+                        </p>
+                        <ul>
+                          {profile.features.map((f) => (
+                            <li key={f}>{f}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+                {activeTab === "hours" ? (
+                  profile.hours ? (
+                    <div>
+                      {profile.hours.always ? (
+                        <p className="firm-hours-always">{t("firm.hours.always")}</p>
+                      ) : (
+                        <ul className="firm-hours">
+                          {[1, 2, 3, 4, 5, 6, 7].map((day) => {
+                            const row = profile.hours && !profile.hours.always ? profile.hours.days.find((d) => d.day === day) : undefined;
+                            return (
+                              <li key={day}>
+                                <span>{t(`day.${day}`)}</span>
+                                <strong>{row ? `${row.open} – ${row.close}` : t("firm.hours.closedDay")}</strong>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                      <p className="firm-fine">{t("firm.hours.tz")}</p>
+                    </div>
+                  ) : (
+                    <p>{t("firm.hours.note", { v: profile.hoursNote })}</p>
+                  )
+                ) : null}
+                {activeTab === "districts" ? (
+                  <ul className="firm-dist">
+                    {profile.districts.map((d) => (
+                      <li key={d}>{d}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                {activeTab === "prices" ? (
+                  <>
+                    <ul className="firm-prices">
+                      {profile.prices.map((row, i) => (
+                        <li key={i}>
+                          <div>
+                            <p>{row.title}</p>
+                            {firmPrices ? null : <span>{t("firm.price.listing")}</span>}
+                          </div>
+                          <strong>{priceText(row)}</strong>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="firm-fine">{t("firm.price.note")}</p>
+                  </>
+                ) : null}
+                {activeTab === "news" ? (
+                  <ul className="firm-news">
+                    {profile.announcements.map((a) => (
+                      <li key={`${a.at}-${a.text}`}>
+                        <time className="firm-fine">{dateText(a.at)}</time>
+                        <p>{a.text}</p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {activeTab === "qa" ? (
+                  <ul className="firm-qa">
+                    {profile.qa.map((item) => (
+                      <li key={item.q}>
+                        <p className="firm-q">{item.q}</p>
+                        <p>{item.a}</p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
 
           <section className="firm-reviews">
             <div className="firm-rev-head">
@@ -409,6 +513,7 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
             </a>
           </div>
 
+          {gallery.length ? (
           <section className="firm-gallery">
             <h2>{t("firm.works")}</h2>
             <div className="firm-slider">
@@ -451,6 +556,7 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
               </div>
             ) : null}
           </section>
+          ) : null}
 
           {profile.checks.length ? (
             <section className="firm-checks">

@@ -11052,6 +11052,70 @@ html[data-device="phone"] .svc-portal-offer {
   font-weight: 800;
   margin: 0 0 0.2rem;
 }
+.firm-news p,
+.firm-qa p {
+  margin: 0;
+  white-space: pre-line;
+}
+.firm-fine {
+  display: block;
+  margin: 0.5rem 0 0;
+  color: #6b7280;
+  font-size: 0.72rem;
+}
+.firm-news .firm-fine {
+  margin: 0 0 0.15rem;
+}
+.firm-hours {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-width: 22rem;
+}
+.firm-hours li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 0.82rem;
+}
+.firm-hours strong {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.firm-hours-always {
+  margin: 0;
+  font-weight: 700;
+}
+.firm-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0;
+}
+.firm-details dt {
+  color: #6b7280;
+  font-size: 0.72rem;
+}
+.firm-details dd {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+.firm-owner-hint {
+  margin: 0 0 0.75rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px dashed #93c5fd;
+  border-radius: 0.5rem;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 0.8rem;
+}
+.firm-owner-hint a {
+  font-weight: 800;
+  text-decoration: underline;
+}
 .firm-rev-head {
   border-bottom: 1px solid #e5e7eb;
   padding: 0.55rem 0.9rem;

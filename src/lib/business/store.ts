@@ -1,8 +1,10 @@
 import "server-only";
-import type { BusinessAccount, Prisma } from "@prisma/client";
+import { Prisma, type BusinessAccount } from "@prisma/client";
+import { districtsOf } from "@/data/turkey";
 import { prisma } from "@/lib/db";
 import { liveListingWhere } from "@/lib/listings/lifecycle";
 import { DEMO_SELLER_EMAIL_SUFFIX } from "@/lib/seoIndexing";
+import { cleanFirmExtras, readFirmExtras, type FirmExtrasInput, type PublicFirm } from "@/lib/business/firmProfile";
 import { hideSellerPhone, listingInclude, toClientListing } from "@/lib/listings/store";
 import { sanitizeMultiline, sanitizeText } from "@/lib/security/sanitize";
 import { deleteStoredObject, isOwnBusinessImage, storageKeyFromUrl } from "@/lib/storage/media";
@@ -54,6 +56,7 @@ export function toOwnerView(row: BusinessAccount, stats?: OwnerStats): OwnerBusi
     reviewedAt: row.reviewedAt?.getTime(),
     approvedAt: row.approvedAt?.getTime(),
     ...(stats ? { stats } : {}),
+    extras: readFirmExtras(row),
   };
 }
 
@@ -215,14 +218,40 @@ export async function submitApplication(userId: string, input: ApplyInput): Prom
 }
 
 /** Approved owners only; the account is always the caller's own (no id is accepted from the client). */
-export async function updateStoreProfile(userId: string, patch: Partial<ApplyInput>): Promise<{ row: BusinessAccount } | Fail> {
+export async function updateStoreProfile(
+  userId: string,
+  patch: Partial<ApplyInput> & FirmExtrasInput,
+): Promise<{ row: BusinessAccount } | Fail> {
   const existing = await findOwnBusiness(userId);
   if (!existing) return fail("biz.err.none", 404);
   if (existing.status !== "approved") return fail("biz.err.notApproved", 409);
-  const fields = cleanProfileFields(userId, patch, existing);
+  const { hours, serviceDistricts, priceList, announcements, faq, ...profile } = patch;
+  const fields = cleanProfileFields(userId, profile, existing);
   if ("error" in fields) return fields;
-  if (!Object.keys(fields).length) return { row: existing };
-  const row = await prisma.businessAccount.update({ where: { id: existing.id }, data: fields });
+  const city = fields.city ?? existing.city;
+  const current = readFirmExtras(existing);
+  const extras = cleanFirmExtras(
+    {
+      hours,
+      // A new city invalidates districts of the old one; keep only those that still exist.
+      serviceDistricts:
+        serviceDistricts ?? (fields.city !== undefined ? current.serviceDistricts.filter((d) => districtsOf(city).includes(d)) : undefined),
+      priceList,
+      announcements,
+      faq,
+    },
+    city,
+    current.announcements,
+  );
+  if ("error" in extras) return fail(extras.error);
+  const data: Prisma.BusinessAccountUpdateInput = { ...fields };
+  if (extras.hours !== undefined) data.workingHours = extras.hours ?? Prisma.DbNull;
+  if (extras.serviceDistricts) data.serviceDistricts = extras.serviceDistricts;
+  if (extras.priceList) data.priceList = extras.priceList;
+  if (extras.announcements) data.announcements = extras.announcements;
+  if (extras.faq) data.faq = extras.faq;
+  if (!Object.keys(data).length) return { row: existing };
+  const row = await prisma.businessAccount.update({ where: { id: existing.id }, data });
   await dropReplacedImages(userId, existing, row);
   return { row };
 }
@@ -403,6 +432,22 @@ export async function findPublicStore(slug: string): Promise<{
 export async function findStoreContact(slug: string) {
   if (!/^[a-z0-9-]{1,80}$/.test(slug)) return null;
   return prisma.businessAccount.findFirst({ where: publicStoreWhere(slug), select: { email: true, phone: true } });
+}
+
+/** Owner-entered service profile shown on the seller's service pages; null unless the store is public. */
+export async function findPublicFirmBySeller(sellerId: string): Promise<PublicFirm | null> {
+  if (!/^[0-9a-f-]{36}$/i.test(sellerId)) return null;
+  const row = await prisma.businessAccount.findFirst({
+    where: { userId: sellerId, status: "approved", user: { bannedAt: null } },
+  });
+  if (!row) return null;
+  return {
+    slug: row.slug,
+    name: row.name,
+    description: row.description,
+    ...(row.website ? { website: row.website } : {}),
+    ...readFirmExtras(row),
+  };
 }
 
 export async function listPublicStores(filters: { categoryId?: string; city?: string; district?: string }) {

@@ -258,6 +258,12 @@ model BusinessAccount {
   coverUrl     String?             @map("cover_url")
   tier         String              @default("free")
   tierUntil    DateTime?           @map("tier_until") @db.Timestamptz(6)
+  /// Owner-entered service profile; empty means "not provided" and is never filled in by the app.
+  workingHours     Json?    @map("working_hours")
+  serviceDistricts String[] @default([]) @map("service_districts")
+  priceList        Json     @default("[]") @map("price_list")
+  announcements    Json     @default("[]")
+  faq              Json     @default("[]")
   rejectReason String?             @map("reject_reason")
   submittedAt  DateTime            @default(now()) @map("submitted_at") @db.Timestamptz(6)
   reviewedAt   DateTime?           @map("reviewed_at") @db.Timestamptz(6)

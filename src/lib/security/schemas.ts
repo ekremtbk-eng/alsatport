@@ -319,6 +319,36 @@ export const businessProfilePatchSchema = z
     phone: z.string().trim().max(24).optional(),
     logoUrl: z.string().trim().max(500).optional(),
     coverUrl: z.string().trim().max(500).optional(),
+    hours: z
+      .union([
+        z.object({ always: z.literal(true) }).strict(),
+        z
+          .object({
+            always: z.literal(false),
+            days: z
+              .array(z.object({ day: z.number().int(), open: z.string().max(5), close: z.string().max(5) }).strict())
+              .max(7),
+          })
+          .strict(),
+        z.null(),
+      ])
+      .optional(),
+    serviceDistricts: z.array(z.string().max(40)).max(100).optional(),
+    priceList: z
+      .array(
+        z
+          .object({
+            title: z.string().max(200),
+            min: z.number(),
+            max: z.number().nullable().optional(),
+            unit: z.string().max(60).optional(),
+          })
+          .strict(),
+      )
+      .max(20)
+      .optional(),
+    announcements: z.array(z.object({ text: z.string().max(600), at: z.number().optional() }).strict()).max(5).optional(),
+    faq: z.array(z.object({ q: z.string().max(300), a: z.string().max(1200) }).strict()).max(10).optional(),
   })
   .strict();
 

@@ -6,6 +6,7 @@
 import { MESSAGES } from "../src/i18n/messages";
 import { businessNavState } from "../src/lib/business/navState";
 import type { OwnerBusiness } from "../src/lib/business/shared";
+import { EMPTY_FIRM_EXTRAS } from "../src/lib/business/firmProfile";
 
 const results: { name: string; pass: boolean }[] = [];
 function check(name: string, pass: boolean) {
@@ -33,6 +34,7 @@ function biz(status: OwnerBusiness["status"], slug = "ornek-magaza"): OwnerBusin
     coverUrl: "",
     rejectReason: "",
     submittedAt: 0,
+    extras: EMPTY_FIRM_EXTRAS,
   };
 }
 

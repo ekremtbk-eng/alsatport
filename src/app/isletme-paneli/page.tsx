@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Eye, Heart, MessageCircle, PlusCircle, Store, Zap } from "lucide-react";
 import { ProfileFields, type ProfileValues } from "@/components/business/BusinessFormFields";
 import { BusinessStatusCard } from "@/components/business/BusinessStatusCard";
+import { FirmExtrasEditor } from "@/components/business/FirmExtrasEditor";
 import { StoreLogo, VerifiedBusinessBadge } from "@/components/business/StoreBits";
 import { useOwnBusiness } from "@/components/business/useOwnBusiness";
 import { SellerListings } from "@/components/listings/SellerListings";
@@ -154,6 +155,8 @@ export default function BusinessPanelPage() {
           </div>
         </form>
       </section>
+
+      <FirmExtrasEditor key={business.city} business={business} onSaved={setBusiness} />
     </div>
   );
 }

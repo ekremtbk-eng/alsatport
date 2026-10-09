@@ -1,5 +1,6 @@
 import { categories, lookupCategory, type Category } from "@/data/categories";
 import { TURKEY_CITIES, districtsOf } from "@/data/turkey";
+import type { FirmExtras } from "@/lib/business/firmProfile";
 
 export const COMPANY_TYPES = ["sahis", "limited", "anonim", "diger"] as const;
 export type CompanyType = (typeof COMPANY_TYPES)[number];
@@ -136,6 +137,7 @@ export type OwnerBusiness = {
   reviewedAt?: number;
   approvedAt?: number;
   stats?: OwnerStats;
+  extras: FirmExtras;
 };
 
 export type AdminBusiness = OwnerBusiness & {
