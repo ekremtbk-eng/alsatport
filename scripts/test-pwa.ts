@@ -143,6 +143,55 @@ async function http() {
   }
   const reg = await fetch(`${BASE}/`);
   check("H6", "page links the manifest", (await reg.text()).includes('rel="manifest"'));
+  await emailHold();
+}
+
+/** Signed-in user whose e-mail is not verified yet (ev=0): PWA files must load, everything else stays on hold. */
+async function emailHold() {
+  if (!process.env.AUTH_SECRET) {
+    console.log("SKIP  E*   e-mail hold checks need the local AUTH_SECRET");
+    return;
+  }
+  const { signAccessToken } = await import("../src/lib/security/jwt");
+  const { COOKIE_ACCESS } = await import("../src/lib/security/cookies");
+  const token = await signAccessToken({
+    sub: "00000000-0000-4000-8000-0000000000e0",
+    id: "00000000-0000-4000-8000-0000000000e0",
+    sid: "pwa-test-session",
+    role: "member",
+    email: "pwa-hold@test.invalid",
+    username: "pwa-hold",
+    pc: 1,
+    ev: 0,
+  });
+  const get = (p: string, cookie = true) =>
+    fetch(`${BASE}${p}`, { redirect: "manual", headers: cookie ? { cookie: `${COOKIE_ACCESS}=${token}` } : {} });
+  const holdTarget = (r: Response) => r.status >= 300 && r.status < 400 && new URL(r.headers.get("location") ?? "", BASE).pathname === "/eposta-dogrula";
+
+  const pwa = ["/sw.js", "/manifest.webmanifest", "/offline.html"];
+  const ok = await Promise.all(pwa.map(async (p) => [p, (await get(p)).status] as const));
+  check("E1", "unverified user can load sw.js, manifest and offline page", ok.every(([, s]) => s === 200), ok.map(([p, s]) => `${p}=${s}`).join(" "));
+
+  const sw = await get("/sw.js");
+  check("E2", "sw.js for unverified user keeps JS type, no-cache and security headers",
+    /javascript/.test(sw.headers.get("content-type") ?? "") && /no-store/.test(sw.headers.get("cache-control") ?? "") && !!sw.headers.get("content-security-policy") && sw.headers.get("x-content-type-options") === "nosniff");
+
+  const admin = await get("/admin");
+  check("E3a", "/admin for an unverified member is still refused (role check redirects)",
+    admin.status >= 300 && admin.status < 400 && new URL(admin.headers.get("location") ?? "", BASE).pathname !== "/admin");
+
+  const held = ["/", "/ara", "/profil", "/mesajlar", "/favoriler", "/ilan-ver", "/bildirimler", "/sw.js/x", "/sw.jsx", "/manifest.webmanifest/x", "/offline.html/x", "/x/sw.js"];
+  const heldRes = await Promise.all(held.map(async (p) => [p, holdTarget(await get(p))] as const));
+  check("E3", "every other page (incl. lookalike paths) still goes to /eposta-dogrula", heldRes.every(([, h]) => h), heldRes.filter(([, h]) => !h).map(([p]) => p).join(","));
+
+  const verify = await get("/eposta-dogrula");
+  check("E4", "/eposta-dogrula itself still reachable for unverified user", verify.status === 200);
+
+  const anon = await Promise.all(["/profil", "/admin", "/mesajlar"].map((p) => get(p, false)));
+  check("E5", "signed-out access to private pages still redirects to /giris",
+    anon.every((r) => r.status >= 300 && r.status < 400 && new URL(r.headers.get("location") ?? "", BASE).pathname === "/giris"));
+  const anonPwa = await Promise.all(pwa.map((p) => get(p, false)));
+  check("E6", "signed-out visitors can load the PWA files", anonPwa.every((r) => r.status === 200));
 }
 
 async function main() {

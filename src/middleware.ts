@@ -35,7 +35,11 @@ const EMAIL_HOLD_ALLOW = [
   "/kurumsal/iletisim",
 ];
 
+/** Public PWA files; browsers reject a service worker or manifest served through a redirect. Exact paths only. */
+const PWA_PUBLIC_FILES = new Set(["/sw.js", "/manifest.webmanifest", "/offline.html"]);
+
 function isEmailHoldAllowed(path: string) {
+  if (PWA_PUBLIC_FILES.has(path)) return true;
   if (path.startsWith("/api/")) return true;
   return EMAIL_HOLD_ALLOW.some((p) => path === p || path.startsWith(`${p}/`));
 }
