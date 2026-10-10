@@ -9,6 +9,8 @@ import { useAuthModal } from "@/context/AuthModalContext";
 import { useI18n } from "@/context/I18nContext";
 import { paymentsPaused } from "@/lib/campaign";
 import { compactListingFacts } from "@/lib/listingFacts";
+import { isRightHandDrive } from "@/data/kktcVehicle";
+import { placeLabel } from "@/data/locations";
 
 /** Phone/tablet result row shared by every category; only the fact line differs per category schema. */
 export function CompactListingRow({ listing, meta }: { listing: Listing; meta?: ReactNode }) {
@@ -16,8 +18,9 @@ export function CompactListingRow({ listing, meta }: { listing: Listing; meta?: 
   const { requireAuth } = useAuthModal();
   const { formatMoney, t } = useI18n();
   const liked = favorites.includes(listing.id);
-  const place = [listing.city, listing.district].filter(Boolean).join(", ");
+  const place = placeLabel(listing.city, listing.district, ", ");
   const facts = compactListingFacts(listing);
+  const rhd = isRightHandDrive(listing.specs);
   const badge = paymentsPaused() ? null : listing.vip ? "VIP" : listing.featured ? t("common.featured") : null;
 
   return (
@@ -27,6 +30,7 @@ export function CompactListingRow({ listing, meta }: { listing: Listing; meta?: 
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={listing.images[0]} alt={listing.title} loading="lazy" decoding="async" />
           {badge ? <span className="mrow-badge">{badge}</span> : null}
+          {rhd ? <span className="rhd-badge">{t("kktc.rhd")}</span> : null}
         </div>
         <div className="mrow-body">
           <h3 className="mrow-title">{listing.title}</h3>
@@ -39,7 +43,7 @@ export function CompactListingRow({ listing, meta }: { listing: Listing; meta?: 
             ) : (
               <span />
             )}
-            {listing.price > 0 ? <span className="mrow-price">{formatMoney(listing.price)}</span> : null}
+            {listing.price > 0 ? <span className="mrow-price">{formatMoney(listing.price, listing.currency)}</span> : null}
           </div>
         </div>
         {facts.length || meta ? (

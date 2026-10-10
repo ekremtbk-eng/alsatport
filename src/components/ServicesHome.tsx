@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { findCategory, formatListingCount, hrefForCategory } from "@/data/categories";
-import { TURKEY_CITIES, districtsOf } from "@/data/turkey";
+import { districtsOf } from "@/data/turkey";
+import { LocationOptions } from "@/components/LocationOptions";
 import { useI18n } from "@/context/I18nContext";
 import { servicesSearchHref, SERVICE_PORTAL_TABS } from "@/components/ServicesPortalNav";
 
@@ -113,11 +114,7 @@ export function ServicesHome() {
               aria-label={t("post.city")}
             >
               <option value="">{t("flt.allCities")}</option>
-              {TURKEY_CITIES.map((c) => (
-                <option key={c.name} value={c.name}>
-                  {c.name}
-                </option>
-              ))}
+              <LocationOptions />
             </select>
             <select
               value={district}

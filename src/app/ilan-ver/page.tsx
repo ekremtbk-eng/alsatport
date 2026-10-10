@@ -8,7 +8,10 @@ import { useApp } from "@/context/AppContext";
 import type { Listing } from "@/data/store";
 import { PhotoUploader, MIN_PHOTOS } from "@/components/PhotoUploader";
 import { COMPLETE_PATH, isProfileComplete } from "@/lib/profile";
-import { TURKEY_CITIES, districtsOf } from "@/data/turkey";
+import { districtsOf } from "@/data/turkey";
+import { COUNTRIES, type Country, countryOfCity, isKnownCity, regionNamesFor } from "@/data/locations";
+import { KKTC_VEHICLE_FIELDS, kktcFieldsForSegment } from "@/data/kktcVehicle";
+import { LISTING_CURRENCIES, type ListingCurrency, listingCurrencyOf, listingCurrencySymbol } from "@/lib/listings/currency";
 import { mahallelerOf } from "@/data/regionProfiles";
 import { equipmentForVehicleCombo, typeToCategory, typeFromCategoryId } from "@/data/listingOptions";
 import { listingBodyPlaceholder, listingTitlePlaceholder } from "@/data/listingCopy";
@@ -31,6 +34,7 @@ import {
 } from "@/data/listingSchema";
 import { SearchSelect } from "@/components/SearchSelect";
 import { DynamicAttributeForm } from "@/components/DynamicAttributeForm";
+import { VehicleRequestBox, useApprovedVehicles } from "@/components/VehicleRequestBox";
 import { ChassisMap } from "@/components/ChassisMap";
 import { FeatureGrid } from "@/components/FeatureGrid";
 import { catName, useI18n } from "@/context/I18nContext";
@@ -62,6 +66,7 @@ export default function PostListingPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
+  const [currency, setCurrency] = useState<ListingCurrency>("TRY");
   const [city, setCity] = useState("İstanbul");
   const [district, setDistrict] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
@@ -95,10 +100,18 @@ export default function PostListingPage() {
   const live = user ? reconcileEntitlements(user) : null;
   const allowed = canPublishListing(live);
   const steps = [t("post.s0"), t("post.s1"), t("post.s2")];
-  const cityNames = useMemo(() => TURKEY_CITIES.map((c) => c.name), []);
+  const [countryPick, setCountryPick] = useState<Country>("TR");
+  const country: Country = countryOfCity(city) ?? countryPick;
+  const isKktc = country === "KKTC";
+  const cityNames = useMemo(() => regionNamesFor(country), [country]);
   const districts = useMemo(() => districtsOf(city), [city]);
   const mahalleler = useMemo(() => mahallelerOf(city, district), [city, district]);
   const schema = useMemo(() => schemaForCategoryId(categoryId), [categoryId]);
+  const approvedVehicles = useApprovedVehicles(Boolean(schema.catalogKind));
+  const kktcFields = useMemo(
+    () => (isKktc && schema.family === "vasita" ? kktcFieldsForSegment(schema.catalogKind ?? "auto") : []),
+    [isKktc, schema.family, schema.catalogKind],
+  );
   const locKey = `${city}|${district}|${neighborhood}`;
 
   const resolveGeo = useCallback((key: string) => {
@@ -153,7 +166,7 @@ export default function PostListingPage() {
     ) {
       setType(typeQ);
     }
-    if (cityQ && TURKEY_CITIES.some((c) => c.name === cityQ)) setCity(cityQ);
+    if (cityQ && isKnownCity(cityQ)) setCity(cityQ);
   }, []);
 
   useEffect(() => {
@@ -164,6 +177,11 @@ export default function PostListingPage() {
       const hit = editing.specs.find((s) => s.label === f.specLabel || s.label === f.label);
       if (hit) nextAttrs[f.key] = sch.vehicleProfile ? attrValueFromSpec(f, hit.value) : hit.value;
     }
+    for (const f of KKTC_VEHICLE_FIELDS) {
+      const hit = editing.specs.find((s) => s.label === f.specLabel);
+      if (hit) nextAttrs[`${KKTC_ATTR}${f.key}`] = hit.value;
+    }
+    setCurrency(listingCurrencyOf(editing.currency));
     setType(typeFromCategoryId(editing.categoryId));
     setCategoryId(editing.categoryId);
     setTitle(editing.title);
@@ -196,6 +214,7 @@ export default function PostListingPage() {
     setTitle(draft.title);
     setDescription(draft.description);
     setPrice(draft.price);
+    setCurrency(listingCurrencyOf(draft.currency));
     setCity(draft.city);
     setDistrict(draft.district);
     setNeighborhood(draft.neighborhood);
@@ -221,6 +240,7 @@ export default function PostListingPage() {
       attrs,
       features,
       chassis,
+      currency,
     });
   }, [
     hydrated,
@@ -232,6 +252,7 @@ export default function PostListingPage() {
     title,
     description,
     price,
+    currency,
     city,
     district,
     neighborhood,
@@ -374,6 +395,10 @@ export default function PostListingPage() {
 
   function buildSpecs() {
     const specs = specsWithChassis(schema, attrs, chassis);
+    for (const f of kktcFields) {
+      const value = attrs[`${KKTC_ATTR}${f.key}`]?.trim();
+      if (value && !specs.some((s) => s.label === f.specLabel)) specs.push({ label: f.specLabel, value });
+    }
     if (schema.family === "emlak") {
       const deal = estateDealFromCategoryId(categoryId);
       const homeType = estateHomeTypeFromCategoryId(categoryId);
@@ -456,6 +481,7 @@ export default function PostListingPage() {
           title: title || t("post.new"),
           subtitle: `${types.find((item) => item.id === type)?.label} · ${city} / ${district}${neighborhood ? ` / ${neighborhood}` : ""}`,
           price: amount,
+          currency,
           categoryId,
           city,
           district,
@@ -486,6 +512,7 @@ export default function PostListingPage() {
         title: title || t("post.new"),
         subtitle: `${types.find((item) => item.id === type)?.label} · ${city} / ${district}${neighborhood ? ` / ${neighborhood}` : ""}`,
         price: amount,
+        currency,
         categoryId,
         city,
         district,
@@ -641,7 +668,8 @@ export default function PostListingPage() {
         <div className="space-y-4">
           <div className="space-y-3 rounded-xl border border-line bg-card p-3 shadow-sm">
             <p className="text-xs font-bold text-ink">{t("post.dyn")}</p>
-            <DynamicAttributeForm schema={schema} attrs={attrs} onChange={setAttr} />
+            <DynamicAttributeForm schema={schema} attrs={attrs} onChange={setAttr} approved={approvedVehicles} />
+            {schema.catalogKind ? <VehicleRequestBox segment={schema.catalogKind} brand={attrs.brand} model={attrs.model} /> : null}
           </div>
 
           {schema.chassis ? (
@@ -681,20 +709,63 @@ export default function PostListingPage() {
             />
           </Field>
           <Field label={t("post.price")}>
-            <div className="relative">
-              <input
-                value={price}
-                onChange={(e) => setPrice(e.target.value.replace(/\D/g, "").slice(0, 12))}
-                placeholder="0"
-                inputMode="numeric"
-                maxLength={12}
-                className="h-12 w-full rounded-xl border border-line bg-panel px-3 pe-12 text-sm text-ink shadow-sm"
-              />
-              <span className="absolute end-3 top-1/2 -translate-y-1/2 text-sm text-muted">TL</span>
+            <div className="flex gap-2">
+              <div className="relative min-w-0 flex-1">
+                <input
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value.replace(/\D/g, "").slice(0, 12))}
+                  placeholder="0"
+                  inputMode="numeric"
+                  maxLength={12}
+                  className="h-12 w-full rounded-xl border border-line bg-panel px-3 pe-10 text-sm text-ink shadow-sm"
+                />
+                <span className="absolute end-3 top-1/2 -translate-y-1/2 text-sm text-muted">
+                  {currency === "TRY" ? "TL" : listingCurrencySymbol(currency)}
+                </span>
+              </div>
+              <select
+                aria-label={t("cur.label")}
+                value={currency}
+                onChange={(e) => setCurrency(listingCurrencyOf(e.target.value))}
+                className="h-12 w-28 shrink-0 rounded-xl border border-line bg-panel px-2 text-sm text-ink shadow-sm"
+              >
+                {LISTING_CURRENCIES.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.symbol} {c.id}
+                  </option>
+                ))}
+              </select>
             </div>
+            <span className="mt-1 block text-[11px] text-muted">{t("cur.note")}</span>
           </Field>
+          <div>
+            <span className="mb-1.5 block text-sm text-ink">{t("loc.country")}</span>
+            <div className="country-switch !grid-cols-2" role="radiogroup" aria-label={t("loc.country")}>
+              {COUNTRIES.map((c) => {
+                const on = country === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    className={on ? "is-on" : ""}
+                    onClick={() => {
+                      if (on) return;
+                      setCountryPick(c.id);
+                      setCity(c.id === "KKTC" ? "" : "İstanbul");
+                      setDistrict("");
+                      setNeighborhood("");
+                    }}
+                  >
+                    {c.short}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <SearchSelect
-            label={t("post.city")}
+            label={isKktc ? t("loc.kktcRegion") : t("post.city")}
             value={city}
             options={cityNames}
             placeholder={t("post.phCity")}
@@ -705,7 +776,7 @@ export default function PostListingPage() {
             }}
           />
           <SearchSelect
-            label={t("post.district")}
+            label={isKktc ? t("loc.kktcPlace") : t("post.district")}
             value={district}
             options={districts}
             disabled={!city}
@@ -715,6 +786,37 @@ export default function PostListingPage() {
               setNeighborhood("");
             }}
           />
+          {isKktc && type !== "emlak" && mahalleler.length > 0 ? (
+            <SearchSelect
+              label={t("post.neighborhood")}
+              value={neighborhood}
+              options={mahalleler}
+              placeholder={t("post.phHood")}
+              onChange={setNeighborhood}
+            />
+          ) : null}
+          {kktcFields.length > 0 ? (
+            <div className="space-y-3 rounded-xl border border-line bg-card p-3 shadow-sm">
+              <p className="text-xs font-bold text-ink">{t("kktc.vehicle")}</p>
+              <p className="kktc-declared">{t("kktc.declared")}</p>
+              {kktcFields.map((f) => (
+                <Field key={f.key} label={t(`kktc.f.${f.key}`)}>
+                  <select
+                    value={attrs[`${KKTC_ATTR}${f.key}`] ?? ""}
+                    onChange={(e) => setAttrs((prev) => ({ ...prev, [`${KKTC_ATTR}${f.key}`]: e.target.value }))}
+                    className="h-12 w-full rounded-xl border border-line bg-panel px-3 text-sm text-ink shadow-sm"
+                  >
+                    <option value="">{t("kktc.unset")}</option>
+                    {f.options.map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ))}
+            </div>
+          ) : null}
           {type === "emlak" ? (
             <SearchSelect
               label={t("post.neighborhood")}
@@ -756,7 +858,7 @@ export default function PostListingPage() {
             previewPhoto={previewPhoto}
             onPickPhoto={setPreviewPhoto}
             title={title || t("post.untitled")}
-            priceLabel={formatMoney(parseListingPrice(price) ?? 0)}
+            priceLabel={formatMoney(parseListingPrice(price) ?? 0, currency)}
             description={description}
             city={city}
             district={district}
@@ -806,6 +908,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const DRAFT_KEY = "alsatport-listing-draft";
+/** Prefix of the KKTC vasıta answers kept in `attrs`, so drafts and category resets cover them too. */
+const KKTC_ATTR = "kk_";
 
 type ListingDraft = {
   step: number;
@@ -821,6 +925,7 @@ type ListingDraft = {
   attrs: Record<string, string>;
   features: string[];
   chassis: Record<string, ChassisStatus>;
+  currency?: ListingCurrency;
 };
 
 function readListingDraft(): ListingDraft | null {

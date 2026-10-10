@@ -2,6 +2,8 @@
 
 import { ArrowLeft, ChevronRight, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { CountrySwitch } from "@/components/CountrySwitch";
+import { CurrencyChips } from "@/components/CurrencyChips";
 import { FilterSheet } from "@/components/FilterSheet";
 import { SearchSelect } from "@/components/SearchSelect";
 import { STD_DATE_PRESETS } from "@/components/StdFilterSidebar";
@@ -10,6 +12,7 @@ import {
   ESTATE_FILTER_GROUPS,
   applyFilterChange,
   districtOptions,
+  fieldOffered,
   resolvedOptions,
   type EstateFilterGroup,
   type FilterField,
@@ -20,7 +23,7 @@ import { apiGet } from "@/lib/security/client";
 type T = (key: string, vars?: Record<string, string | number>) => string;
 
 /** Keys the dialog owns besides the schema fields; everything else in the URL state is left untouched. */
-const EXTRA_KEYS: Partial<Record<EstateFilterGroup, string[]>> = { basic: ["posted"], other: ["keyword"] };
+const EXTRA_KEYS: Partial<Record<EstateFilterGroup, string[]>> = { basic: ["posted", "currency"], other: ["keyword"] };
 
 const LOCK_HINTS: Record<string, string> = { district: "flt.districtFirst", brand: "flt.brandFirst", model: "flt.modelFirst" };
 
@@ -33,7 +36,7 @@ function splitList(value?: string) {
 }
 
 export function estateDialogKeys(fields: FilterField[]) {
-  const keys = new Set<string>(["posted", "keyword"]);
+  const keys = new Set<string>(["posted", "keyword", "currency"]);
   for (const f of fields) {
     keys.add(f.key);
     if (f.pairKey) keys.add(f.pairKey);
@@ -150,8 +153,15 @@ function FieldBlock({
   const titleHit = !needle || fold(title).includes(needle);
   let body: React.ReactNode = null;
 
-  if (field.kind === "range" && field.pairKey) {
-    body = <RangeControl field={field} maxKey={field.pairKey} draft={draft} set={set} t={t} />;
+  if (field.kind === "country") {
+    body = <CountrySwitch value={draft.country ?? ""} onChange={(v) => set("country", v)} />;
+  } else if (field.kind === "range" && field.pairKey) {
+    body = (
+      <>
+        {field.key === "priceMin" ? <CurrencyChips value={draft.currency ?? ""} onChange={(v) => set("currency", v)} /> : null}
+        <RangeControl field={field} maxKey={field.pairKey} draft={draft} set={set} t={t} />
+      </>
+    );
   } else if (field.kind === "city" || field.kind === "district" || field.searchable) {
     const locked = Boolean(field.dependsOn && !draft[field.dependsOn]);
     const options = field.kind === "district" ? districtOptions(draft.city) : resolvedOptions(field, draft);
@@ -241,7 +251,10 @@ export function EstateFilterDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const visible = useMemo(() => fields.filter((f) => f.group && !(f.kind === "range" && f.key.endsWith("Max"))), [fields]);
+  const visible = useMemo(
+    () => fields.filter((f) => f.group && !(f.kind === "range" && f.key.endsWith("Max")) && fieldOffered(f, draft)),
+    [fields, draft],
+  );
   const groups = useMemo(
     () => ESTATE_FILTER_GROUPS.filter((g) => visible.some((f) => f.group === g) || EXTRA_KEYS[g]),
     [visible],

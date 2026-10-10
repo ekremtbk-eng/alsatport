@@ -82,6 +82,13 @@ export const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
   Yalova: { lat: 40.655, lng: 29.2769 },
   Yozgat: { lat: 39.82, lng: 34.8083 },
   Zonguldak: { lat: 41.4564, lng: 31.7987 },
+  // KKTC ilçe centres (en.wikipedia coordinates; İskele from OpenStreetMap).
+  Lefkoşa: { lat: 35.19, lng: 33.3636 },
+  Gazimağusa: { lat: 35.125, lng: 33.9417 },
+  Girne: { lat: 35.3403, lng: 33.3192 },
+  Güzelyurt: { lat: 35.1981, lng: 32.9939 },
+  İskele: { lat: 35.2857, lng: 33.8931 },
+  Lefke: { lat: 35.1133, lng: 32.8511 },
 };
 
 function hash(s: string) {

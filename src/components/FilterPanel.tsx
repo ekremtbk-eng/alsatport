@@ -3,6 +3,8 @@
 import { ChevronDown, ChevronLeft, Settings2, X } from "lucide-react";
 import { useState } from "react";
 import { CategoryDrill } from "@/components/CategoryDrill";
+import { CurrencyChips } from "@/components/CurrencyChips";
+import { listingCurrencySymbol } from "@/lib/listings/currency";
 import { SearchSelect } from "@/components/SearchSelect";
 import { TutorFilterChips } from "@/components/TutorFilterChips";
 import { StdFilterSidebar } from "@/components/StdFilterSidebar";
@@ -20,6 +22,7 @@ import {
   YEAR_OPTIONS,
   countActiveFilters,
   countFilterOption,
+  fieldOffered,
   type FilterField,
   type FilterState,
 } from "@/lib/categoryFilters";
@@ -79,9 +82,11 @@ function RangePair({
   hideLabel?: boolean;
 }) {
   const { t } = useI18n();
+  const isPrice = minField.key === "priceMin";
   return (
     <div className={hideLabel ? "" : "flt-group"}>
       {hideLabel ? null : <p className="flt-label">{fieldTitle(t, minField.labelKey)}</p>}
+      {isPrice ? <CurrencyChips value={state.currency ?? ""} onChange={(v) => onChange("currency", v)} /> : null}
       <div className="flt-range">
         <input
           inputMode="numeric"
@@ -109,10 +114,17 @@ function RangePair({
               onClick={() => onChange(maxField.key, state[maxField.key] === p ? "" : p)}
             >
               {p}
-              {minField.suffix ? ` ${minField.suffix}` : "+"}
+              {isPrice ? ` ${listingCurrencySymbol(state.currency || "TRY")}` : minField.suffix ? ` ${minField.suffix}` : "+"}
             </button>
           ))}
         </div>
+      ) : null}
+      {isPrice ? (
+        <p className="flt-note">
+          {state.currency || state[minField.key] || state[maxField.key]
+            ? t("cur.priceIn", { c: state.currency || "TRY" })
+            : t("cur.note")}
+        </p>
       ) : null}
     </div>
   );
@@ -298,7 +310,7 @@ function FieldControl({
     </label>
   );
 }
-const STD_FIELD_KEYS = new Set(["city", "district", "neighborhood", "posted", "keyword", "hours24"]);
+const STD_FIELD_KEYS = new Set(["country", "city", "district", "neighborhood", "posted", "keyword", "hours24"]);
 const PRIMARY_FIELD_KEYS = new Set(["priceMin", "priceMax", "kimden", "species", "petProduct", "breed", "sex", "ageMin"]);
 const PLUGIN_FIELD_KEYS = new Set([
   "brand",
@@ -402,6 +414,7 @@ export function FilterPanel({
       : subcats ?? [];
   const extraFields = fields.filter((field) => {
     if (STD_FIELD_KEYS.has(field.key)) return false;
+    if (!fieldOffered(field, state)) return false;
     if (nav.treeKeys.includes(field.key) && !field.preferOpen && !PLUGIN_FIELD_KEYS.has(field.key)) return false;
     if (field.kind === "range" && field.key.endsWith("Max")) return false;
     return true;
@@ -462,7 +475,10 @@ export function FilterPanel({
   const primaryAcc = (field: FilterField) => {
     const title = fieldTitle(t, field.labelKey);
     const value =
-      field.key === "priceMin" ? (priceSummary ? `${priceSummary} TL` : undefined)
+      field.key === "priceMin"
+        ? priceSummary
+          ? `${priceSummary} ${state.currency || "TL"}`
+          : state.currency || undefined
       : field.key === "kimden" ? kimdenSummary.replaceAll(",", ", ") || undefined
       : field.kind === "range"
         ? [state[field.key], field.pairKey ? state[field.pairKey] : ""].filter(Boolean).join(" – ") || undefined
@@ -563,6 +579,8 @@ export function FilterPanel({
         primary={primary}
         extra={extra}
         plugins={plugins}
+        country={state.country ?? ""}
+        onCountry={(v) => onChange("country", v)}
         city={state.city ?? ""}
         district={state.district ?? ""}
         neighborhood={state.neighborhood ?? ""}

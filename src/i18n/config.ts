@@ -45,16 +45,17 @@ export function localeMeta(id: Locale) {
 }
 
 /**
- * Listing prices are stored and always shown in TRY. There is no live exchange-rate source,
- * so prices are never converted into the display currency of the selected language.
+ * Prices are shown in the currency they were entered in (listings default to TRY). There is no live exchange-rate
+ * source, so amounts are never converted into the display currency of the selected language.
  */
-export function formatMoney(amountTry: number, locale: Locale) {
+export function formatMoney(amount: number, locale: Locale, currency: string = "TRY") {
+  const code = CURRENCIES.some((c) => c.id === currency) ? currency : "TRY";
   return new Intl.NumberFormat(NUMBER_LOCALE[locale], {
     style: "currency",
-    currency: "TRY",
+    currency: code,
     currencyDisplay: "narrowSymbol",
     maximumFractionDigits: 0,
-  }).format(amountTry);
+  }).format(amount);
 }
 
 export const PAY_METHODS: {

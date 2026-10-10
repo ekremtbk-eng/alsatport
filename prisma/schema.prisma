@@ -182,6 +182,8 @@ model User {
   notifications       Notification[]
   business            BusinessAccount?   @relation("BusinessOwner")
   businessReviews     BusinessAccount[]  @relation("BusinessReviewer")
+  vehicleRequests     VehicleCatalogRequest[] @relation("VehicleRequester")
+  vehicleReviews      VehicleCatalogRequest[] @relation("VehicleReviewer")
 
   @@unique([provider, providerSub], map: "users_provider_sub_uidx")
   @@index([role], map: "users_role_idx")
@@ -710,4 +712,32 @@ model SpecialDay {
 
   @@index([active, month, day], map: "special_days_active_md_idx")
   @@map("special_days")
+}
+
+/// User-submitted vehicle missing from the static catalog. Only "approved" rows are offered in the listing form;
+/// approval means an admin accepted the name, not that the vehicle data was officially verified.
+model VehicleCatalogRequest {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  segment      String
+  brand        String
+  model        String
+  series       String    @default("")
+  engine       String    @default("")
+  yearFrom     Int?      @map("year_from")
+  yearTo       Int?      @map("year_to")
+  note         String    @default("")
+  status       String    @default("pending")
+  rejectReason String?   @map("reject_reason")
+  reviewedById String?   @map("reviewed_by") @db.Uuid
+  reviewedAt   DateTime? @map("reviewed_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user       User  @relation("VehicleRequester", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("VehicleReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt], map: "vehicle_catalog_requests_status_idx")
+  @@index([userId, createdAt], map: "vehicle_catalog_requests_user_idx")
+  @@map("vehicle_catalog_requests")
 }

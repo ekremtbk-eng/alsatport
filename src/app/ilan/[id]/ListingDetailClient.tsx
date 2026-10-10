@@ -15,6 +15,8 @@ import {
 import { getSellerPhone, maskPhone, phoneToTel, type Listing } from "@/data/store";
 import { schemaForCategoryId } from "@/data/listingSchema";
 import { ListingSpecTables } from "@/components/ListingSpecTables";
+import { placeLabel } from "@/data/locations";
+import { isRightHandDrive } from "@/data/kktcVehicle";
 import { useApp } from "@/context/AppContext";
 import { catName, useI18n } from "@/context/I18nContext";
 import Link from "next/link";
@@ -183,7 +185,7 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
         variant="banner"
         listingId={listing.id}
         title={listing.title}
-        priceLabel={formatMoney(listing.price)}
+        priceLabel={formatMoney(listing.price, listing.currency)}
         imageUrl={listing.images[0]}
         description={listing.description}
       />
@@ -199,7 +201,7 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
           variant="icon"
           listingId={listing.id}
           title={listing.title}
-          priceLabel={formatMoney(listing.price)}
+          priceLabel={formatMoney(listing.price, listing.currency)}
           imageUrl={listing.images[0]}
           description={listing.description}
         />
@@ -290,7 +292,7 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
           share={{
             listingId: listing.id,
             title: listing.title,
-            priceLabel: formatMoney(listing.price),
+            priceLabel: formatMoney(listing.price, listing.currency),
             imageUrl: listing.images[0],
             description: listing.description,
           }}
@@ -331,7 +333,7 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
             variant="hero"
             listingId={listing.id}
             title={listing.title}
-            priceLabel={formatMoney(listing.price)}
+            priceLabel={formatMoney(listing.price, listing.currency)}
             imageUrl={listing.images[0]}
             description={listing.description}
           />
@@ -358,13 +360,13 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
         <div>
           <h1 className="text-xl font-extrabold text-ink md:text-2xl">{listing.title}</h1>
           <p className="text-sm text-muted">{listing.subtitle}</p>
-          <p className="price-text mt-2 text-2xl font-extrabold">{formatMoney(listing.price)}</p>
+          <p className="price-text mt-2 text-2xl font-extrabold">{formatMoney(listing.price, listing.currency)}</p>
           <div className="mt-3 lg:hidden">
             <ListingShareTrigger
               variant="banner"
               listingId={listing.id}
               title={listing.title}
-              priceLabel={formatMoney(listing.price)}
+              priceLabel={formatMoney(listing.price, listing.currency)}
               imageUrl={listing.images[0]}
               description={listing.description}
             />
@@ -373,9 +375,8 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
           <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted">
             <span>No: {listing.listingNo}</span>
             <span>{listing.createdAt}</span>
-            <span>
-              {listing.city} / {listing.district}
-            </span>
+            <span>{placeLabel(listing.city, listing.district, " / ")}</span>
+            {isRightHandDrive(listing.specs) ? <span className="rhd-badge is-inline">{t("kktc.rhd")}</span> : null}
             {user?.id !== listing.sellerId ? (
               <button type="button" className="inline-flex items-center gap-1 font-semibold text-orange" onClick={reportListing}>
                 <Flag className="h-3.5 w-3.5" />
@@ -473,7 +474,7 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
         share={{
           listingId: listing.id,
           title: listing.title,
-          priceLabel: formatMoney(listing.price),
+          priceLabel: formatMoney(listing.price, listing.currency),
           imageUrl: listing.images[0],
           description: listing.description,
         }}

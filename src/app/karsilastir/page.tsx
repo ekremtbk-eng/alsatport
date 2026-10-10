@@ -71,7 +71,7 @@ export default function ComparePage() {
               <th>{t("cmp.price")}</th>
               {items.map((l) => (
                 <td key={l.id} className="price-text font-extrabold">
-                  {formatMoney(l.price)}
+                  {formatMoney(l.price, l.currency)}
                 </td>
               ))}
             </tr>

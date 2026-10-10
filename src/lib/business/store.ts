@@ -1,6 +1,7 @@
 import "server-only";
 import { Prisma, type BusinessAccount } from "@prisma/client";
 import { districtsOf } from "@/data/turkey";
+import { type Country, cityWhereForCountry } from "@/data/locations";
 import { prisma } from "@/lib/db";
 import { liveListingWhere } from "@/lib/listings/lifecycle";
 import { DEMO_SELLER_EMAIL_SUFFIX } from "@/lib/seoIndexing";
@@ -179,7 +180,7 @@ export async function submitApplication(userId: string, input: ApplyInput): Prom
   const taxOffice = sanitizeText(input.taxOffice, 60);
   const taxNumber = input.taxNumber.replace(/\D/g, "");
   if (name.length < 2 || contactName.length < 3 || taxOffice.length < 2) return fail("biz.err.required");
-  if (!isValidTaxNumber(taxNumber)) return fail("biz.err.taxNumber");
+  if (!isValidTaxNumber(taxNumber, sanitizeText(input.city ?? existing?.city ?? "", 40))) return fail("biz.err.taxNumber");
   if (!input.logoUrl || !input.coverUrl) return fail("biz.err.imagesRequired");
   const fields = cleanProfileFields(userId, input, existing ?? undefined);
   if ("error" in fields) return fields;
@@ -450,9 +451,11 @@ export async function findPublicFirmBySeller(sellerId: string): Promise<PublicFi
   };
 }
 
-export async function listPublicStores(filters: { categoryId?: string; city?: string; district?: string }) {
+export async function listPublicStores(filters: { categoryId?: string; city?: string; district?: string; country?: Country }) {
   const where: Prisma.BusinessAccountWhereInput = { status: "approved", user: { bannedAt: null } };
   if (filters.categoryId) where.categoryId = filters.categoryId;
+  const countryCity = cityWhereForCountry(filters.country);
+  if (countryCity && !filters.city) where.city = countryCity;
   if (filters.city) where.city = filters.city;
   if (filters.city && filters.district) where.district = filters.district;
   const rows = await prisma.businessAccount.findMany({

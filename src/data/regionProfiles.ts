@@ -1,3 +1,5 @@
+import { isKktcCity, kktcNeighborhoodsOf } from "./locations";
+
 export type Density = "high" | "mid" | "low";
 
 export type RegionStats = {
@@ -225,6 +227,7 @@ function complete(p: Omit<RegionStats, "unspecified">): RegionStats {
 
 export function mahallelerOf(city?: string, district?: string): string[] {
   if (!city || !district) return [];
+  if (isKktcCity(city)) return kktcNeighborhoodsOf(city, district);
   return MAHALLELER[keyOf(city, district)] ?? [...DEFAULT_MAHALLE];
 }
 

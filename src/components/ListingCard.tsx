@@ -7,6 +7,8 @@ import { useApp } from "@/context/AppContext";
 import { useAuthModal } from "@/context/AuthModalContext";
 import { catName, useI18n } from "@/context/I18nContext";
 import { findCategory } from "@/data/categories";
+import { isRightHandDrive } from "@/data/kktcVehicle";
+import { placeLabel } from "@/data/locations";
 import { paymentsPaused } from "@/lib/campaign";
 import { listingAgeLabel } from "@/lib/listingAge";
 
@@ -23,7 +25,8 @@ export function ListingCard({
   const { requireAuth } = useAuthModal();
   const { formatMoney, t, locale } = useI18n();
   const liked = favorites.includes(listing.id);
-  const place = [listing.city, listing.district].filter(Boolean).join(" · ");
+  const place = placeLabel(listing.city, listing.district);
+  const rhd = isRightHandDrive(listing.specs);
   const blurb = listing.subtitle?.trim() || listing.description?.trim() || place;
   const cat = findCategory(listing.categoryId);
   const catLabel = cat ? catName(t, cat.id, cat.name) : "";
@@ -37,12 +40,13 @@ export function ListingCard({
             <img src={listing.images[0]} alt={listing.title} loading="lazy" decoding="async" />
             <div className="hp-card-badges">
               {catLabel ? <span className="hp-card-badge is-cat">{catLabel}</span> : null}
+              {rhd ? <span className="hp-card-badge is-rhd">{t("kktc.rhd")}</span> : null}
             </div>
           </div>
           <div className="hp-card-body">
             <p className="hp-card-place">{place || t("acil.turkey")}</p>
             <h3>{listing.title}</h3>
-            <p className="hp-card-price">{formatMoney(listing.price)}</p>
+            <p className="hp-card-price">{formatMoney(listing.price, listing.currency)}</p>
             <p className="hp-card-meta">{listingAgeLabel(listing, locale)}</p>
           </div>
         </Link>
@@ -72,11 +76,12 @@ export function ListingCard({
           ) : listing.featured ? (
             <span className="badge-blue lux-listing-badge">{t("common.featured")}</span>
           ) : null}
+          {rhd ? <span className="rhd-badge">{t("kktc.rhd")}</span> : null}
         </div>
         <div className="lux-listing-body">
           <h3>{listing.title}</h3>
           {blurb ? <p className="lux-listing-line">{blurb}</p> : null}
-          <p className="lux-listing-line lux-listing-price">{formatMoney(listing.price)}</p>
+          <p className="lux-listing-line lux-listing-price">{formatMoney(listing.price, listing.currency)}</p>
           {place ? <p className="lux-listing-line">{place}</p> : null}
           <span className="lux-listing-cta">{t("common.inspect")}</span>
         </div>

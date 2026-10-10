@@ -260,7 +260,7 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
           variant="banner"
           listingId={listing.id}
           title={listing.title}
-          priceLabel={formatMoney(listing.price)}
+          priceLabel={formatMoney(listing.price, listing.currency)}
           imageUrl={listing.images[0] || listing.sellerAvatar}
           description={profile.about}
           kind="firm"

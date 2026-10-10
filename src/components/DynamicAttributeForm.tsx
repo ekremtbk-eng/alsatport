@@ -10,14 +10,18 @@ import {
   type VehicleSegment,
 } from "@/data/listingOptions";
 import type { AttrField, ListingSchema } from "@/data/listingSchema";
+import { withApprovedOptions, type ApprovedVehicle } from "@/data/vehicleRequests";
 
-function optionsOf(field: AttrField, attrs: Record<string, string>, segment: VehicleSegment) {
+function optionsOf(field: AttrField, attrs: Record<string, string>, segment: VehicleSegment, approved?: ApprovedVehicle[]) {
   const kind = field.catalogKind ?? segment;
-  if (field.optionSource === "vehicleModels") return modelsOfBrand(attrs.brand, kind);
-  if (field.optionSource === "vehiclePackages") return packagesOfModel(attrs.brand, attrs.model, kind);
-  if (field.optionSource === "vehicleEngines") return enginesOfModel(attrs.brand, attrs.model, kind);
+  const merge = (level: "brand" | "model" | "trim" | "engine", options: string[]) =>
+    withApprovedOptions(level, options, approved, kind, attrs);
+  if (field.optionSource === "vehicleModels") return merge("model", modelsOfBrand(attrs.brand, kind));
+  if (field.optionSource === "vehiclePackages") return merge("trim", packagesOfModel(attrs.brand, attrs.model, kind));
+  if (field.optionSource === "vehicleEngines") return merge("engine", enginesOfModel(attrs.brand, attrs.model, kind));
   if (field.optionSource === "vehicleBodies") return bodiesOfModel(attrs.brand, attrs.model, kind);
   if (field.optionSource === "vehicleRanges") return rangesOfModel(attrs.brand, attrs.model, kind);
+  if (field.key === "brand" && field.catalogKind && approved?.length) return merge("brand", field.options ?? []);
   return field.options ?? [];
 }
 
@@ -50,10 +54,13 @@ export function DynamicAttributeForm({
   schema,
   attrs,
   onChange,
+  approved,
 }: {
   schema: ListingSchema;
   attrs: Record<string, string>;
   onChange: (key: string, value: string) => void;
+  /** Admin-approved catalog additions, only passed for vasıta schemas. */
+  approved?: ApprovedVehicle[];
 }) {
   const segment = schema.catalogKind ?? "auto";
 
@@ -61,7 +68,7 @@ export function DynamicAttributeForm({
     <div className="dyn-form">
       <div className="dyn-form-grid">
         {schema.fields.map((field) => {
-          const options = optionsOf(field, attrs, segment);
+          const options = optionsOf(field, attrs, segment, approved);
           const parentKey = field.dependsOn;
           const parentMissing = Boolean(parentKey && !attrs[parentKey]);
           const parentField = parentKey ? schema.fields.find((item) => item.key === parentKey) : undefined;
@@ -71,7 +78,7 @@ export function DynamicAttributeForm({
           const parentHasNoOptions =
             parentField != null &&
             parentReady &&
-            optionsOf(parentField, attrs, segment).length === 0 &&
+            optionsOf(parentField, attrs, segment, approved).length === 0 &&
             Boolean(parentField.optionSource);
           const locked = parentMissing && !parentHasNoOptions;
           const placeholder = locked ? lockHint(field.dependsOn) : "Seçiniz";

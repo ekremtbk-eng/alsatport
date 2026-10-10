@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 import { STD_DATE_PRESETS } from "@/components/StdFilterSidebar";
 import { useI18n } from "@/context/I18nContext";
+import { parseCountry } from "@/data/locations";
 import type { FilterField, FilterState } from "@/lib/categoryFilters";
 
 function labelOf(t: (k: string) => string, field?: FilterField, key?: string) {
@@ -83,6 +84,15 @@ export function FilterChips({
     if (key === "posted") {
       const preset = STD_DATE_PRESETS.find((p) => p.id === value);
       chips.push({ id: key, key, text: `${t("flt.posted")}: ${preset ? t(preset.labelKey) : value}` });
+      continue;
+    }
+    if (key === "country") {
+      const c = parseCountry(value);
+      if (c) chips.push({ id: key, key, text: t(c === "KKTC" ? "loc.kktc" : "loc.trGroup") });
+      continue;
+    }
+    if (key === "currency") {
+      chips.push({ id: key, key, text: `${t("cur.label")}: ${value}` });
       continue;
     }
     if (key === "urgent" && value === "1") {

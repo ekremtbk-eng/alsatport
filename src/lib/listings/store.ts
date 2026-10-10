@@ -17,6 +17,11 @@ import { type ListingRef, isLiveRow, liveListingWhere, newPeriod } from "@/lib/l
 import { invalidateCategoryCounts } from "@/lib/listings/categoryCounts";
 import { enforcePetSpecs } from "@/lib/listings/petSpecPolicy";
 import { vehicleSpecError } from "@/lib/listings/vehicleSpecPolicy";
+import type { ApprovedVehicle } from "@/data/vehicleRequests";
+import { approvedVehicles } from "@/lib/vehicleRequests/store";
+import { type ListingCurrency, listingCurrencyOf, parseListingCurrency } from "@/lib/listings/currency";
+import { type Country, cityWhereForCountry, isKktcCity, kktcNeighborhoodsOf } from "@/data/locations";
+import { districtsOf } from "@/data/turkey";
 
 const storeSelect = { select: { status: true, slug: true, name: true, logoUrl: true } } as const;
 
@@ -88,6 +93,7 @@ export function toClientListing(row: ListingWithRelations): Listing {
     title: row.title,
     subtitle: row.subtitle,
     price: Number(row.price),
+    currency: listingCurrencyOf(row.currency),
     categoryId: row.categoryId,
     city: row.city,
     district: row.district,
@@ -169,6 +175,8 @@ export async function queryListings(params: {
   categoryId?: string;
   city?: string;
   district?: string;
+  country?: Country;
+  currency?: ListingCurrency;
   priceMin?: number;
   priceMax?: number;
   posted?: string;
@@ -207,8 +215,15 @@ export async function queryListings(params: {
     const district = sanitizeText(params.district, 40);
     if (district) and.push({ district: { equals: district, mode: "insensitive" } });
   }
-  if (params.priceMin != null && Number.isFinite(params.priceMin)) and.push({ price: { gte: params.priceMin } });
-  if (params.priceMax != null && Number.isFinite(params.priceMax)) and.push({ price: { lte: params.priceMax } });
+  const countryCity = cityWhereForCountry(params.country);
+  if (countryCity) and.push({ city: countryCity });
+  if (params.currency) and.push({ currency: params.currency });
+  const hasMin = params.priceMin != null && Number.isFinite(params.priceMin);
+  const hasMax = params.priceMax != null && Number.isFinite(params.priceMax);
+  // Amounts are never converted, so a price range only compares listings in one currency (TRY unless chosen).
+  if ((hasMin || hasMax) && !params.currency) and.push({ currency: "TRY" });
+  if (hasMin) and.push({ price: { gte: params.priceMin } });
+  if (hasMax) and.push({ price: { lte: params.priceMax } });
   const postedHours = postedFilterHours(params.posted);
   if (postedHours > 0) {
     const since = new Date(Date.now() - postedHours * 3_600_000);
@@ -294,6 +309,7 @@ export type ListingInput = {
   /** undefined = not sent; null = sent but rejected */
   coords?: { lat: number; lng: number } | null;
   price: number;
+  currency: ListingCurrency;
   images: string[];
   specs?: Listing["specs"];
   features?: string[];
@@ -310,6 +326,7 @@ export type ListingInput = {
 export function parseListingInput(
   body: Record<string, unknown> | null,
   previous?: { categoryId: string; specs: Listing["specs"] },
+  approvedVehicles?: ApprovedVehicle[],
 ): ListingInput | { error: string } {
   if (!body) return { error: "auth.err.required" };
   const checked = listingCreateBodySchema.safeParse(body);
@@ -331,6 +348,13 @@ export function parseListingInput(
   if (!title || !categoryId || !city || !Number.isFinite(price) || price < 0) {
     return { error: "auth.err.required" };
   }
+  const currency = body.currency == null ? "TRY" : parseListingCurrency(body.currency);
+  if (!currency) return { error: "auth.err.required" };
+  // KKTC places are new data: the settlement and mahalle must belong to the chosen ilçe.
+  if (isKktcCity(city)) {
+    if (!district || !districtsOf(city).includes(district)) return { error: "post.needDist" };
+    if (neighborhood && !kktcNeighborhoodsOf(city, district).includes(neighborhood)) return { error: "auth.err.required" };
+  }
   const images = parseImages(body.images);
   if (!images.length) return { error: "photo.minN" };
   const moderation = moderateListingDraft({ title: `${title} ${subtitle}`, description, categoryId, images });
@@ -345,7 +369,7 @@ export function parseListingInput(
       : [],
   );
   if (pet.missingRequired) return { error: "post.needSchema" };
-  const vehicleError = vehicleSpecError(categoryId, pet.specs, previous);
+  const vehicleError = vehicleSpecError(categoryId, pet.specs, previous, approvedVehicles);
   if (vehicleError) return { error: vehicleError };
   return {
     id: typeof body.id === "string" ? sanitizeText(body.id, 80) : undefined,
@@ -358,6 +382,7 @@ export function parseListingInput(
     neighborhood,
     coords: body.lat == null && body.lng == null ? undefined : validListingCoords(body.lat, body.lng, city),
     price,
+    currency,
     images,
     specs: pet.specs,
     features: Array.isArray(body.features)
@@ -442,6 +467,7 @@ export async function createListing(user: StoredUser, input: ListingInput) {
         subtitle: input.subtitle || "",
         description: input.description,
         price: input.price,
+        currency: input.currency,
         city: input.city,
         district: input.district || "",
         neighborhood: input.neighborhood || "",
@@ -497,6 +523,7 @@ export async function updateListingRecord(user: StoredUser, id: string, patch: R
     lat: patch.lat,
     lng: patch.lng,
     price: patch.price ?? Number(existing.price),
+    currency: patch.currency ?? listingCurrencyOf(existing.currency),
     subtitle: patch.subtitle ?? existing.subtitle,
     images: imagesProvided ? patch.images : existing.images.map((i) => i.url),
     specs: patch.specs ?? existing.specs,
@@ -508,7 +535,7 @@ export async function updateListingRecord(user: StoredUser, id: string, patch: R
   }, {
     categoryId: existing.categoryId,
     specs: Array.isArray(existing.specs) ? (existing.specs as Listing["specs"]) : [],
-  });
+  }, await approvedVehicles());
   if ("error" in parsed) return { error: parsed.error, status: 400 };
   if (imagesProvided) {
     parsed.images = ownedImages(parsed.images, existing.sellerId, existing.images.map((i) => i.url));
@@ -570,6 +597,7 @@ export async function updateListingRecord(user: StoredUser, id: string, patch: R
         neighborhood: parsed.neighborhood || "",
         ...coordsData,
         price: parsed.price,
+        currency: parsed.currency,
         status: nextStatus,
         ...(reactivated ? newPeriod() : {}),
         urgent: parsed.urgent,

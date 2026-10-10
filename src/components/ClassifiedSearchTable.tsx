@@ -44,7 +44,7 @@ export function ClassifiedSearchTable({
                   </Link>
                 </td>
                 {showProduct ? <td className="cls-muted">{product || "—"}</td> : null}
-                <td className="cls-price">{formatMoney(listing.price)}</td>
+                <td className="cls-price">{formatMoney(listing.price, listing.currency)}</td>
                 <td className="cls-muted">{listing.createdAt}</td>
                 <td className="cls-muted">
                   {listing.city}

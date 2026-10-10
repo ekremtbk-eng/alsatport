@@ -111,7 +111,7 @@ export function ListingPrintSheet({
 }: {
   listing: Listing;
   mode: "standard" | "classified";
-  formatMoney: (n: number) => string;
+  formatMoney: (n: number, currency?: string) => string;
 }) {
   const { user, hydrated } = useApp();
   const { t, locale, dir } = useI18n();
@@ -199,7 +199,7 @@ export function ListingPrintSheet({
         ) : null}
         <div className="ps-summary">
           <p className="ps-price-label">{t("print.price")}</p>
-          <p className="ps-price">{formatMoney(listing.price)}</p>
+          <p className="ps-price">{formatMoney(listing.price, listing.currency)}</p>
           <RowGrid rows={summaryRows} />
         </div>
       </div>

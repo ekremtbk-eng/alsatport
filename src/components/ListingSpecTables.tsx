@@ -9,6 +9,10 @@ import {
   type ListingSchema,
 } from "@/data/listingSchema";
 import type { Listing } from "@/data/store";
+import { KKTC_VEHICLE_FIELDS } from "@/data/kktcVehicle";
+import { useI18n } from "@/context/I18nContext";
+
+const KKTC_SPEC_LABELS = new Set(KKTC_VEHICLE_FIELDS.map((f) => f.specLabel));
 
 const ESTATE_TABLE = ["m²", "Net m²", "Oda", "Kat", "Isıtma", "Bina yaşı", "Cephe"];
 const VEHICLE_TABLE = [
@@ -103,7 +107,11 @@ export function ListingSpecTables({
   listing: Listing;
   schema: ListingSchema;
 }) {
-  const { hi, estateRows, vehicleRows, serviceRows, rest } = listingSpecSections(listing, schema);
+  const { t } = useI18n();
+  const sections = listingSpecSections(listing, schema);
+  const { hi, estateRows, vehicleRows, serviceRows } = sections;
+  const kktcRows = sections.rest.filter((s) => KKTC_SPEC_LABELS.has(s.label));
+  const rest = kktcRows.length ? sections.rest.filter((s) => !KKTC_SPEC_LABELS.has(s.label)) : sections.rest;
 
   return (
     <div className="spec-wrap">
@@ -121,6 +129,12 @@ export function ListingSpecTables({
       {schema.family === "emlak" ? <SpecTable title="Konut bilgileri" rows={estateRows} /> : null}
       {schema.family === "vasita" ? <SpecTable title="Araç teknik bilgileri" rows={vehicleRows} /> : null}
       {schema.family === "hizmet" ? <SpecTable title="Hizmet bilgileri" rows={serviceRows} /> : null}
+      {kktcRows.length ? (
+        <>
+          <SpecTable title={t("kktc.vehicle")} rows={kktcRows} />
+          <p className="kktc-declared">{t("kktc.declared")}</p>
+        </>
+      ) : null}
       <SpecTable title="İlan bilgileri" rows={rest} />
 
       {schema.chassis ? (

@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import { ImagePlus } from "lucide-react";
 import { catName, useI18n } from "@/context/I18nContext";
-import { TURKEY_CITIES, districtsOf } from "@/data/turkey";
+import { districtsOf } from "@/data/turkey";
+import { LocationOptions } from "@/components/LocationOptions";
 import { BUSINESS_DESC_MAX, businessCategories } from "@/lib/business/shared";
 import { apiUpload } from "@/lib/security/client";
 
@@ -110,11 +111,7 @@ export function ProfileFields({ v, set }: { v: ProfileValues; set: (patch: Parti
       <Field label={t("biz.f.city")}>
         <select className="dash-input" required value={v.city} onChange={(e) => set({ city: e.target.value, district: "" })}>
           <option value="">{t("biz.f.choose")}</option>
-          {TURKEY_CITIES.map((c) => (
-            <option key={c.name} value={c.name}>
-              {c.name}
-            </option>
-          ))}
+          <LocationOptions />
         </select>
       </Field>
       <Field label={t("biz.f.district")}>

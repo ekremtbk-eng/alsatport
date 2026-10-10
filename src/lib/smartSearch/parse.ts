@@ -7,6 +7,8 @@ import {
   type Category,
 } from "@/data/categories";
 import { TURKEY_CITIES, districtsOf } from "@/data/turkey";
+import { KKTC_DISTRICTS } from "@/data/kktc";
+import { cityInCountry, isKnownCity, parseCountry } from "@/data/locations";
 import {
   commonFilterFields,
   filterFieldsForCategory,
@@ -107,6 +109,7 @@ const CITY_ALIASES: Record<string, string> = {
   izmit: "Kocaeli",
   adapazari: "Sakarya",
   ist: "İstanbul",
+  magusa: "Gazimağusa",
 };
 const STRONG_CHAT = [
   /\b(merhaba|selam|selamlar|naber|nasilsin|kimsin|tesekkur|tesekkurler)\b/,
@@ -318,9 +321,16 @@ function extractFacts(text: Text): Facts {
   return facts;
 }
 
-function extractPlace(text: Text): { city?: string; district?: string } {
+const KKTC_ROWS = KKTC_DISTRICTS.map((d) => ({ name: d.name, districts: d.settlements.map((s) => s.name) }));
+const TR_DISTRICT_NAMES = new Set(TURKEY_CITIES.flatMap((c) => c.districts.map((d) => foldText(d))));
+/** Without a KKTC keyword, a KKTC name that is also a Turkish district (Güzelyurt) keeps its Turkish meaning. */
+const PLACE_ROWS = [...TURKEY_CITIES, ...KKTC_ROWS.filter((r) => !TR_DISTRICT_NAMES.has(foldText(r.name)))];
+
+function extractPlace(text: Text): { city?: string; district?: string; country?: string } {
   let city: string | undefined;
-  const byLength = [...TURKEY_CITIES].sort((a, b) => b.name.length - a.name.length);
+  const kktc = ["kuzey kibris", "kktc", "kibris"].some((w) => text.take(w));
+  if (kktc) return { ...extractPlaceIn(text, KKTC_ROWS), country: "kktc" };
+  const byLength = [...PLACE_ROWS].sort((a, b) => b.name.length - a.name.length);
   for (const c of byLength) {
     const t = foldText(c.name);
     if (text.take(t, t.length >= 4 ? 4 : 0)) {
@@ -344,8 +354,29 @@ function extractPlace(text: Text): { city?: string; district?: string } {
     }
     return { city };
   }
+  return extractPlaceIn(text, PLACE_ROWS, true);
+}
+
+/** District-only matches (unique names) within `rows`; with `skipCities`, city names were already tried. */
+function extractPlaceIn(
+  text: Text,
+  rows: { name: string; districts: string[] }[],
+  skipCities = false,
+): { city?: string; district?: string } {
+  if (!skipCities) {
+    for (const c of [...rows].sort((a, b) => b.name.length - a.name.length)) {
+      const t = foldText(c.name);
+      if (!text.take(t, t.length >= 4 ? 4 : 0)) continue;
+      const ds = c.districts.filter((d) => d !== "Merkez" && d !== c.name).sort((a, b) => b.length - a.length);
+      for (const d of ds) {
+        const dt = foldText(d);
+        if (dt.length >= 3 && text.take(dt, dt.length >= 4 ? 4 : 0)) return { city: c.name, district: d };
+      }
+      return { city: c.name };
+    }
+  }
   const seen = new Map<string, { city: string; district: string }[]>();
-  for (const c of TURKEY_CITIES) {
+  for (const c of rows) {
     for (const d of c.districts) {
       const t = foldText(d);
       if (t.length < 5 || d === "Merkez" || catIndex?.has(t) || optIndex?.has(t)) continue;
@@ -464,6 +495,7 @@ export function parseSmartQuery(raw: string, hint?: SmartHint): SmartParse {
   const place = extractPlace(text);
   const fields = category ? filterFieldsForCategory(category) : commonFilterFields();
   const state: FilterState = {};
+  if (place.country) state.country = place.country;
   if (place.city) state.city = place.city;
   if (place.district) state.district = place.district;
   setRange(state, fields, "priceMin", "priceMax", facts.price);
@@ -513,14 +545,16 @@ export function validateSmartState(category: Category | null, candidate: Record<
   const out: FilterState = {};
   const get = (key: string) =>
     Object.prototype.hasOwnProperty.call(candidate, key) && typeof candidate[key] === "string" ? (candidate[key] as string) : "";
+  const country = get("country");
+  if ((country === "tr" || country === "kktc") && byKey.has("country")) out.country = country;
   const city = get("city");
-  if (city && TURKEY_CITIES.some((c) => c.name === city) && byKey.has("city")) {
+  if (city && isKnownCity(city) && byKey.has("city") && (!out.country || cityInCountry(city, parseCountry(out.country)))) {
     out.city = city;
     const district = get("district");
     if (district && districtsOf(city).includes(district) && byKey.has("district")) out.district = district;
   }
   for (const [key, field] of byKey) {
-    if (key === "city" || key === "district" || key === "neighborhood") continue;
+    if (key === "city" || key === "district" || key === "neighborhood" || key === "country") continue;
     const value = get(key);
     if (!value) continue;
     if (field.kind === "range") {

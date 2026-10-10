@@ -11,6 +11,7 @@ import { isDemoListingRow, isServiceCategoryId } from "@/lib/seoIndexing";
 import { findCategory } from "@/data/categories";
 import { listingJsonLd, pageMetadata, absoluteAssetUrl } from "@/lib/seo";
 import { formatMoney } from "@/i18n/config";
+import { placeLabel } from "@/data/locations";
 import { ListingDetailClient } from "./ListingDetailClient";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -35,8 +36,8 @@ export async function generateMetadata({ params }: Ctx): Promise<Metadata> {
   if (isBlockedLiveAnimalListing(listing)) {
     return { title: "İlan · AlsatPort", robots: { index: false, follow: false } };
   }
-  const priceLabel = formatMoney(listing.price, "tr");
-  const place = [listing.city, listing.district].filter(Boolean).join(" / ");
+  const priceLabel = formatMoney(listing.price, "tr", listing.currency);
+  const place = placeLabel(listing.city, listing.district, " / ");
   const title = `${listing.title} · ${priceLabel}`;
   const description = [priceLabel, place, listing.subtitle || listing.description || listing.title]
     .filter(Boolean)
@@ -55,7 +56,7 @@ export async function generateMetadata({ params }: Ctx): Promise<Metadata> {
       height: 630,
     })),
     priceAmount: listing.price,
-    priceCurrency: "TRY",
+    priceCurrency: listing.currency ?? "TRY",
   });
 }
 
@@ -78,6 +79,7 @@ export default async function ListingDetailPage({ params }: Ctx) {
           title: listing.title,
           description: listing.description || listing.subtitle || listing.title,
           price: listing.price,
+          currency: listing.currency,
           images: listing.images,
           city: listing.city,
           categoryName: cat?.name,

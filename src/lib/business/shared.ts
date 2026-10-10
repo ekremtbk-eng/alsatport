@@ -1,5 +1,6 @@
 import { categories, lookupCategory, type Category } from "@/data/categories";
-import { TURKEY_CITIES, districtsOf } from "@/data/turkey";
+import { districtsOf } from "@/data/turkey";
+import { isKnownCity as isKnownLocationCity, isKktcCity } from "@/data/locations";
 import type { FirmExtras } from "@/lib/business/firmProfile";
 
 export const COMPANY_TYPES = ["sahis", "limited", "anonim", "diger"] as const;
@@ -28,8 +29,9 @@ export function businessCategoryName(id: string) {
   return lookupCategory(id)?.name ?? "";
 }
 
+/** Turkish province or KKTC ilçe (see `@/data/locations`). */
 export function isKnownCity(city: string) {
-  return TURKEY_CITIES.some((c) => c.name === city);
+  return isKnownLocationCity(city);
 }
 
 export function isKnownDistrict(city: string, district: string) {
@@ -84,7 +86,12 @@ export function normalizeWebsite(raw: string | null | undefined): string | null 
   }
 }
 
-export function isValidTaxNumber(value: string) {
+/**
+ * Türkiye: 10-digit VKN or 11-digit TCKN. KKTC numbers follow a different, unconfirmed format, so only a loose
+ * digit-length check applies there; the admin review of every application is the real check.
+ */
+export function isValidTaxNumber(value: string, city?: string) {
+  if (isKktcCity(city)) return /^\d{4,15}$/.test(value);
   return /^\d{10,11}$/.test(value);
 }
 

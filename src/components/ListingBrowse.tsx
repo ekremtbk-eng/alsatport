@@ -40,6 +40,7 @@ import {
 import { filtersFromSearchParams, mergeFilterQuery, parseBrowseMeta } from "@/lib/filterUrl";
 import type { Listing } from "@/data/store";
 import { sanitizeSearchQuery } from "@/lib/security/inputGuard";
+import { currencyOrder } from "@/lib/listings/currency";
 import { ClassifiedSearchTable } from "@/components/ClassifiedSearchTable";
 import { isSeaEquipCategoryId } from "@/data/seaEquip";
 import { isPublicListing } from "@/lib/categoryCounts";
@@ -159,8 +160,8 @@ export function ListingBrowse({
   const items = useMemo(() => {
     const source = serverResult && scopedListings === listings ? serverResult : scopedListings;
     let list = source.filter((l) => listingMatchesDynamicFilters(l, filters, fields));
-    if (sort === "ucuz") list = [...list].sort((a, b) => a.price - b.price);
-    else if (sort === "pahali") list = [...list].sort((a, b) => b.price - a.price);
+    if (sort === "ucuz") list = [...list].sort((a, b) => currencyOrder(a, b) || a.price - b.price);
+    else if (sort === "pahali") list = [...list].sort((a, b) => currencyOrder(a, b) || b.price - a.price);
     else if (sort === "yeni") {
       list = [...list].sort((a, b) => (b.postedAt ?? 0) - (a.postedAt ?? 0));
     } else if (sort === "puan") {

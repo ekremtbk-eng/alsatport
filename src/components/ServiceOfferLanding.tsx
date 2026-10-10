@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { TURKEY_CITIES } from "@/data/turkey";
+import { regionNamesFor } from "@/data/locations";
 import { useApp } from "@/context/AppContext";
 import { useI18n } from "@/context/I18nContext";
 import { isValidEmail } from "@/lib/auth";
@@ -22,7 +22,7 @@ export function ServiceOfferLanding() {
   const { t } = useI18n();
   const { user } = useApp();
   const router = useRouter();
-  const cities = useMemo(() => TURKEY_CITIES.map((c) => c.name), []);
+  const cities = useMemo(() => regionNamesFor(), []);
   const defaultCity =
     user?.city && cities.includes(user.city) ? user.city : "İstanbul";
   const [city, setCity] = useState(defaultCity);

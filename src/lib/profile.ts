@@ -1,10 +1,14 @@
 import { isValidEmail } from "@/lib/auth";
 import type { UserProfile } from "@/data/store";
 
-/** TR cep (10 hane, isteğe bağlı baştaki 0). 50/51/53–56 operatör aralığı; TCKN ve vergi no ile karışmaz. */
+/**
+ * TR / KKTC cep (+90 alan kodu; KKTC 533/542/548): 10 hane, isteğe bağlı baştaki 0 veya 90.
+ * 50/51/53–56 operatör aralığı; TCKN ve vergi no ile karışmaz.
+ */
 export function nationalPhoneDigits(value: string) {
   const d = value.replace(/\D/g, "");
   if (d.length === 11 && d.startsWith("0")) return d.slice(1);
+  if (d.length === 12 && d.startsWith("90")) return d.slice(2);
   return d;
 }
 

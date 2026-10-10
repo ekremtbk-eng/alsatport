@@ -95,7 +95,7 @@ export function SellerListings({ rounded = "rounded-xl" }: { rounded?: string })
                   <Link href={`/ilan/${l.id}`} className="line-clamp-2 font-semibold">
                     {l.title} {l.subtitle}
                   </Link>
-                  <p className="price-text text-sm font-bold">{formatMoney(l.price)}</p>
+                  <p className="price-text text-sm font-bold">{formatMoney(l.price, l.currency)}</p>
                   <p className="text-xs text-muted">
                     {l.views} {t("my.views")} · {l.city}
                   </p>

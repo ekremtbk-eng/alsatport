@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { SearchSelect } from "@/components/SearchSelect";
 import { useApp } from "@/context/AppContext";
 import { useI18n } from "@/context/I18nContext";
-import { TURKEY_CITIES } from "@/data/turkey";
+import { regionNamesFor } from "@/data/locations";
 import {
   DEFAULT_NOTIFICATION_PREFS,
   type ChannelPref,
@@ -212,7 +212,7 @@ export function NotificationSettingsPanel() {
               <SearchSelect
                 label={t("notif.city")}
                 value={geo.city ?? ""}
-                options={TURKEY_CITIES.map((c) => c.name)}
+                options={regionNamesFor()}
                 placeholder={t("notif.city")}
                 onChange={setGeoCity}
               />

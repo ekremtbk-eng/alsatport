@@ -7,7 +7,8 @@ import { useEffect, useState } from "react";
 import { SearchSuggest } from "@/components/SearchSuggest";
 import { SmartSearch } from "@/components/home/SmartSearch";
 import { useI18n } from "@/context/I18nContext";
-import { TURKEY_CITIES } from "@/data/turkey";
+import { applyLocationPick, locationPickFromParams } from "@/data/locations";
+import { LocationOptions } from "@/components/LocationOptions";
 import { HOME_HERO_CATEGORIES, HOME_POPULAR_SEARCHES } from "@/data/homeHubs";
 import { findCategory } from "@/data/categories";
 
@@ -15,7 +16,7 @@ function readUrlState() {
   if (typeof window === "undefined") return { q: "", city: "", catId: "" };
   const sp = new URLSearchParams(window.location.search);
   const q = (sp.get("q") ?? "").trim();
-  const city = (sp.get("city") ?? "").trim();
+  const city = locationPickFromParams(sp);
   const slug = (sp.get("kategori") ?? sp.get("cat") ?? "").trim();
   const path = window.location.pathname;
   if (path.startsWith("/is-ilanlari")) return { q, city, catId: "jobs" };
@@ -45,7 +46,7 @@ export function HomeHero() {
     e.preventDefault();
     const params = new URLSearchParams();
     if (q.trim()) params.set("q", q.trim());
-    if (city) params.set("city", city);
+    applyLocationPick(params, city);
     if (catId === "jobs") {
       router.push(params.toString() ? `/is-ilanlari?${params}` : "/is-ilanlari");
       return;
@@ -133,7 +134,7 @@ export function HomeHero() {
               query={q}
               active={suggestOn}
               extraParams={{
-                ...(city ? { city } : {}),
+                ...(city && !city.startsWith("@") ? { city } : {}),
                 ...(catId && catId !== "jobs" && catId !== "services"
                   ? { kategori: findCategory(catId)?.slug ?? "" }
                   : {}),
@@ -143,13 +144,9 @@ export function HomeHero() {
           </div>
           <label className="hp-hero-city">
             <MapPin className="h-4 w-4" aria-hidden />
-            <select value={city} onChange={(e) => setCity(e.target.value)}>
-              <option value="">{t("acil.turkey")}</option>
-              {TURKEY_CITIES.map((c) => (
-                <option key={c.name} value={c.name}>
-                  {c.name}
-                </option>
-              ))}
+            <select value={city} onChange={(e) => setCity(e.target.value)} aria-label={t("loc.country")}>
+              <option value="">{t("loc.allPlaces")}</option>
+              <LocationOptions countryPicks />
             </select>
           </label>
           <button type="submit" className="hp-hero-go">

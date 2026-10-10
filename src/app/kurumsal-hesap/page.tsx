@@ -8,6 +8,7 @@ import { Field, ProfileFields, type ProfileValues } from "@/components/business/
 import { useOwnBusiness } from "@/components/business/useOwnBusiness";
 import { useApp } from "@/context/AppContext";
 import { useI18n } from "@/context/I18nContext";
+import { isKktcCity } from "@/data/locations";
 import { COMPANY_TYPES, type CompanyType, type OwnerBusiness } from "@/lib/business/shared";
 import { apiPost } from "@/lib/security/client";
 
@@ -145,10 +146,10 @@ export default function BusinessApplyPage() {
                 className="dash-input"
                 required
                 inputMode="numeric"
-                maxLength={11}
-                pattern="\d{10,11}"
+                maxLength={isKktcCity(v.city) ? 15 : 11}
+                pattern={isKktcCity(v.city) ? "\\d{4,15}" : "\\d{10,11}"}
                 value={v.taxNumber}
-                onChange={(e) => set({ taxNumber: e.target.value.replace(/\D/g, "").slice(0, 11) })}
+                onChange={(e) => set({ taxNumber: e.target.value.replace(/\D/g, "").slice(0, isKktcCity(v.city) ? 15 : 11) })}
               />
             </Field>
             <ProfileFields v={v} set={set} />

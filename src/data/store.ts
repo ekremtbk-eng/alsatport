@@ -7,6 +7,8 @@ export type Listing = {
   title: string;
   subtitle: string;
   price: number;
+  /** ISO code of `price` (TRY, GBP, EUR, USD); missing means TRY. */
+  currency?: string;
   priceLabel?: string;
   categoryId: string;
   city: string;

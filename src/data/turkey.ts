@@ -1,3 +1,5 @@
+import { KKTC_DISTRICTS } from "./kktc";
+
 export type CityRecord = { name: string; districts: string[] };
 
 export const TURKEY_CITIES: CityRecord[] = [
@@ -84,6 +86,9 @@ export const TURKEY_CITIES: CityRecord[] = [
   { name: "Zonguldak", districts: ["Alaplı", "Çaycuma", "Devrek", "Ereğli", "Gökçebey", "Kilimli", "Kozlu", "Merkez"] },
 ];
 
+/** İlçeler of a Turkish province, or settlements of a KKTC ilçe (see `@/data/locations`). */
 export function districtsOf(city: string) {
-  return TURKEY_CITIES.find((c) => c.name === city)?.districts ?? [];
+  const tr = TURKEY_CITIES.find((c) => c.name === city);
+  if (tr) return tr.districts;
+  return KKTC_DISTRICTS.find((d) => d.name === city)?.settlements.map((s) => s.name) ?? [];
 }
