@@ -63,24 +63,31 @@ export function DynamicAttributeForm({
   approved?: ApprovedVehicle[];
 }) {
   const segment = schema.catalogKind ?? "auto";
+  const lockedMemo = new Map<string, boolean>();
+  const isLocked = (field: AttrField, depth = 0): boolean => {
+    const cached = lockedMemo.get(field.key);
+    if (cached !== undefined) return cached;
+    const parentKey = field.dependsOn;
+    let locked = false;
+    if (parentKey && !attrs[parentKey] && depth < 12) {
+      const parentField = schema.fields.find((item) => item.key === parentKey);
+      const parentSkippable =
+        parentField != null &&
+        Boolean(parentField.optionSource) &&
+        !isLocked(parentField, depth + 1) &&
+        optionsOf(parentField, attrs, segment, approved).length === 0;
+      locked = !parentSkippable;
+    }
+    lockedMemo.set(field.key, locked);
+    return locked;
+  };
 
   return (
     <div className="dyn-form">
       <div className="dyn-form-grid">
         {schema.fields.map((field) => {
           const options = optionsOf(field, attrs, segment, approved);
-          const parentKey = field.dependsOn;
-          const parentMissing = Boolean(parentKey && !attrs[parentKey]);
-          const parentField = parentKey ? schema.fields.find((item) => item.key === parentKey) : undefined;
-          const parentReady = parentField
-            ? !parentField.dependsOn || Boolean(attrs[parentField.dependsOn])
-            : true;
-          const parentHasNoOptions =
-            parentField != null &&
-            parentReady &&
-            optionsOf(parentField, attrs, segment, approved).length === 0 &&
-            Boolean(parentField.optionSource);
-          const locked = parentMissing && !parentHasNoOptions;
+          const locked = isLocked(field);
           const placeholder = locked ? lockHint(field.dependsOn) : "Seçiniz";
           if (field.kind === "number" || field.kind === "text") {
             return (

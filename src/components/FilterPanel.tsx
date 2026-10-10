@@ -8,7 +8,9 @@ import { listingCurrencySymbol } from "@/lib/listings/currency";
 import { SearchSelect } from "@/components/SearchSelect";
 import { TutorFilterChips } from "@/components/TutorFilterChips";
 import { StdFilterSidebar } from "@/components/StdFilterSidebar";
+import { useApprovedVehicles } from "@/components/VehicleRequestBox";
 import { catName, useI18n } from "@/context/I18nContext";
+import { withApprovedOptions, type ApprovedVehicle } from "@/data/vehicleRequests";
 import { categoryPath, visibleChildren, type Category } from "@/data/categories";
 import {
   AGE_MONTH_PRESETS,
@@ -130,6 +132,16 @@ function RangePair({
   );
 }
 
+/** Vehicle cascade level of a filter field, for merging admin-approved catalog requests into its options. */
+function approvedLevel(field: FilterField) {
+  if (!field.catalogKind) return null;
+  if (field.key === "brand") return "brand" as const;
+  if (field.optionSource === "vehicleModels") return "model" as const;
+  if (field.optionSource === "vehiclePackages") return "trim" as const;
+  if (field.optionSource === "vehicleEngines") return "engine" as const;
+  return null;
+}
+
 function FieldControl({
   field,
   fields,
@@ -137,6 +149,7 @@ function FieldControl({
   onChange,
   hideLabel,
   listings,
+  approved,
 }: {
   field: FilterField;
   fields: FilterField[];
@@ -144,6 +157,7 @@ function FieldControl({
   onChange: (key: string, value: string) => void;
   hideLabel?: boolean;
   listings?: Listing[];
+  approved?: ApprovedVehicle[];
 }) {
   const { t } = useI18n();
   if (field.kind === "range" && field.pairKey && field.key.endsWith("Max")) return null;
@@ -246,7 +260,10 @@ function FieldControl({
   }
 
   const locked = Boolean(field.dependsOn && !state[field.dependsOn ?? ""]);
-  const options = field.kind === "district" ? districtOptions(state.city) : resolvedOptions(field, state);
+  const level = approvedLevel(field);
+  const baseOptions = field.kind === "district" ? districtOptions(state.city) : resolvedOptions(field, state);
+  const options =
+    level && field.catalogKind ? withApprovedOptions(level, baseOptions, approved, field.catalogKind, state) : baseOptions;
   const optionCounts =
     !locked && listings && listings.length && listings.length <= 800
       ? Object.fromEntries(
@@ -338,11 +355,12 @@ function renderExtraField(
   onChange: (key: string, value: string) => void,
   t: (key: string, vars?: Record<string, string | number>) => string,
   listings?: Listing[],
+  approved?: ApprovedVehicle[],
 ) {
   return (
     <div key={field.key} className="flt-field-block">
       <p className="flt-field-label">{fieldTitle(t, field.labelKey)}</p>
-      <FieldControl field={field} fields={fields} state={state} onChange={onChange} hideLabel listings={listings} />
+      <FieldControl field={field} fields={fields} state={state} onChange={onChange} hideLabel listings={listings} approved={approved} />
     </div>
   );
 }
@@ -397,6 +415,7 @@ export function FilterPanel({
   const { t } = useI18n();
   const [more, setMore] = useState(false);
   const [drill, setDrill] = useState(false);
+  const approved = useApprovedVehicles(fields.some((f) => f.key === "brand" && f.catalogKind));
   const [localDraft, setLocalDraft] = useState(state.keyword ?? "");
   const draft = wordDraft ?? localDraft;
   const setDraft = onWordDraft ?? setLocalDraft;
@@ -491,7 +510,7 @@ export function FilterPanel({
           <ChevronDown className="flt-acc-chev h-4 w-4" />
         </summary>
         <div className="flt-acc-body">
-          <FieldControl field={field} fields={fields} state={state} onChange={onChange} hideLabel listings={listings} />
+          <FieldControl field={field} fields={fields} state={state} onChange={onChange} hideLabel listings={listings} approved={approved} />
         </div>
       </details>
     );
@@ -517,7 +536,7 @@ export function FilterPanel({
               <ChevronDown className="flt-acc-chev h-4 w-4" />
             </summary>
             <div className="flt-acc-body">
-              <FieldControl field={field} fields={fields} state={state} onChange={onChange} hideLabel listings={listings} />
+              <FieldControl field={field} fields={fields} state={state} onChange={onChange} hideLabel listings={listings} approved={approved} />
             </div>
           </details>
         ))}
@@ -526,7 +545,7 @@ export function FilterPanel({
 
   const extra =
     !advanced && moreFields.length > 0 ? (
-      <>{moreFields.map((field) => renderExtraField(field, fields, state, onChange, t, listings))}</>
+      <>{moreFields.map((field) => renderExtraField(field, fields, state, onChange, t, listings, approved))}</>
     ) : null;
 
   return (

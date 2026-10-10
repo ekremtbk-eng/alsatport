@@ -420,10 +420,7 @@ export default function PostListingPage() {
     if (!district) return t("post.needDist");
     const banned = moderateListingDraft({ title, description, categoryId, images });
     if (banned.blocked) return t(banned.reason ?? "mod.animal");
-    const missing = schema.vehicleProfile
-      ? missingRequiredAttrs(schema, attrs)
-      : schema.fields.filter((f) => f.required && !attrs[f.key]?.trim());
-    if (missing.length) return t("post.needSchema");
+    if (missingRequiredAttrs(schema, attrs).length) return t("post.needSchema");
     return "";
   }
 

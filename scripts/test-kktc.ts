@@ -20,6 +20,8 @@ import { countryOfCity, isKnownCity, KKTC_REGION_NAMES, placeLabel, regionNamesF
 import { DISTANCE_MILE, isRightHandDrive, STEERING_RIGHT } from "@/data/kktcVehicle";
 import { isApprovedCombo, withApprovedOptions } from "@/data/vehicleRequests";
 import { findCategory } from "@/data/categories";
+import { enginesOfModel, modelsOfBrand, packagesOfModel } from "@/data/vehicleIndex";
+import { missingRequiredAttrs, schemaForCategoryId } from "@/data/listingSchema";
 import { fieldOffered, filterFieldsForCategory, listingMatchesDynamicFilters, type FilterState } from "@/lib/categoryFilters";
 import { filtersFromSearchParams, mergeFilterQuery, serverFilterState } from "@/lib/filterUrl";
 import { parseListingInput } from "@/lib/listings/store";
@@ -74,6 +76,26 @@ function unitTests() {
   check("L5", "KKTC settlements are the district list of a KKTC ilçe; Turkish districts unchanged",
     districtsOf("Girne").includes(GIRNE_PLACE) && districtsOf("İstanbul").includes("Kadıköy") && isKnownCity("Lefkoşa"));
   check("L6", "Place label marks KKTC only", placeLabel("Girne", GIRNE_PLACE) === `Girne · ${GIRNE_PLACE} · KKTC` && placeLabel("Ankara", "Çankaya") === "Ankara · Çankaya");
+  const settlementKeys = KKTC_DISTRICTS.flatMap((d) => d.settlements.map((s) => `${d.name}/${s.name}`.toLocaleLowerCase("tr")));
+  const dupMah = KKTC_DISTRICTS.flatMap((d) => d.settlements).filter((s) => new Set(s.neighborhoods).size !== s.neighborhoods.length);
+  check("L7", "No duplicate settlement within an ilçe and no duplicate mahalle within a settlement",
+    new Set(settlementKeys).size === settlementKeys.length && dupMah.length === 0, `${settlementKeys.length} settlements`);
+  const has = (d: string, s: string) => districtsOf(d).includes(s);
+  check("L8", "Spellings follow 15/2022 Belediyeler Birleştirme Yasası (İkinci Cetvel)",
+    has("Girne", "Malatya") && has("Girne", "İncesu") && has("Girne", "Kılıçarslan") && has("İskele", "Topçuköy") &&
+      has("Lefkoşa", "Kızılbaş") && has("Lefke", "Yağmuralan") && !has("Girne", "Malatya-İncesu"));
+
+  // Vehicle catalog: Türkiye entries unchanged, KKTC market models added without guessed packages
+  check("V1", "Existing Türkiye catalog lines keep their packages (Toyota Corolla, BMW 3 Serisi untouched)",
+    packagesOfModel("Toyota", "Corolla").length > 1 && modelsOfBrand("Toyota")[0] === "Yaris" && modelsOfBrand("BMW").length >= 18);
+  check("V2", "JDM / UK-import models present with empty packages and engines",
+    ["Vitz", "Aqua", "Noah"].every((m) => modelsOfBrand("Toyota").includes(m)) && modelsOfBrand("Vauxhall").includes("Corsa") &&
+      packagesOfModel("Toyota", "Vitz").length === 0 && enginesOfModel("Honda", "Fit").length === 0);
+  check("V3", "SUV-bodied additions reach the Arazi/SUV catalog",
+    modelsOfBrand("Honda", "suv").includes("Vezel") && modelsOfBrand("Toyota", "suv").includes("Harrier") && !modelsOfBrand("Toyota", "suv").includes("Vitz"));
+  const autoSchema = schemaForCategoryId("vasita-otomobil");
+  check("V4", "A catalog model without packages never blocks the form (trim/engine not required)",
+    !missingRequiredAttrs(autoSchema, { brand: "Toyota", model: "Vitz" }).some((f) => f.key === "trim" || f.key === "engine"));
 
   // Currency display
   check("C1", "Prices keep their own currency (no conversion)",

@@ -4,7 +4,10 @@
  * Source: Turkish Wikipedia, 2022 municipality navigation templates ("<Belediye>'nin mahalle ve köyleri") with each
  * settlement's ilçe taken from its own article infobox (fiilen ilçe), retrieved 2026-10-10. 16 entries had no ilçe in
  * their article and use their municipality's ilçe (every other settlement of the same municipality agrees).
- * Not an official list; verify against KKTC İçişleri Bakanlığı records before treating it as authoritative.
+ * Cross-checked against the İkinci Cetvel of 15/2022 Belediyelerin Birleştirilmesine İlişkin (Özel) Yasa (settlements
+ * per municipality; ilçe follows the municipality's bucak). Settlements listed there were added/renamed to match it.
+ * Kapalı Maraş, Suriçi, Kantara and Yukarı Yeşilırmak are not in that annex and remain unverified. Mahalleler come only
+ * from the Wikipedia templates and are not verified against an official source.
  *
  * Stored on listings as city = ilçe, district = settlement, neighborhood = mahalle.
  */
@@ -19,14 +22,18 @@ export const KKTC_DISTRICTS: KktcDistrict[] = [
       { name: "Alayköy", neighborhoods: [] },
       { name: "Balıkesir", neighborhoods: [] },
       { name: "Beyköy", neighborhoods: [] },
+      { name: "Büyük Kaymaklı", neighborhoods: [] },
       { name: "Cihangir", neighborhoods: [] },
       { name: "Çukurova", neighborhoods: [] },
       { name: "Değirmenlik", neighborhoods: ["Bahçelievler","Başpınar","Camialtı","Mehmetçik","Saray","Tepebaşı"] },
       { name: "Demirhan", neighborhoods: [] },
+      { name: "Dereliköy", neighborhoods: [] },
       { name: "Dilekkaya", neighborhoods: [] },
       { name: "Düzova", neighborhoods: [] },
       { name: "Erdemli", neighborhoods: [] },
+      { name: "Eylence", neighborhoods: [] },
       { name: "Gaziköy", neighborhoods: [] },
+      { name: "Gaziler", neighborhoods: [] },
       { name: "Gökhan", neighborhoods: [] },
       { name: "Gönyeli", neighborhoods: ["Merkez","Yenikent"] },
       { name: "Gürpınar", neighborhoods: [] },
@@ -35,8 +42,10 @@ export const KKTC_DISTRICTS: KktcDistrict[] = [
       { name: "İkidere", neighborhoods: [] },
       { name: "Kalavaç", neighborhoods: [] },
       { name: "Kanlıköy", neighborhoods: [] },
+      { name: "Kiracıköy", neighborhoods: [] },
       { name: "Kırıkkale", neighborhoods: [] },
       { name: "Kırklar", neighborhoods: [] },
+      { name: "Kızılbaş", neighborhoods: [] },
       { name: "Lefkoşa", neighborhoods: ["Abdi Çavuş","Akkavuk","Arabahmet","Aydemet","Ayyıldız","Çağlayan","Haydarpaşa","İbrahimpaşa","İplik Pazarı","Kafesli","Karamanzade","Kızılay","Köşklüçiftlik","Kumsal","Küçük Kaymaklı","Mahmutpaşa","Marmara","Ortaköy","Selimiye","Taşkınköy","Yenicami","Yenişehir"] },
       { name: "Meriç", neighborhoods: [] },
       { name: "Minareliköy", neighborhoods: [] },
@@ -52,6 +61,7 @@ export const KKTC_DISTRICTS: KktcDistrict[] = [
       { name: "Akdoğan", neighborhoods: [] },
       { name: "Akova", neighborhoods: [] },
       { name: "Alaniçi", neighborhoods: [] },
+      { name: "Arıdamı", neighborhoods: [] },
       { name: "Aslanköy", neighborhoods: [] },
       { name: "Atlılar", neighborhoods: [] },
       { name: "Beyarmudu", neighborhoods: [] },
@@ -94,6 +104,7 @@ export const KKTC_DISTRICTS: KktcDistrict[] = [
       { name: "Yamaçköy", neighborhoods: [] },
       { name: "Yeniboğaziçi", neighborhoods: [] },
       { name: "Yıldırım", neighborhoods: [] },
+      { name: "Yukarı Derinya", neighborhoods: [] },
     ],
   },
   {
@@ -130,12 +141,13 @@ export const KKTC_DISTRICTS: KktcDistrict[] = [
       { name: "Karpaşa", neighborhoods: [] },
       { name: "Karşıyaka", neighborhoods: [] },
       { name: "Kayalar", neighborhoods: [] },
-      { name: "Kılıçaslan", neighborhoods: [] },
+      { name: "Kılıçarslan", neighborhoods: [] },
       { name: "Koruçam", neighborhoods: [] },
       { name: "Kozan", neighborhoods: [] },
       { name: "Kömürcü", neighborhoods: [] },
       { name: "Lapta", neighborhoods: ["Adatepe","Başpınar","Kocatepe","Sakarya","Tınaztepe","Türk","Yavuz"] },
-      { name: "Malatya-İncesu", neighborhoods: [] },
+      { name: "Malatya", neighborhoods: [] },
+      { name: "İncesu", neighborhoods: [] },
       { name: "Ozanköy", neighborhoods: [] },
       { name: "Özhan", neighborhoods: [] },
       { name: "Pınarbaşı", neighborhoods: [] },
@@ -178,6 +190,7 @@ export const KKTC_DISTRICTS: KktcDistrict[] = [
       { name: "Aygün", neighborhoods: [] },
       { name: "Bafra", neighborhoods: [] },
       { name: "Balalan", neighborhoods: [] },
+      { name: "Bahçeler", neighborhoods: [] },
       { name: "Boğaz", neighborhoods: [] },
       { name: "Boğaziçi", neighborhoods: [] },
       { name: "Boğaztepe", neighborhoods: [] },
@@ -207,7 +220,7 @@ export const KKTC_DISTRICTS: KktcDistrict[] = [
       { name: "Sınırüstü", neighborhoods: [] },
       { name: "Sipahi", neighborhoods: [] },
       { name: "Taşlıca", neighborhoods: [] },
-      { name: "Topcuköy", neighborhoods: [] },
+      { name: "Topçuköy", neighborhoods: [] },
       { name: "Turnalar", neighborhoods: [] },
       { name: "Tuzluca", neighborhoods: [] },
       { name: "Yarköy", neighborhoods: [] },
@@ -221,6 +234,7 @@ export const KKTC_DISTRICTS: KktcDistrict[] = [
   {
     name: "Lefke",
     settlements: [
+      { name: "Aşağı Kurtboğan", neighborhoods: [] },
       { name: "Bademliköy", neighborhoods: [] },
       { name: "Bağlıköy", neighborhoods: [] },
       { name: "Cengizköy", neighborhoods: [] },
@@ -240,6 +254,7 @@ export const KKTC_DISTRICTS: KktcDistrict[] = [
       { name: "Taşpınar", neighborhoods: [] },
       { name: "Yedidalga", neighborhoods: [] },
       { name: "Yeşilırmak", neighborhoods: [] },
+      { name: "Yağmuralan", neighborhoods: [] },
       { name: "Yeşilyurt", neighborhoods: [] },
       { name: "Yukarı Yeşilırmak", neighborhoods: [] },
     ],
