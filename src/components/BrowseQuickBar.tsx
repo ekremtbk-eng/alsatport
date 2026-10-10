@@ -170,7 +170,7 @@ export function BrowseQuickBar({
           <option value="">{t("loc.all")}</option>
           {COUNTRIES.map((c) => (
             <option key={c.id} value={c.urlValue}>
-              {c.short}
+              {t(c.labelKey)}
             </option>
           ))}
         </select>

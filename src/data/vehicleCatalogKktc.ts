@@ -72,7 +72,7 @@ export function withKktcMarket(base: VehicleBrand[]): VehicleBrand[] {
     const added = extra.models.filter((x) => !names.has(x.name.toLocaleLowerCase("tr")));
     if (!added.length) continue;
     prev.models = [...prev.models, ...added];
-    prev.series = prev.models.map((x) => ({ name: x.name, models: x.packages }));
+    prev.series = [...(prev.series ?? []), ...added.map((x) => ({ name: x.name, models: x.packages }))];
   }
   return out.sort((a, b) => a.name.localeCompare(b.name, "en"));
 }

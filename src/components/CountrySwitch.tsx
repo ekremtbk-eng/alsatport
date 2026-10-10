@@ -16,7 +16,7 @@ export function CountrySwitch({
   const { t } = useI18n();
   const options: { id: string; label: string }[] = [
     { id: "", label: t("loc.all") },
-    ...COUNTRIES.map((c: { id: Country; short: string; urlValue: string }) => ({ id: c.urlValue, label: c.short })),
+    ...COUNTRIES.map((c: { id: Country; labelKey: string; urlValue: string }) => ({ id: c.urlValue, label: t(c.labelKey) })),
   ];
   return (
     <div className={`country-switch ${className}`} role="radiogroup" aria-label={t("loc.country")}>

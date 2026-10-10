@@ -68,7 +68,7 @@ export function StoresDirectory({ stores, filters }: { stores: PublicStore[]; fi
             <option value="">{t("biz.f.all")}</option>
             {COUNTRIES.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.short}
+                {t(c.labelKey)}
               </option>
             ))}
           </select>

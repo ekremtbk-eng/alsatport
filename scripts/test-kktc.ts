@@ -16,7 +16,9 @@ import { SignJWT } from "jose";
 import { PrismaClient } from "@prisma/client";
 import { KKTC_DISTRICTS } from "@/data/kktc";
 import { TURKEY_CITIES, districtsOf } from "@/data/turkey";
-import { countryOfCity, isKnownCity, KKTC_REGION_NAMES, placeLabel, regionNamesFor } from "@/data/locations";
+import { COUNTRIES, countryOfCity, isKnownCity, KKTC_REGION_NAMES, placeLabel, regionNamesFor } from "@/data/locations";
+import { VEHICLE_BRANDS } from "@/data/vehicleCatalog";
+import { MESSAGES } from "@/i18n/messages";
 import { DISTANCE_MILE, DISTANCE_UNIT_LABEL, isRightHandDrive, STEERING_RIGHT, withDeclaredDistance } from "@/data/kktcVehicle";
 import { isApprovedCombo, withApprovedOptions } from "@/data/vehicleRequests";
 import { findCategory } from "@/data/categories";
@@ -96,6 +98,16 @@ function unitTests() {
   const autoSchema = schemaForCategoryId("vasita-otomobil");
   check("V4", "A catalog model without packages never blocks the form (trim/engine not required)",
     !missingRequiredAttrs(autoSchema, { brand: "Toyota", model: "Vitz" }).some((f) => f.key === "trim" || f.key === "engine"));
+  const toyota = VEHICLE_BRANDS.find((b) => b.name === "Toyota");
+  const seriesNames = (toyota?.series ?? []).map((s) => s.name);
+  check("V5", "KKTC models are appended after the Türkiye series (Türkiye series keep their order)",
+    seriesNames[0] === "Yaris" && seriesNames.indexOf("Vitz") > seriesNames.indexOf("Corolla") && seriesNames.indexOf("Corolla") >= 0,
+    seriesNames.slice(0, 4).join(","));
+
+  // Country labels in the language system
+  check("I1", "Country switches read Türkiye/KKTC in Turkish and Turkey/North Cyprus in English",
+    COUNTRIES.map((c) => MESSAGES.tr[c.labelKey]).join("|") === "Türkiye|KKTC" &&
+      COUNTRIES.map((c) => MESSAGES.en[c.labelKey]).join("|") === "Turkey|North Cyprus");
 
   // Currency display
   check("C1", "Prices keep their own currency (no conversion)",

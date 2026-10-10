@@ -755,7 +755,7 @@ export default function PostListingPage() {
                       setNeighborhood("");
                     }}
                   >
-                    {c.short}
+                    {t(c.labelKey)}
                   </button>
                 );
               })}

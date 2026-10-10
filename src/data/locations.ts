@@ -9,9 +9,10 @@ import { TURKEY_CITIES } from "./turkey";
  */
 export type Country = "TR" | "KKTC";
 
-export const COUNTRIES: { id: Country; label: string; short: string; urlValue: string }[] = [
-  { id: "TR", label: "Türkiye", short: "Türkiye", urlValue: "tr" },
-  { id: "KKTC", label: "Kuzey Kıbrıs Türk Cumhuriyeti", short: "KKTC", urlValue: "kktc" },
+/** `short` is the Turkish text used in server-rendered copy; UI controls show `t(labelKey)`. */
+export const COUNTRIES: { id: Country; label: string; short: string; labelKey: string; urlValue: string }[] = [
+  { id: "TR", label: "Türkiye", short: "Türkiye", labelKey: "loc.trGroup", urlValue: "tr" },
+  { id: "KKTC", label: "Kuzey Kıbrıs Türk Cumhuriyeti", short: "KKTC", labelKey: "loc.kktc", urlValue: "kktc" },
 ];
 
 export const TURKEY_CITY_NAMES: string[] = TURKEY_CITIES.map((c) => c.name);
