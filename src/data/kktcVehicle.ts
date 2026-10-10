@@ -60,6 +60,22 @@ export function kktcFieldsForSegment(segment: VehicleSegment): KktcVehicleField[
 
 export const KKTC_FILTER_KEYS = KKTC_VEHICLE_FIELDS.map((f) => f.key);
 
+export function declaresMiles(specs: { label: string; value: string }[] | undefined) {
+  return Boolean(specs?.some((s) => s.label === DISTANCE_UNIT_LABEL && s.value === DISTANCE_MILE));
+}
+
+/** The "Km" spec holds the odometer as typed; when the seller declared miles, show it as miles with a km estimate. */
+export function withDeclaredDistance<T extends { label: string; value: string }>(specs: T[]): T[] {
+  if (!declaresMiles(specs)) return specs;
+  return specs.map((s) => {
+    if (s.label !== "Km") return s;
+    const n = Number(String(s.value).replace(/\D/g, ""));
+    if (!(n > 0)) return s;
+    const km = Math.round(n * KM_PER_MILE);
+    return { ...s, value: `${n.toLocaleString("tr-TR")} mil (≈ ${km.toLocaleString("tr-TR")} km)` };
+  });
+}
+
 export function isRightHandDrive(specs: { label: string; value: string }[] | undefined) {
   return Boolean(specs?.some((s) => s.label === "Direksiyon" && s.value === STEERING_RIGHT));
 }

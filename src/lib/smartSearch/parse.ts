@@ -250,7 +250,16 @@ function pickPreferred(ids: string[]) {
 }
 
 type Range = { min?: number; max?: number };
-type Facts = { price?: Range; year?: Range; km?: Range; sqm?: Range };
+type Facts = { price?: Range; year?: Range; km?: Range; sqm?: Range; currency?: string };
+
+const CURRENCY_WORDS = "tl|lira|try|ingiliz sterlini|sterlin|sterlini|pound|gbp|euro|eur|avro|dolar|usd";
+function currencyOf(s: string): string | undefined {
+  if (/\b(sterlin|sterlini|pound|gbp)\b/.test(s)) return "GBP";
+  if (/\b(euro|eur|avro)\b/.test(s)) return "EUR";
+  if (/\b(dolar|usd)\b/.test(s)) return "USD";
+  if (/\b(tl|lira|try)\b/.test(s)) return "TRY";
+  return undefined;
+}
 
 function money(num: string, unit?: string) {
   if (unit === "milyon" || unit === "m") return Math.round(Number(num) * 1_000_000);
@@ -291,19 +300,21 @@ function extractFacts(text: Text): Facts {
     text.mask({ start: sqm.index, end: sqm.index + sqm[0].length });
   }
   const unit = "(milyon|bin|k|m)?";
-  const cur = "(?:tl|lira|try)?";
+  const cur = `(?:${CURRENCY_WORDS})?`;
   const between = new RegExp(`(?<= )${num} ?${unit} ?${cur} ?(?:-|ile|ila) ?${num} ?${unit} ?${cur}(?: arasi)?(?= )`).exec(text.s);
-  if (between && (between[2] || between[4] || /tl|lira/.test(between[0]))) {
+  if (between && (between[2] || between[4] || currencyOf(between[0]))) {
     const lo = money(between[1], between[2] ?? between[4]);
     const hi = money(between[3], between[4]);
     if (lo <= hi) facts.price = { min: lo, max: hi };
+    facts.currency = currencyOf(between[0]);
     text.mask({ start: between.index, end: between.index + between[0].length });
   } else {
     const pre = new RegExp(`(?<= )(en fazla|en az|max|maksimum|min|minimum) ${num} ?${unit} ?${cur}(?= )`).exec(text.s);
-    const post = new RegExp(`(?<= )${num} ?${unit} ?(tl|lira|try)?(?: ?(${MAX_WORDS}|${MIN_WORDS}))?(?= )`);
-    if (pre && (pre[3] || /tl|lira/.test(pre[0]) || money(pre[2]) >= 1000)) {
+    const post = new RegExp(`(?<= )${num} ?${unit} ?(${CURRENCY_WORDS})?(?: ?(${MAX_WORDS}|${MIN_WORDS}))?(?= )`);
+    if (pre && (pre[3] || currencyOf(pre[0]) || money(pre[2]) >= 1000)) {
       const v = money(pre[2], pre[3]);
       facts.price = /en az|min/.test(pre[1]) ? { min: v } : { max: v };
+      facts.currency = currencyOf(pre[0]);
       text.mask({ start: pre.index, end: pre.index + pre[0].length });
     } else {
       const re = new RegExp(post.source, "g");
@@ -312,6 +323,7 @@ function extractFacts(text: Text): Facts {
         const v = money(n, u);
         if ((u || c || (mod && v >= 1000)) && v > 0) {
           facts.price = mod && new RegExp(`^(?:${MIN_WORDS})$`).test(mod) ? { min: v } : { max: v };
+          facts.currency = c ? currencyOf(c) : undefined;
           text.mask({ start: m.index, end: m.index + m[0].length });
           break;
         }
@@ -323,8 +335,17 @@ function extractFacts(text: Text): Facts {
 
 const KKTC_ROWS = KKTC_DISTRICTS.map((d) => ({ name: d.name, districts: d.settlements.map((s) => s.name) }));
 const TR_DISTRICT_NAMES = new Set(TURKEY_CITIES.flatMap((c) => c.districts.map((d) => foldText(d))));
-/** Without a KKTC keyword, a KKTC name that is also a Turkish district (Güzelyurt) keeps its Turkish meaning. */
-const PLACE_ROWS = [...TURKEY_CITIES, ...KKTC_ROWS.filter((r) => !TR_DISTRICT_NAMES.has(foldText(r.name)))];
+/** KKTC ilçe names that are also common words ("tekne iskele" = pier) need a KKTC keyword. */
+const KKTC_KEYWORD_ONLY = new Set(["iskele"]);
+/**
+ * Without a KKTC keyword only KKTC ilçe names are recognised, and only when they are not Turkish districts
+ * (Güzelyurt) or common words. Settlement-level matching stays Turkish-only, so names shared with KKTC villages
+ * (Karşıyaka, Tuzla, Korkuteli) keep resolving to their Turkish district.
+ */
+const PLACE_ROWS = [
+  ...TURKEY_CITIES,
+  ...KKTC_ROWS.filter((r) => !TR_DISTRICT_NAMES.has(foldText(r.name)) && !KKTC_KEYWORD_ONLY.has(foldText(r.name))),
+];
 
 function extractPlace(text: Text): { city?: string; district?: string; country?: string } {
   let city: string | undefined;
@@ -354,7 +375,7 @@ function extractPlace(text: Text): { city?: string; district?: string; country?:
     }
     return { city };
   }
-  return extractPlaceIn(text, PLACE_ROWS, true);
+  return extractPlaceIn(text, TURKEY_CITIES, true);
 }
 
 /** District-only matches (unique names) within `rows`; with `skipCities`, city names were already tried. */
@@ -499,6 +520,7 @@ export function parseSmartQuery(raw: string, hint?: SmartHint): SmartParse {
   if (place.city) state.city = place.city;
   if (place.district) state.district = place.district;
   setRange(state, fields, "priceMin", "priceMax", facts.price);
+  if (facts.price && facts.currency && facts.currency !== "TRY") state.currency = facts.currency;
   setRange(state, fields, "yearMin", "yearMax", facts.year);
   setRange(state, fields, "kmMin", "kmMax", facts.km);
   setRange(state, fields, "sqmMin", "sqmMax", facts.sqm);
@@ -510,6 +532,7 @@ const FILLER = new Set([
   "ve", "ile", "icin", "bir", "en", "cok", "ariyorum", "ariyoruz", "istiyorum", "lazim", "bul", "bulun", "bana", "benim",
   "uygun", "ucuz", "guzel", "iyi", "temiz", "olan", "gibi", "da", "de", "ki", "mi", "mu", "ilan", "ilani", "ilanlari",
   "alinik", "almak", "satin", "al", "ara", "arama", "acil", "yakin", "yakinda", "civari", "civarinda", "tl", "lira",
+  "sterlin", "sterlini", "ingiliz", "pound", "gbp", "euro", "eur", "avro", "dolar", "usd",
 ]);
 
 /** Original-spelling words the structured pass did not consume; used only as a plain keyword search. */
@@ -572,6 +595,8 @@ export function validateSmartState(category: Category | null, candidate: Record<
   for (const [lo, hi] of [["priceMin", "priceMax"], ["yearMin", "yearMax"], ["kmMin", "kmMax"], ["sqmMin", "sqmMax"]]) {
     if (out[lo] && out[hi] && +out[lo] > +out[hi]) delete out[lo];
   }
+  const currency = get("currency");
+  if (["GBP", "EUR", "USD"].includes(currency) && (out.priceMin || out.priceMax)) out.currency = currency;
   return out;
 }
 
@@ -602,7 +627,9 @@ export function smartChips(category: Category | null, state: FilterState, keywor
   const done = new Set(["city", "district"]);
   for (const [lo, hi, labelKey, unit] of RANGE_CHIPS) {
     done.add(lo).add(hi);
-    if (state[lo] || state[hi]) chips.push({ labelKey, min: state[lo], max: state[hi], unit });
+    if (!state[lo] && !state[hi]) continue;
+    const foreign = unit === "try" && state.currency && state.currency !== "TRY" ? state.currency : undefined;
+    chips.push({ labelKey, min: state[lo], max: state[hi], unit: foreign ? undefined : unit, ...(foreign ? { currency: foreign } : {}) });
   }
   for (const f of fields) {
     if (done.has(f.key) || !state[f.key]) continue;

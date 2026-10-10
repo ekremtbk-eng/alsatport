@@ -14,4 +14,6 @@ export type SmartChip = {
   min?: string;
   max?: string;
   unit?: "try" | "km" | "sqm";
+  /** Non-TRY price chips: ISO code of the searched currency. */
+  currency?: string;
 };

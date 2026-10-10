@@ -17,7 +17,7 @@ import { PrismaClient } from "@prisma/client";
 import { KKTC_DISTRICTS } from "@/data/kktc";
 import { TURKEY_CITIES, districtsOf } from "@/data/turkey";
 import { countryOfCity, isKnownCity, KKTC_REGION_NAMES, placeLabel, regionNamesFor } from "@/data/locations";
-import { DISTANCE_MILE, isRightHandDrive, STEERING_RIGHT } from "@/data/kktcVehicle";
+import { DISTANCE_MILE, DISTANCE_UNIT_LABEL, isRightHandDrive, STEERING_RIGHT, withDeclaredDistance } from "@/data/kktcVehicle";
 import { isApprovedCombo, withApprovedOptions } from "@/data/vehicleRequests";
 import { findCategory } from "@/data/categories";
 import { enginesOfModel, modelsOfBrand, packagesOfModel } from "@/data/vehicleIndex";
@@ -142,6 +142,37 @@ function unitTests() {
   check("Q1", "Smart search: KKTC ilçe recognised; 'Güzelyurt' alone keeps its Turkish meaning; 'KKTC Güzelyurt' is KKTC",
     s1.state.city === "Girne" && s2.state.city !== "Güzelyurt" && s3.state.city === "Güzelyurt",
     `${s1.state.city}|${s2.state.city}/${s2.state.district}|${s3.state.city}`);
+  const fold = (s: string) => s.toLocaleLowerCase("tr");
+  const kktcPlaceNames = new Set(KKTC_DISTRICTS.flatMap((d) => d.settlements.map((s) => fold(s.name))));
+  const trCount = new Map<string, number>();
+  for (const c of TURKEY_CITIES) for (const d of c.districts) trCount.set(fold(d), (trCount.get(fold(d)) ?? 0) + 1);
+  const shared = TURKEY_CITIES.flatMap((c) =>
+    c.districts.filter((d) => d.length >= 5 && kktcPlaceNames.has(fold(d)) && trCount.get(fold(d)) === 1).map((d) => ({ city: c.name, d })),
+  );
+  const sharedWrong = shared.filter(({ city, d }) => {
+    const p = parseSmartQuery(`${d} satılık ev`).state;
+    return p.city !== city || p.country === "kktc";
+  });
+  check("Q2", `Turkish districts that are also KKTC village names stay Turkish (${shared.length} names)`,
+    shared.length > 0 && sharedWrong.length === 0, sharedWrong.map((x) => x.d).join(", "));
+  const korkuteli = parseSmartQuery("korkuteli satılık arsa").state;
+  check("Q3", "'korkuteli satılık arsa' → Antalya / Korkuteli", korkuteli.city === "Antalya" && korkuteli.district === "Korkuteli",
+    `${korkuteli.city}/${korkuteli.district}`);
+  const pier = parseSmartQuery("tekne iskele").state;
+  const kktcIskele = parseSmartQuery("kktc iskele satılık ev").state;
+  check("Q4", "'iskele' alone is not pinned to KKTC İskele; 'kktc iskele' is", pier.city !== "İskele" && !pier.country && kktcIskele.city === "İskele",
+    `${pier.city}/${pier.country} | ${kktcIskele.city}`);
+  const gbp = parseSmartQuery("girne araba 10 bin sterlin altı").state;
+  const tl = parseSmartQuery("ankara araba 500 bin tl altı").state;
+  const eur = parseSmartQuery("girne kiralık daire 800 euro altı").state;
+  check("Q5", "Smart search reads the price currency (sterlin → GBP, euro → EUR, TL stays default)",
+    gbp.currency === "GBP" && gbp.priceMax === "10000" && !tl.currency && tl.priceMax === "500000" && eur.currency === "EUR",
+    `${gbp.currency}/${gbp.priceMax} ${tl.currency}/${tl.priceMax} ${eur.currency}/${eur.priceMax}`);
+  const mileSpecs = [{ label: "Km", value: "42000" }, { label: DISTANCE_UNIT_LABEL, value: DISTANCE_MILE }];
+  const shownKm = withDeclaredDistance(mileSpecs).find((s) => s.label === "Km")?.value ?? "";
+  const kmOnly = withDeclaredDistance([{ label: "Km", value: "42000" }])[0].value;
+  check("Q6", "Odometer declared in miles is shown as miles (with km estimate), km listings unchanged",
+    /^42\.000 mil \(≈ 67\.592 km\)$/.test(shownKm) && kmOnly === "42000", `${shownKm} | ${kmOnly}`);
 
   // Phone / business
   check("P1", "KKTC mobile numbers (533 / 542 / 548) accepted for membership", ["+90 533 850 12 34", "05428501234", "5488501234"].every(isValidPhone));

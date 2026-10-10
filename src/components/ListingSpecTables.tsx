@@ -9,7 +9,7 @@ import {
   type ListingSchema,
 } from "@/data/listingSchema";
 import type { Listing } from "@/data/store";
-import { KKTC_VEHICLE_FIELDS } from "@/data/kktcVehicle";
+import { KKTC_VEHICLE_FIELDS, withDeclaredDistance } from "@/data/kktcVehicle";
 import { useI18n } from "@/context/I18nContext";
 
 const KKTC_SPEC_LABELS = new Set(KKTC_VEHICLE_FIELDS.map((f) => f.specLabel));
@@ -81,7 +81,7 @@ const FAMILY_TABLE_TITLE: Partial<Record<ListingSchema["family"], string>> = {
 };
 
 export function listingSpecSections(listing: Listing, schema: ListingSchema) {
-  const specs = listing.specs ?? [];
+  const specs = withDeclaredDistance(listing.specs ?? []);
   const hi = highlightSpecs(specs, schema.family);
   const estateRows = schema.family === "emlak" ? pickByLabels(specs, ESTATE_TABLE) : [];
   const vehicleRows = schema.family === "vasita" ? pickByLabels(specs, VEHICLE_TABLE) : [];

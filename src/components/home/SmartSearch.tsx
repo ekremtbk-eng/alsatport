@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Sparkles } from "lucide-react";
 import { catName, useI18n } from "@/context/I18nContext";
 import { findCategory, hrefForCategoryListings, parentOf } from "@/data/categories";
+import { listingCurrencyOf, listingCurrencySymbol } from "@/lib/listings/currency";
 import { SMART_HINTS, type SmartChip, type SmartHint } from "@/lib/smartSearch/hints";
 
 const MAX_LEN = 200;
@@ -84,7 +85,8 @@ export function SmartSearch({ variant = "hero" }: { variant?: "hero" | "phone" }
       const fmt = (v?: string) => {
         if (!v) return "";
         const n = Number(v);
-        const base = chip.unit && Number.isFinite(n) ? n.toLocaleString("tr-TR") : v;
+        const base = (chip.unit || chip.currency) && Number.isFinite(n) ? n.toLocaleString("tr-TR") : v;
+        if (chip.currency) return `${base} ${listingCurrencySymbol(listingCurrencyOf(chip.currency))}`;
         return chip.unit === "try" ? `${base} ₺` : chip.unit === "km" ? `${base} km` : chip.unit === "sqm" ? `${base} m²` : base;
       };
       if (chip.min && chip.max) return chip.min === chip.max ? fmt(chip.min) : `${fmt(chip.min)} – ${fmt(chip.max)}`;
