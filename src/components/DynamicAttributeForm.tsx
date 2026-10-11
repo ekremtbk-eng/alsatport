@@ -11,6 +11,7 @@ import {
 } from "@/data/listingOptions";
 import type { AttrField, ListingSchema } from "@/data/listingSchema";
 import { withApprovedOptions, type ApprovedVehicle } from "@/data/vehicleRequests";
+import { fieldUnit } from "@/lib/listings/currency";
 
 function optionsOf(field: AttrField, attrs: Record<string, string>, segment: VehicleSegment, approved?: ApprovedVehicle[]) {
   const kind = field.catalogKind ?? segment;
@@ -55,12 +56,15 @@ export function DynamicAttributeForm({
   attrs,
   onChange,
   approved,
+  currency,
 }: {
   schema: ListingSchema;
   attrs: Record<string, string>;
   onChange: (key: string, value: string) => void;
   /** Admin-approved catalog additions, only passed for vasıta schemas. */
   approved?: ApprovedVehicle[];
+  /** Currency chosen for the listing; amount fields are labelled with it. */
+  currency?: string;
 }) {
   const segment = schema.catalogKind ?? "auto";
   const lockedMemo = new Map<string, boolean>();
@@ -90,11 +94,12 @@ export function DynamicAttributeForm({
           const locked = isLocked(field);
           const placeholder = locked ? lockHint(field.dependsOn) : "Seçiniz";
           if (field.kind === "number" || field.kind === "text") {
+            const unit = fieldUnit(field, currency);
             return (
               <label key={field.key} className="block">
                 <span className="mb-1.5 block text-sm font-semibold text-ink">
                   {field.label}
-                  {field.unit ? ` (${field.unit})` : ""}
+                  {unit ? ` (${unit})` : ""}
                   {field.required ? " *" : ""}
                 </span>
                 <input

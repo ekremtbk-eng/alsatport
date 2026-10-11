@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { STD_DATE_PRESETS } from "@/components/StdFilterSidebar";
 import { useI18n } from "@/context/I18nContext";
 import { parseCountry } from "@/data/locations";
-import type { FilterField, FilterState } from "@/lib/categoryFilters";
+import { rangeSuffix, type FilterField, type FilterState } from "@/lib/categoryFilters";
 
 function labelOf(t: (k: string) => string, field?: FilterField, key?: string) {
   if (field) {
@@ -58,9 +58,10 @@ export function FilterChips({
     const minPair = key.endsWith("Max") ? fields.find((f) => f.pairKey === key) : undefined;
     if (minPair) {
       if (state[minPair.key]) continue;
+      const sfx = rangeSuffix(minPair, state);
       const text = minPair.group
-        ? `${RANGE_PREFIX[minPair.key] ?? ""}≤ ${fmt(value)} ${minPair.suffix ?? ""}`.trim()
-        : `${labelOf(t, minPair, key)}: ≤ ${value}`;
+        ? `${RANGE_PREFIX[minPair.key] ?? ""}≤ ${fmt(value)} ${sfx ?? ""}`.trim()
+        : `${labelOf(t, minPair, key)}: ≤ ${minPair.money ? `${fmt(value)} ${sfx}` : value}`;
       chips.push({ id: key, key, text });
       continue;
     }
@@ -68,10 +69,14 @@ export function FilterChips({
     if (key.endsWith("Min") && field?.pairKey) {
       const max = state[field.pairKey] ?? "";
       seen.add(field.pairKey);
+      const sfx = rangeSuffix(field, state);
       if (field.group) {
         const span = max ? `${fmt(value)}–${fmt(max)}` : `${fmt(value)}+`;
-        const unit = field.suffix ? ` ${field.suffix}` : ` (${labelOf(t, field, key)})`;
+        const unit = sfx ? ` ${sfx}` : ` (${labelOf(t, field, key)})`;
         chips.push({ id: key, key, text: `${RANGE_PREFIX[key] ?? ""}${span}${unit}` });
+      } else if (field.money) {
+        const span = max ? `${fmt(value)}–${fmt(max)}` : `${fmt(value)}+`;
+        chips.push({ id: key, key, text: `${labelOf(t, field, key)}: ${span} ${sfx}` });
       } else {
         chips.push({
           id: key,

@@ -98,7 +98,7 @@ import {
 import { districtsOf } from "@/data/turkey";
 import { cityInCountry, countryOfCity, parseCountry, regionNamesFor } from "@/data/locations";
 import { DISTANCE_MILE, DISTANCE_UNIT_LABEL, KKTC_FILTER_KEYS, KM_PER_MILE, kktcFieldsForSegment } from "@/data/kktcVehicle";
-import { listingCurrencyOf } from "@/lib/listings/currency";
+import { listingCurrencyOf, listingCurrencySymbol } from "@/lib/listings/currency";
 import { catalogForSegment } from "@/data/vehicleIndex";
 import { vehicleProfileSpec, type VehicleProfileSpec } from "@/data/vehicleProfiles";
 import type { VehicleModelLine } from "@/data/vehicleCatalog";
@@ -179,6 +179,8 @@ export type FilterField = {
   group?: EstateFilterGroup;
   /** Range over a spec that may hold a decimal value (12,5 m). */
   decimal?: boolean;
+  /** Amount range: shown in, and compared only within, the filter's currency (TRY unless one is chosen). */
+  money?: boolean;
   currencyTabs?: boolean;
   /** Only offered while the country filter (or the chosen city) is in this country. */
   country?: "KKTC";
@@ -233,6 +235,9 @@ function sel(
   return { key, kind: "select", labelKey, options, specKeys, ...extra };
 }
 
+/** Suffix passed to `range` for amounts; the shown symbol follows the filter's currency. */
+const MONEY_SUFFIX = "₺";
+
 function range(
   minKey: string,
   maxKey: string,
@@ -241,10 +246,16 @@ function range(
   suffix?: string,
   preferOpen = false,
 ): FilterField[] {
+  const money = suffix === MONEY_SUFFIX ? { money: true } : {};
   return [
-    { key: minKey, kind: "range", labelKey, specKeys, pairKey: maxKey, suffix, preferOpen },
-    { key: maxKey, kind: "range", labelKey, specKeys, pairKey: minKey, suffix, preferOpen },
+    { key: minKey, kind: "range", labelKey, specKeys, pairKey: maxKey, suffix, preferOpen, ...money },
+    { key: maxKey, kind: "range", labelKey, specKeys, pairKey: minKey, suffix, preferOpen, ...money },
   ];
+}
+
+/** Unit shown after a range value; amounts use the currency the filter is scoped to. */
+export function rangeSuffix(field: Pick<FilterField, "money" | "suffix">, state: FilterState) {
+  return field.money ? listingCurrencySymbol(state.currency || "TRY") : field.suffix;
 }
 
 export function commonFilterFields(): FilterField[] {
@@ -399,6 +410,7 @@ function vehicleProfileFilterFields(spec: VehicleProfileSpec): FilterField[] {
           ...f,
           ...base,
           ...(def.decimal ? { decimal: true } : {}),
+          ...(def.money ? { money: true } : {}),
         })),
       );
       continue;
@@ -1536,6 +1548,7 @@ export function listingMatchesDynamicFilters(listing: Listing, state: FilterStat
       const min = state[field.key];
       const max = state[field.pairKey];
       if (!min && !max) continue;
+      if (field.money && listingCurrencyOf(listing.currency) !== (state.currency || "TRY")) return false;
       let value: number | undefined;
       if (field.key.startsWith("year")) value = listingYear(listing);
       else if (field.key.startsWith("km")) value = listingKm(listing);

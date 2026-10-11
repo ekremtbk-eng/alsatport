@@ -25,6 +25,7 @@ import {
   countActiveFilters,
   countFilterOption,
   fieldOffered,
+  rangeSuffix,
   type FilterField,
   type FilterState,
 } from "@/lib/categoryFilters";
@@ -85,6 +86,7 @@ function RangePair({
 }) {
   const { t } = useI18n();
   const isPrice = minField.key === "priceMin";
+  const suffix = rangeSuffix(minField, state);
   return (
     <div className={hideLabel ? "" : "flt-group"}>
       {hideLabel ? null : <p className="flt-label">{fieldTitle(t, minField.labelKey)}</p>}
@@ -116,7 +118,7 @@ function RangePair({
               onClick={() => onChange(maxField.key, state[maxField.key] === p ? "" : p)}
             >
               {p}
-              {isPrice ? ` ${listingCurrencySymbol(state.currency || "TRY")}` : minField.suffix ? ` ${minField.suffix}` : "+"}
+              {suffix ? ` ${suffix}` : "+"}
             </button>
           ))}
         </div>
@@ -496,7 +498,7 @@ export function FilterPanel({
     const value =
       field.key === "priceMin"
         ? priceSummary
-          ? `${priceSummary} ${state.currency || "TL"}`
+          ? `${priceSummary} ${listingCurrencySymbol(state.currency || "TRY")}`
           : state.currency || undefined
       : field.key === "kimden" ? kimdenSummary.replaceAll(",", ", ") || undefined
       : field.kind === "range"

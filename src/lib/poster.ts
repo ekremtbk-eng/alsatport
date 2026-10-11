@@ -1,5 +1,7 @@
 import type { Listing } from "@/data/store";
 import { estateDealFromCategoryId, schemaForCategoryId, type ListingSchema } from "@/data/listingSchema";
+import { formatMoney } from "@/i18n/config";
+import { listingCurrencyOf } from "@/lib/listings/currency";
 
 export type PosterDeal = "sale" | "rent";
 export type PosterTemplate = "sale" | "rent" | "plain";
@@ -84,8 +86,9 @@ export function posterFeatures(listing: Listing, max = 5): PosterFeature[] {
   return out;
 }
 
-export function posterPrice(price: number, period: "month" | "day" | null) {
-  const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(price);
+/** Price in the listing's own currency (₺, £, €, $); never converted. */
+export function posterPrice(price: number, period: "month" | "day" | null, currency?: string) {
+  const money = formatMoney(price, "tr", listingCurrencyOf(currency));
   return period === "month" ? `${money} / Ay` : period === "day" ? `${money} / Gün` : money;
 }
 

@@ -11,7 +11,13 @@ import { COMPLETE_PATH, isProfileComplete } from "@/lib/profile";
 import { districtsOf } from "@/data/turkey";
 import { COUNTRIES, type Country, countryOfCity, isKnownCity, regionNamesFor } from "@/data/locations";
 import { KKTC_VEHICLE_FIELDS, kktcFieldsForSegment } from "@/data/kktcVehicle";
-import { LISTING_CURRENCIES, type ListingCurrency, listingCurrencyOf, listingCurrencySymbol } from "@/lib/listings/currency";
+import {
+  LISTING_CURRENCIES,
+  type ListingCurrency,
+  defaultCurrencyForCountry,
+  listingCurrencyOf,
+  listingCurrencySymbol,
+} from "@/lib/listings/currency";
 import { mahallelerOf } from "@/data/regionProfiles";
 import { equipmentForVehicleCombo, typeToCategory, typeFromCategoryId } from "@/data/listingOptions";
 import { listingBodyPlaceholder, listingTitlePlaceholder } from "@/data/listingCopy";
@@ -20,8 +26,8 @@ import { parseListingPrice } from "@/lib/listingPrice";
 import { reconcileEntitlements } from "@/lib/entitlements";
 import { EntitlementStatus } from "@/components/EntitlementStatus";
 import {
-  attrValueFromSpec,
   dependentAttrKeys,
+  editAttrValue,
   missingRequiredAttrs,
   emptyChassis,
   estateDealFromCategoryId,
@@ -67,6 +73,8 @@ export default function PostListingPage() {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [currency, setCurrency] = useState<ListingCurrency>("TRY");
+  /** Set once the currency comes from the user, a draft or the edited listing; the country default never overrides it. */
+  const [currencyChosen, setCurrencyChosen] = useState(false);
   const [city, setCity] = useState("İstanbul");
   const [district, setDistrict] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
@@ -103,6 +111,10 @@ export default function PostListingPage() {
   const [countryPick, setCountryPick] = useState<Country>("TR");
   const country: Country = countryOfCity(city) ?? countryPick;
   const isKktc = country === "KKTC";
+  useEffect(() => {
+    if (currencyChosen || editId) return;
+    setCurrency(defaultCurrencyForCountry(country));
+  }, [country, currencyChosen, editId]);
   const cityNames = useMemo(() => regionNamesFor(country), [country]);
   const districts = useMemo(() => districtsOf(city), [city]);
   const mahalleler = useMemo(() => mahallelerOf(city, district), [city, district]);
@@ -175,13 +187,14 @@ export default function PostListingPage() {
     const nextAttrs: Record<string, string> = {};
     for (const f of sch.fields) {
       const hit = editing.specs.find((s) => s.label === f.specLabel || s.label === f.label);
-      if (hit) nextAttrs[f.key] = sch.vehicleProfile ? attrValueFromSpec(f, hit.value) : hit.value;
+      if (hit) nextAttrs[f.key] = editAttrValue(f, hit.value, sch.vehicleProfile);
     }
     for (const f of KKTC_VEHICLE_FIELDS) {
       const hit = editing.specs.find((s) => s.label === f.specLabel);
       if (hit) nextAttrs[`${KKTC_ATTR}${f.key}`] = hit.value;
     }
     setCurrency(listingCurrencyOf(editing.currency));
+    setCurrencyChosen(true);
     setType(typeFromCategoryId(editing.categoryId));
     setCategoryId(editing.categoryId);
     setTitle(editing.title);
@@ -215,6 +228,7 @@ export default function PostListingPage() {
     setDescription(draft.description);
     setPrice(draft.price);
     setCurrency(listingCurrencyOf(draft.currency));
+    if (draft.currency) setCurrencyChosen(true);
     setCity(draft.city);
     setDistrict(draft.district);
     setNeighborhood(draft.neighborhood);
@@ -240,7 +254,7 @@ export default function PostListingPage() {
       attrs,
       features,
       chassis,
-      currency,
+      currency: currencyChosen ? currency : undefined,
     });
   }, [
     hydrated,
@@ -253,6 +267,7 @@ export default function PostListingPage() {
     description,
     price,
     currency,
+    currencyChosen,
     city,
     district,
     neighborhood,
@@ -394,7 +409,7 @@ export default function PostListingPage() {
   }
 
   function buildSpecs() {
-    const specs = specsWithChassis(schema, attrs, chassis);
+    const specs = specsWithChassis(schema, attrs, chassis, currency);
     for (const f of kktcFields) {
       const value = attrs[`${KKTC_ATTR}${f.key}`]?.trim();
       if (value && !specs.some((s) => s.label === f.specLabel)) specs.push({ label: f.specLabel, value });
@@ -665,7 +680,7 @@ export default function PostListingPage() {
         <div className="space-y-4">
           <div className="space-y-3 rounded-xl border border-line bg-card p-3 shadow-sm">
             <p className="text-xs font-bold text-ink">{t("post.dyn")}</p>
-            <DynamicAttributeForm schema={schema} attrs={attrs} onChange={setAttr} approved={approvedVehicles} />
+            <DynamicAttributeForm schema={schema} attrs={attrs} onChange={setAttr} approved={approvedVehicles} currency={currency} />
             {schema.catalogKind ? <VehicleRequestBox segment={schema.catalogKind} brand={attrs.brand} model={attrs.model} /> : null}
           </div>
 
@@ -723,7 +738,10 @@ export default function PostListingPage() {
               <select
                 aria-label={t("cur.label")}
                 value={currency}
-                onChange={(e) => setCurrency(listingCurrencyOf(e.target.value))}
+                onChange={(e) => {
+                  setCurrency(listingCurrencyOf(e.target.value));
+                  setCurrencyChosen(true);
+                }}
                 className="h-12 w-28 shrink-0 rounded-xl border border-line bg-panel px-2 text-sm text-ink shadow-sm"
               >
                 {LISTING_CURRENCIES.map((c) => (
@@ -734,6 +752,9 @@ export default function PostListingPage() {
               </select>
             </div>
             <span className="mt-1 block text-[11px] text-muted">{t("cur.note")}</span>
+            {isKktc && !currencyChosen && currency === "GBP" ? (
+              <span className="mt-1 block text-[11px] text-muted">{t("cur.kktcHint")}</span>
+            ) : null}
           </Field>
           <div>
             <span className="mb-1.5 block text-sm text-ink">{t("loc.country")}</span>

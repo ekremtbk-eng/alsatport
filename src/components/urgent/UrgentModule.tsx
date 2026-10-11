@@ -31,6 +31,8 @@ import { StdFilterSidebar, STD_DATE_PRESETS, STD_FRESH_PRESETS } from "@/compone
 import { FilterCategoryTree } from "@/components/FilterCategoryTree";
 import { FilterSheet } from "@/components/FilterSheet";
 import { VerifiedBusinessBadge } from "@/components/business/StoreBits";
+import { CurrencyChips } from "@/components/CurrencyChips";
+import { currencyOrder, listingCurrencyOf, listingCurrencySymbol } from "@/lib/listings/currency";
 
 export type SpecialMode = "urgent" | "h48";
 type ViewMode = "split" | "grid" | "list";
@@ -121,6 +123,7 @@ export function SpecialListingsModule({ mode }: { mode: SpecialMode }) {
   const [more, setMore] = useState(false);
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
+  const [currency, setCurrency] = useState("");
   const [hint, setHint] = useState("");
   const [draft, setDraft] = useState(initialQ);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -153,6 +156,10 @@ export function SpecialListingsModule({ mode }: { mode: SpecialMode }) {
       }
       const min = priceMin ? Number(priceMin.replace(/\D/g, "")) : 0;
       const max = priceMax ? Number(priceMax.replace(/\D/g, "")) : 0;
+      const own = listingCurrencyOf(l.currency);
+      if (currency && own !== currency) return false;
+      // Amounts are never converted: a price range only looks at one currency (TRY unless another is chosen).
+      if ((min || max) && own !== (currency || "TRY")) return false;
       if (min && l.price < min) return false;
       if (max && l.price > max) return false;
       if (word.trim()) {
@@ -160,11 +167,11 @@ export function SpecialListingsModule({ mode }: { mode: SpecialMode }) {
       }
       return true;
     });
-    if (sort === "ucuz") list = [...list].sort((a, b) => a.price - b.price);
-    else if (sort === "pahali") list = [...list].sort((a, b) => b.price - a.price);
+    if (sort === "ucuz") list = [...list].sort((a, b) => currencyOrder(a, b) || a.price - b.price);
+    else if (sort === "pahali") list = [...list].sort((a, b) => currencyOrder(a, b) || b.price - a.price);
     else list = [...list].sort((a, b) => listingPostedAt(b) - listingPostedAt(a));
     return list;
-  }, [pool, pickedCat, city, district, mappedOnly, posted, word, includeDesc, sort, priceMin, priceMax]);
+  }, [pool, pickedCat, city, district, mappedOnly, posted, word, includeDesc, sort, priceMin, priceMax, currency]);
 
   function onSave() {
     if (!requireAuth("member")) return;
@@ -208,25 +215,29 @@ export function SpecialListingsModule({ mode }: { mode: SpecialMode }) {
         )
       }
       extra={
-        <label className="acil-field">
+        <div className="acil-field">
           <span>{t("flt.price")}</span>
+          <CurrencyChips value={currency} onChange={setCurrency} />
           <div className="acil-price-row">
             <input
               className="acil-input"
               inputMode="numeric"
               value={priceMin}
               onChange={(e) => setPriceMin(e.target.value.replace(/\D/g, ""))}
-              placeholder={t("flt.min")}
+              placeholder={`${t("flt.min")} (${listingCurrencySymbol(currency || "TRY")})`}
+              aria-label={`${t("flt.price")} ${t("flt.min")}`}
             />
             <input
               className="acil-input"
               inputMode="numeric"
               value={priceMax}
               onChange={(e) => setPriceMax(e.target.value.replace(/\D/g, ""))}
-              placeholder={t("flt.max")}
+              placeholder={`${t("flt.max")} (${listingCurrencySymbol(currency || "TRY")})`}
+              aria-label={`${t("flt.price")} ${t("flt.max")}`}
             />
           </div>
-        </label>
+          {currency || priceMin || priceMax ? <p className="flt-note">{t("cur.priceIn", { c: currency || "TRY" })}</p> : null}
+        </div>
       }
       city={city}
       district={district}
