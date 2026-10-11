@@ -37,6 +37,7 @@ async function main() {
   const oauth = await import("../src/lib/oauth/complete");
   const { signOAuthState, verifyOAuthState } = await import("../src/lib/oauth/providers");
   const { canLinkProvider } = await import("../src/lib/security/session");
+  const { needsSecondFactor } = await import("../src/lib/security/loginFlow");
 
   const hash = await bcrypt.hash(`Oauth!${TAG}9a`, 10);
   async function makeUser(label: string, opts: { phone?: string; verified?: boolean; role?: "seller" | "admin"; sub?: string } = {}) {
@@ -55,7 +56,7 @@ async function main() {
     return row;
   }
   const snapshot = (id: string) =>
-    prisma.user.findUnique({ where: { id }, select: { email: true, providerSub: true, passwordHash: true, role: true } });
+    prisma.user.findUnique({ where: { id }, select: { email: true, provider: true, providerSub: true, passwordHash: true, role: true, emailVerifiedAt: true } });
   const identity = (email: string, sub: string, verified = true) => ({
     provider: "google" as const,
     sub,
@@ -141,21 +142,56 @@ async function main() {
     await prisma.userSession.create({
       data: { userId: unverified.id, method: "password", expiresAt: new Date(Date.now() + 3600_000), userAgent: "oauth-test" },
     });
+    const uBefore = await snapshot(unverified.id);
     const r6 = await oauth.upsertVerifiedOAuthUser(identity(unverified.email, `sub-claim-${TAG}`), req);
-    const uAfter = await prisma.user.findUnique({
-      where: { id: unverified.id },
-      select: { email: true, passwordHash: true, providerSub: true, emailVerifiedAt: true },
-    });
+    const uAfter = await snapshot(unverified.id);
     const openSessions = await prisma.userSession.count({ where: { userId: unverified.id, revokedAt: null } });
     check(
       "O6",
-      "Unproven sign-up with the exact e-mail: password dropped, sessions revoked, e-mail unchanged",
-      "user" in r6 && !uAfter?.passwordHash && uAfter?.providerSub === `sub-claim-${TAG}` && uAfter?.email === unverified.email && !!uAfter?.emailVerifiedAt && openSessions === 0,
-      `pw=${!!uAfter?.passwordHash} sessions=${openSessions}`,
+      "Unverified account with the exact e-mail is not taken over: password, sessions, e-mail untouched",
+      "linkRequired" in r6 && JSON.stringify(uBefore) === JSON.stringify(uAfter) && uAfter?.providerSub === null && openSessions === 1,
+      `sessions=${openSessions}`,
     );
 
     const r7 = await oauth.upsertVerifiedOAuthUser(identity(`noverify-${TAG}@${DOMAIN}`, `sub-nv-${TAG}`, false), req);
     check("O7", "Provider e-mail not verified: rejected", "error" in r7 && r7.error === "auth.err.email");
+
+    // ---------------- Backward compatibility (shapes of existing accounts) ----------------
+    const unverifiedLogin = await store.findUserByIdentifier(unverified.email);
+    check(
+      "B1",
+      "Unverified account still signs in with its password after a Google attempt",
+      unverifiedLogin?.id === unverified.id && !!unverifiedLogin.passwordHash && (await bcrypt.compare(`Oauth!${TAG}9a`, unverifiedLogin.passwordHash)),
+    );
+
+    const linkedAdmin = await makeUser("linkedadmin", { role: "admin", sub: `sub-linkedadmin-${TAG}` });
+    const laBefore = await snapshot(linkedAdmin.id);
+    const rb2 = await oauth.upsertVerifiedOAuthUser(identity(linkedAdmin.email, `sub-linkedadmin-${TAG}`), req);
+    const laAfter = await snapshot(linkedAdmin.id);
+    check(
+      "B2",
+      "Admin with a linked Google id signs in by that id; role, e-mail and password kept; second factor still required",
+      "user" in rb2 && rb2.user.id === linkedAdmin.id && JSON.stringify(laBefore) === JSON.stringify(laAfter) && (await needsSecondFactor(rb2.user)) === true,
+    );
+
+    const googleOnly = await prisma.user.create({
+      data: {
+        email: `googleonly-${TAG}@${DOMAIN}`,
+        username: `oauthtest_googleonly_${TAG}`,
+        role: "seller",
+        provider: "google",
+        providerSub: `sub-googleonly-${TAG}`,
+        emailVerifiedAt: new Date(),
+        profile: { create: { displayName: "Test Google", fullName: "Test Google", profileComplete: true } },
+      },
+    });
+    const goBefore = await snapshot(googleOnly.id);
+    const rb3 = await oauth.upsertVerifiedOAuthUser(identity(googleOnly.email, `sub-googleonly-${TAG}`), req);
+    check(
+      "B3",
+      "Existing Google-only account signs in by its id; stays passwordless and unchanged",
+      "user" in rb3 && rb3.user.id === googleOnly.id && JSON.stringify(goBefore) === JSON.stringify(await snapshot(googleOnly.id)),
+    );
 
     // ---------------- Explicit linking ----------------
     const linker = await makeUser("linker");

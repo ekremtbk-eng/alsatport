@@ -18,7 +18,6 @@ import {
   saveUser,
   type StoredUser,
 } from "@/lib/security/userStore";
-import { revokeUserSessions } from "@/lib/security/session";
 
 export type VerifiedOAuthIdentity = {
   provider: AuthProviderKind;
@@ -107,8 +106,8 @@ async function signedIn(user: StoredUser) {
 
 /**
  * Social sign-in. An account is entered only through the provider id it is already linked to.
- * A verified account with the same e-mail is never linked here: its owner must sign in with their
- * existing method and link the provider from account security (`linkOAuthIdentity`).
+ * An account with the same e-mail is never linked here: its owner must sign in with their existing
+ * method and link the provider from account security (`linkOAuthIdentity`).
  */
 export async function upsertVerifiedOAuthUser(identity: VerifiedOAuthIdentity, req: Request) {
   if (!identity.sub) return { error: "auth.err.oauth" as const };
@@ -120,24 +119,12 @@ export async function upsertVerifiedOAuthUser(identity: VerifiedOAuthIdentity, r
   const linked = await findUserByGoogleSub(identity.sub);
   if (linked) return signedIn(await refreshFromProvider(linked, identity));
 
+  // Verified or not, an existing account is never taken over here: an unverified one may belong to a
+  // legitimate owner (or a mistyped address). The mailbox owner can still recover it via password reset.
   const existing = await findUserByEmail(email);
   if (existing) {
     if (existing.googleSub) return { error: "auth.err.oauthLinked" as const };
-    if (existing.role === "admin" || existing.profile.emailVerified === true) {
-      return { linkRequired: true as const };
-    }
-    // Pre-registration takeover guard: someone signed up with this exact address and a password but never
-    // proved owning it. The provider has now proven it, so that password and its sessions are discarded.
-    await revokeUserSessions(existing.id, "oauth-claimed-unverified-email");
-    const claimed = await saveUser({
-      ...existing,
-      passwordHash: undefined,
-      googleSub: identity.sub,
-      provider: identity.provider,
-      profile: { ...existing.profile, emailVerified: true, authProvider: identity.provider },
-    });
-    await writeAudit({ actorId: claimed.id, action: "auth.oauth_claim_unverified", entityType: "security", entityId: claimed.id });
-    return signedIn(await refreshFromProvider(claimed, identity));
+    return { linkRequired: true as const };
   }
 
   const name = identity.name.trim();
