@@ -39,6 +39,7 @@ export function useInstall() {
     if (!ev) return "unavailable" as const;
     w.__apInstall = null;
     setCanPrompt(false);
+    window.dispatchEvent(new Event(INSTALL_EVENT));
     await ev.prompt();
     const { outcome } = await ev.userChoice;
     if (outcome === "accepted") setInstalled(true);

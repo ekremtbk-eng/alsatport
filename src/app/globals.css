@@ -14178,3 +14178,389 @@ html[data-device="phone"] .ft-links {
 
 
 
+
+/* ── One-time "get the app" welcome (InstallWelcome) ───────────────────────── */
+html.iw-lock,
+html.iw-lock body {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+.iw-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 105;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(1rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px))
+    max(1rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px));
+  background: rgb(4 21 15 / 0.62);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  overscroll-behavior: contain;
+  animation: iw-fade 0.22s ease-out both;
+}
+
+.iw-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 27.5rem);
+  max-height: calc(100dvh - 2rem);
+  overflow: hidden;
+  border-radius: 1.75rem;
+  background: #fff;
+  color: #111827;
+  box-shadow:
+    0 30px 80px -20px rgb(4 21 15 / 0.55),
+    0 0 0 1px rgb(255 255 255 / 0.06);
+  animation: iw-rise 0.32s cubic-bezier(0.2, 0.9, 0.25, 1.05) both;
+}
+
+.iw-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.iw-x {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.96);
+  color: #06281c;
+  box-shadow: 0 4px 14px rgb(4 21 15 / 0.28);
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+.iw-x svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+.iw-x:hover {
+  background: #fff;
+  transform: scale(1.06);
+}
+[dir="rtl"] .iw-x {
+  right: auto;
+  left: 0.75rem;
+}
+
+.iw-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 2.4rem 1.5rem 1.6rem;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgb(0 200 83 / 0.38), transparent 60%),
+    linear-gradient(160deg, #0a3d2a 0%, #06281c 55%, #041c14 100%);
+  color: #fff;
+}
+.iw-ring {
+  position: absolute;
+  border-radius: 999px;
+  border: 1px solid rgb(255 255 255 / 0.09);
+  pointer-events: none;
+}
+.iw-ring-a {
+  width: 15rem;
+  height: 15rem;
+  top: -4.5rem;
+  left: -5rem;
+}
+.iw-ring-b {
+  width: 11rem;
+  height: 11rem;
+  bottom: -5rem;
+  right: -3rem;
+  border-color: rgb(0 200 83 / 0.25);
+}
+.iw-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 5.25rem;
+  height: 5.25rem;
+  border-radius: 1.5rem;
+  background: #fff;
+  box-shadow:
+    0 12px 30px -8px rgb(0 0 0 / 0.5),
+    0 0 0 6px rgb(0 200 83 / 0.18);
+}
+.iw-mark img {
+  width: 4rem;
+  height: 4rem;
+  object-fit: contain;
+}
+.iw-brand {
+  position: relative;
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: 0.01em;
+}
+
+.iw-body {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.85rem;
+  padding: 1.4rem 1.5rem 1.5rem;
+  text-align: center;
+}
+.iw-title {
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  font-weight: 800;
+  color: #06281c;
+  text-wrap: balance;
+}
+.iw-desc {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  color: #4b5563;
+  text-wrap: pretty;
+}
+
+.iw-perks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.45rem;
+  margin: 0.1rem 0 0.25rem;
+  padding: 0;
+  list-style: none;
+}
+.iw-perks li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.38rem 0.7rem;
+  border-radius: 999px;
+  background: #e8f9ee;
+  color: #06281c;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.iw-perks svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  color: #00a344;
+}
+
+.iw-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  width: 100%;
+  min-height: 3.5rem;
+  padding: 0.85rem 1.25rem;
+  border-radius: 1rem;
+  background: linear-gradient(180deg, #14d466 0%, #00c853 55%, #00b34a 100%);
+  color: #fff;
+  font-size: 1.08rem;
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow:
+    0 12px 24px -10px rgb(0 200 83 / 0.75),
+    inset 0 1px 0 rgb(255 255 255 / 0.25);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.iw-cta svg {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+.iw-cta:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+.iw-cta:active {
+  transform: translateY(0);
+}
+
+.iw-note {
+  margin: -0.2rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #6b7280;
+}
+
+.iw-later {
+  min-height: 3rem;
+  border-radius: 0.9rem;
+  border: 1px solid #e6e9ee;
+  background: #fff;
+  color: #374151;
+  font-size: 0.98rem;
+  font-weight: 700;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.iw-later:hover {
+  background: #f5f7f8;
+  border-color: #d1d5db;
+}
+
+.iw-x:focus-visible,
+.iw-cta:focus-visible,
+.iw-later:focus-visible {
+  outline: 3px solid #00c853;
+  outline-offset: 3px;
+}
+
+.iw-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0.15rem 0 0.25rem;
+  padding: 0;
+  list-style: none;
+  text-align: start;
+}
+.iw-steps li {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 1rem;
+  background: #f5f7f8;
+  border: 1px solid #e6e9ee;
+}
+.iw-step-n {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  background: #06281c;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+.iw-step-ico {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.3rem;
+  height: 2.3rem;
+  border-radius: 0.7rem;
+  background: #e8f9ee;
+  color: #00a344;
+}
+.iw-step-ico svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+.iw-step-text {
+  font-size: 0.92rem;
+  line-height: 1.4;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+/* Phones: bottom sheet, thumb-reachable buttons, never taller than the visible viewport. */
+@media (max-width: 639px) {
+  .iw-overlay {
+    align-items: flex-end;
+    padding: max(0.75rem, env(safe-area-inset-top, 0px)) 0 0;
+  }
+  .iw-card {
+    width: 100%;
+    max-height: calc(100dvh - max(0.75rem, env(safe-area-inset-top, 0px)));
+    border-radius: 1.6rem 1.6rem 0 0;
+    animation-name: iw-sheet;
+  }
+  .iw-body {
+    padding: 1.2rem 1.15rem calc(1.15rem + env(safe-area-inset-bottom, 0px));
+  }
+  .iw-hero {
+    padding: 2rem 1.25rem 1.3rem;
+  }
+  .iw-title {
+    font-size: 1.35rem;
+  }
+}
+
+/* Short landscape phones: compact hero so the buttons stay on screen. */
+@media (max-height: 520px) {
+  .iw-hero {
+    flex-direction: row;
+    justify-content: center;
+    padding: 1rem 3.5rem 1rem 1.25rem;
+  }
+  .iw-mark {
+    width: 3.25rem;
+    height: 3.25rem;
+    border-radius: 1rem;
+  }
+  .iw-mark img {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+  .iw-body {
+    gap: 0.6rem;
+    padding-top: 0.9rem;
+  }
+  .iw-perks,
+  .iw-note-web {
+    display: none;
+  }
+  .iw-cta {
+    min-height: 3rem;
+    padding-block: 0.65rem;
+  }
+  .iw-later {
+    min-height: 2.6rem;
+  }
+  .iw-title {
+    font-size: 1.25rem;
+  }
+}
+
+@media (min-width: 640px) {
+  .iw-card {
+    width: min(100%, 30rem);
+  }
+  .iw-hero {
+    padding-top: 2.8rem;
+  }
+}
+
+@keyframes iw-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes iw-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+}
+@keyframes iw-sheet {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iw-overlay,
+  .iw-card {
+    animation: none;
+  }
+}
+html[data-reduced-motion="1"] .iw-overlay,
+html[data-reduced-motion="1"] .iw-card {
+  animation: none;
+}

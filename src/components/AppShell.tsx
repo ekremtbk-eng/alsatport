@@ -13,6 +13,7 @@ import { NotificationToasts } from "./NotificationToasts";
 import { useI18n } from "@/context/I18nContext";
 import { isServicesPortalPath, ServicesPortalNav } from "@/components/ServicesPortalNav";
 import { MobileSplash } from "@/components/home/MobileSplash";
+import { InstallWelcome } from "@/components/pwa/InstallWelcome";
 
 const BARE = ["/welcome", "/giris", "/kayit", "/hesap-tamamla", "/hizmet-vermek-istiyorum"];
 
@@ -43,6 +44,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <SiteFooter />
         <BottomNav />
         <NotificationToasts />
+        <InstallWelcome />
       </div>
       </CompareProvider>
     </AuthModalProvider>
