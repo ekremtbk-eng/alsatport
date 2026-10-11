@@ -48,7 +48,10 @@ export function oauthConfigured(provider: OAuthProvider) {
   return Boolean(appleClientId() && appleTeamId() && appleKeyId() && applePrivateKey());
 }
 
-export async function signOAuthState(input: { provider: OAuthProvider; next: string; nonce: string }) {
+/** `link` binds the round-trip to the signed-in user and session that asked to link a provider. */
+export type OAuthLinkIntent = { uid: string; sid: string };
+
+export async function signOAuthState(input: { provider: OAuthProvider; next: string; nonce: string; link?: OAuthLinkIntent }) {
   return new SignJWT(input)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -61,9 +64,12 @@ export async function verifyOAuthState(token: string, provider: OAuthProvider) {
     algorithms: ["HS256"],
   });
   if (payload.provider !== provider || typeof payload.nonce !== "string") return null;
+  const raw = payload.link as Partial<OAuthLinkIntent> | undefined;
+  const link = raw && typeof raw.uid === "string" && typeof raw.sid === "string" ? { uid: raw.uid, sid: raw.sid } : undefined;
   return {
     next: typeof payload.next === "string" ? payload.next : "/profil",
     nonce: payload.nonce,
+    link,
   };
 }
 

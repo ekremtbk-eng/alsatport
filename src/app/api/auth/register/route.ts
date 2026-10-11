@@ -4,7 +4,7 @@ import { normalizeUsername } from "@/lib/auth";
 import { hashPassword } from "@/lib/security/password";
 import { clientIp } from "@/lib/security/rateLimit";
 import { sanitizeText } from "@/lib/security/sanitize";
-import { findUserByIdentifier, saveUser } from "@/lib/security/userStore";
+import { findUserByEmail, findUserByUsername, saveUser } from "@/lib/security/userStore";
 import { requireMutatingRequest, startSession } from "@/lib/security/session";
 import { THROTTLE, throttle, tooMany } from "@/lib/security/throttle";
 import { isProfileComplete, stampVerification } from "@/lib/profile";
@@ -75,11 +75,11 @@ export async function POST(req: Request) {
   if (!fullName || fullName.split(/\s+/).length < 2) {
     return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
   }
-  if (await findUserByIdentifier(email)) {
+  if (await findUserByEmail(email)) {
     return NextResponse.json({ ok: false, error: "auth.err.taken" }, { status: 409 });
   }
   let uniqueName = username.replace(/[^a-z0-9._-]+/g, "") || "uye";
-  if (await findUserByIdentifier(uniqueName)) {
+  if (await findUserByUsername(uniqueName)) {
     uniqueName = `${uniqueName}${Math.floor(Math.random() * 99)}`;
   }
 

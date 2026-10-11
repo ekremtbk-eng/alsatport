@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
 import { renewListingRecord } from "@/lib/listings/store";
+import { adminActingGate } from "@/lib/listings/adminGate";
 import { notifyListingEvent } from "@/lib/listings/lifecycle";
 import { readJson } from "@/lib/security/parseBody";
 import { idBodySchema } from "@/lib/security/schemas";
@@ -17,6 +18,8 @@ export async function POST(req: Request) {
   const parsed = await readJson(req, idBodySchema);
   if (!parsed.ok) return parsed.response;
   const id = parsed.data.id;
+  const gated = await adminActingGate(auth, id);
+  if (gated) return gated;
 
   const renewed = await renewListingRecord(auth.user, id);
   if ("error" in renewed) {

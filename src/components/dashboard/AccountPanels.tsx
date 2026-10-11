@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Ban, CheckCircle2, CircleAlert, ImagePlus, KeyRound, Mail, MessageSquareText, QrCode, ShieldCheck, Smartphone } from "lucide-react";
+import { Ban, CheckCircle2, CircleAlert, ImagePlus, KeyRound, Link2, Mail, MessageSquareText, QrCode, ShieldCheck, Smartphone } from "lucide-react";
 import { OtpBoxes } from "@/components/auth/OtpBoxes";
+import { showFlashToast } from "@/components/FlashToast";
+import { LEGAL_SERVICES } from "@/lib/legalServices";
 import { QrSvg } from "@/components/QrSvg";
 import { useApp } from "@/context/AppContext";
 import { useI18n } from "@/context/I18nContext";
@@ -87,9 +89,47 @@ function SummaryRow({ icon: Icon, label, value, href, action }: { icon: typeof M
   );
 }
 
+const LINK_RESULT: Record<string, { key: string; tone: "ok" | "err" }> = {
+  linkok: { key: "acct.google.linked", tone: "ok" },
+  linked: { key: "auth.err.oauthLinked", tone: "err" },
+  reauth: { key: "acct.google.reauth", tone: "err" },
+  session: { key: "acct.google.reauth", tone: "err" },
+  email: { key: "auth.err.email", tone: "err" },
+};
+
+/** Linking is a plain navigation (never a prefetchable Link): the server checks a fresh sign-in first. */
+function GoogleLinkRow({ linked }: { linked: boolean }) {
+  const { t } = useI18n();
+  return (
+    <div className="dash-info-row">
+      <div className="flex min-w-0 items-start gap-2.5">
+        <Link2 className="mt-0.5 h-4 w-4 shrink-0 text-lime" aria-hidden />
+        <div className="min-w-0">
+          <p className="dash-row-label">{t("acct.google.h")}</p>
+          <p className="text-sm">{linked ? t("acct.google.on") : t("acct.google.off")}</p>
+          {!linked ? <p className="text-xs text-muted">{t("acct.google.p")}</p> : null}
+        </div>
+      </div>
+      {!linked ? (
+        <a href="/api/auth/oauth/google/start?intent=link" className="dash-link shrink-0 text-sm font-semibold">
+          {t("acct.google.link")}
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
 export function SecurityPanel() {
   const { user } = useApp();
   const { t } = useI18n();
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const result = LINK_RESULT[url.searchParams.get("oauth") ?? ""];
+    if (!result) return;
+    showFlashToast(t(result.key), result.tone);
+    url.searchParams.delete("oauth");
+    window.history.replaceState(null, "", url.pathname + url.search);
+  }, [t]);
   if (!user) return null;
   return (
     <Pane title={t("acct.sec.overview")}>
@@ -102,6 +142,7 @@ export function SecurityPanel() {
           href={dashHref("sifre")}
           action={user.hasPassword ? t("dash.update") : t("acct.pw.set")}
         />
+        {LEGAL_SERVICES.google ? <GoogleLinkRow linked={!!user.socialLinked} /> : null}
         <SummaryRow
           icon={ShieldCheck}
           label={t("acct.2fa.h")}

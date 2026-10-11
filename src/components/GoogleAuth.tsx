@@ -62,6 +62,10 @@ export function SocialAuth({
               ? "auth.err.email"
               : code === "mail"
                 ? "auth.err.mail"
+              : code === "link"
+                ? "auth.err.oauthLink"
+              : code === "linked"
+                ? "auth.err.oauthLinked"
               : code === "state" || code === "csrf"
                 ? "auth.err.csrf"
                 : "auth.err.google";

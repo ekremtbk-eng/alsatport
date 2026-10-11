@@ -5,7 +5,7 @@ import { RESET_TTL_MINUTES, signPasswordResetToken } from "@/lib/security/passwo
 import { clientIp } from "@/lib/security/rateLimit";
 import { THROTTLE, throttle, tooMany } from "@/lib/security/throttle";
 import { requireMutatingRequest } from "@/lib/security/session";
-import { findUserById, findUserByIdentifier, type StoredUser } from "@/lib/security/userStore";
+import { findUserByEmail, findUserById, type StoredUser } from "@/lib/security/userStore";
 import { prisma } from "@/lib/db";
 import { readJson } from "@/lib/security/parseBody";
 import { forgotBodySchema } from "@/lib/security/schemas";
@@ -13,7 +13,7 @@ import { forgotBodySchema } from "@/lib/security/schemas";
 export const maxDuration = 60;
 
 async function resolveTarget(email: string): Promise<{ user: StoredUser; to: string } | null> {
-  const user = await findUserByIdentifier(email);
+  const user = await findUserByEmail(email);
   if (user) return { user, to: user.email };
   const viaRecovery = await prisma.profile.findFirst({
     where: { recoveryEmail: { equals: email, mode: "insensitive" }, recoveryEmailVerifiedAt: { not: null } },

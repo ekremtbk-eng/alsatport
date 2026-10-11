@@ -4,11 +4,13 @@ import {
   oauthConfigured,
   parseOAuthProvider,
   signOAuthState,
+  type OAuthLinkIntent,
   type OAuthProvider,
 } from "@/lib/oauth/providers";
-import { oauthCallbackUrl, safeNextPath } from "@/lib/oauth/complete";
+import { LINK_RETURN, oauthCallbackUrl, safeNextPath } from "@/lib/oauth/complete";
 import { appOrigin } from "@/lib/site";
 import { LIMITS, clientRateKey, rateLimit } from "@/lib/security/rateLimit";
+import { canLinkProvider, requireUser } from "@/lib/security/session";
 
 type Ctx = { params: Promise<{ provider: string }> };
 
@@ -51,9 +53,20 @@ export async function GET(req: Request, ctx: Ctx) {
         return NextResponse.redirect(new URL("/giris?oauth=rate", req.url));
       }
     }
-    const next = safeNextPath(new URL(req.url).searchParams.get("next"));
+    const params = new URL(req.url).searchParams;
+    const next = safeNextPath(params.get("next"));
+    let link: OAuthLinkIntent | undefined;
+    if (params.get("intent") === "link") {
+      const auth = await requireUser("member");
+      if ("error" in auth) return NextResponse.redirect(new URL(`/giris?next=${encodeURIComponent(LINK_RETURN)}`, req.url));
+      if (auth.user.googleSub) return NextResponse.redirect(new URL(`${LINK_RETURN}&oauth=linked`, req.url));
+      if (!canLinkProvider(auth.session, auth.user.role)) {
+        return NextResponse.redirect(new URL(`${LINK_RETURN}&oauth=reauth`, req.url));
+      }
+      link = { uid: auth.user.id, sid: auth.session.id };
+    }
     const nonce = crypto.randomUUID();
-    const state = await signOAuthState({ provider, next, nonce });
+    const state = await signOAuthState({ provider, next: link ? LINK_RETURN : next, nonce, link });
     const res = NextResponse.redirect(authorizationUrl(provider, state));
     res.cookies.set("ap_oauth_nonce", nonce, {
       httpOnly: true,

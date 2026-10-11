@@ -77,6 +77,8 @@ export type UserProfile = {
   businessName?: string;
   businessVerified?: boolean;
   hasPassword?: boolean;
+  /** A Google/Apple identity is linked; the provider id itself never leaves the server. */
+  socialLinked?: boolean;
   twoFactorEnabled?: boolean;
   twoFactorMethod?: "email" | "sms";
   /** Masked (e***@x.com); the full address never leaves the server. */

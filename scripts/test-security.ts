@@ -1,7 +1,8 @@
 /**
  * Server-side security regression suite. Runs ONLY against a local server + local database:
  *
- *   1. start the app locally in production mode on a local DB (e.g. `next start -p 3013`)
+ *   1. start the app locally in production mode on a local DB (e.g. `next start -p 3013`), with dummy
+ *      GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET so the link-start checks reach the provider redirect
  *   2. SECURITY_TEST_BASE=http://localhost:3013 DATABASE_URL=<local> AUTH_SECRET=<same as server> npm run test:security
  *
  * It creates throw-away users (`*@sectest.invalid`) and removes them at the end.
@@ -9,7 +10,7 @@
  */
 import { randomBytes, randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
-import { SignJWT } from "jose";
+import { SignJWT, jwtVerify } from "jose";
 import { PrismaClient } from "@prisma/client";
 
 const BASE = process.env.SECURITY_TEST_BASE ?? "http://localhost:3013";
@@ -371,6 +372,53 @@ async function main() {
     }
     check("P8", "Phone reveal is rate limited per account", capped);
     await prisma.listing.delete({ where: { id: live.id } });
+
+    // ---------------- Account lookup / social linking ----------------
+    await prisma.rateLimitBucket.deleteMany({});
+    r = await call("POST", "/api/auth/login", await guestCsrf(), { identifier: `x${PHONE.slice(1)}@digits-${TAG}.sectest.invalid`, password: PASSWORD });
+    check("O1", "Login: digits inside an e-mail do not match a phone owner", r.status === 401, `status ${r.status}`);
+    r = await call("POST", "/api/auth/login", await guestCsrf(), { identifier: "0532 987 65 43", password: PASSWORD });
+    check("O2", "Login by phone number still works", r.status === 200, `status ${r.status} ${String(r.json.error ?? "")}`);
+    r = await call("GET", "/api/auth/oauth/google/start?intent=link");
+    check("O4", "Link start without a session goes to login", [302, 303, 307, 308].includes(r.status) && (r.headers.get("location") ?? "").includes("/giris"), `status ${r.status}`);
+    const staleA = await makeSession(a, { ageMinutes: 30 });
+    r = await call("GET", "/api/auth/oauth/google/start?intent=link", staleA);
+    check("O5", "Link start needs a recent sign-in", (r.headers.get("location") ?? "").includes("oauth=reauth"), r.headers.get("location") ?? `status ${r.status}`);
+    const freshA = await makeSession(a);
+    r = await call("GET", "/api/auth/oauth/google/start?intent=link", freshA);
+    const loc = r.headers.get("location") ?? "";
+    let bound = false;
+    if (loc.startsWith("https://accounts.google.com/")) {
+      const st = new URL(loc).searchParams.get("state") ?? "";
+      const { payload } = await jwtVerify(st, key, { algorithms: ["HS256"] });
+      const link = payload.link as { uid?: string; sid?: string } | undefined;
+      bound = link?.uid === a.id && link?.sid === freshA.sid;
+    }
+    check("O6", "Fresh link start is bound to this user and session", bound, loc.slice(0, 40));
+    const adminFreshNoMfa = await makeSession(admin);
+    r = await call("GET", "/api/auth/oauth/google/start?intent=link", adminFreshNoMfa);
+    check("O7", "Admin link start needs a second factor", (r.headers.get("location") ?? "").includes("oauth=reauth"), r.headers.get("location") ?? `status ${r.status}`);
+    const adminFreshMfa = await makeSession(admin, { mfa: true });
+    r = await call("GET", "/api/auth/oauth/google/start?intent=link", adminFreshMfa);
+    check("O8", "Admin with a fresh second factor may start linking", (r.headers.get("location") ?? "").startsWith("https://accounts.google.com/"), `status ${r.status}`);
+    await prisma.user.update({ where: { id: b.id }, data: { providerSub: `sectest-sub-${TAG}` } });
+    r = await call("GET", "/api/auth/oauth/google/start?intent=link", await makeSession(b));
+    check("O9", "Already-linked account cannot start another link", (r.headers.get("location") ?? "").includes("oauth=linked"), r.headers.get("location") ?? `status ${r.status}`);
+    await prisma.user.update({ where: { id: b.id }, data: { providerSub: null } });
+
+    // ---------------- Admin acting on others' listings ----------------
+    r = await call("PUT", `/api/listings/${listing.id}`, await makeSession(admin), { title: "admin edit without 2FA" });
+    const t1 = await prisma.listing.findUnique({ where: { id: listing.id }, select: { title: true } });
+    check("AG1", "Admin edit of another seller's listing needs 2FA", r.status === 403 && r.json.error === "auth.err.adminMfa" && t1?.title === "Security test listing", `status ${r.status} ${String(r.json.error)}`);
+    r = await call("DELETE", `/api/listings/${listing.id}`, await makeSession(admin, { mfa: true, ageMinutes: 60 }));
+    const d1 = await prisma.listing.findUnique({ where: { id: listing.id }, select: { deletedAt: true } });
+    check("AG2", "Admin delete of another seller's listing needs fresh step-up", r.status === 403 && r.json.error === "auth.err.stepUp" && !d1?.deletedAt, `status ${r.status} ${String(r.json.error)}`);
+    r = await call("POST", `/api/listings/${listing.id}/sold`, await makeSession(admin), { action: "sold" });
+    check("AG3", "Admin mark-sold on another seller's listing needs 2FA", r.status === 403 && r.json.error === "auth.err.adminMfa", `status ${r.status} ${String(r.json.error)}`);
+    r = await call("POST", "/api/listings/renew", await makeSession(admin), { id: listing.id });
+    check("AG4", "Admin renew of another seller's listing needs 2FA", r.status === 403 && r.json.error === "auth.err.adminMfa", `status ${r.status} ${String(r.json.error)}`);
+    r = await call("PUT", `/api/listings/${listing.id}`, await makeSession(admin, { mfa: true, ageMinutes: 60, stepUp: true }), { title: "Security test listing" });
+    check("AG5", "Admin with fresh step-up passes the gate", r.json.error !== "auth.err.adminMfa" && r.json.error !== "auth.err.stepUp", `status ${r.status} ${String(r.json.error ?? "")}`);
 
     // ---------------- Admin ----------------
     const noMfa = await makeSession(admin);

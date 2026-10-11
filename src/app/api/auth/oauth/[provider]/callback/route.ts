@@ -1,14 +1,22 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { upsertVerifiedOAuthUser, safeNextPath } from "@/lib/oauth/complete";
+import {
+  LINK_RETURN,
+  linkOAuthIdentity,
+  upsertVerifiedOAuthUser,
+  safeNextPath,
+  type VerifiedOAuthIdentity,
+} from "@/lib/oauth/complete";
 import { COMPLETE_PATH, allowlistedReturn } from "@/lib/profile";
 import {
   exchangeOAuthCode,
   parseOAuthProvider,
   verifyOAuthState,
+  type OAuthLinkIntent,
   type OAuthProvider,
 } from "@/lib/oauth/providers";
-import { startSession } from "@/lib/security/session";
+import { STEP_UP_WINDOW_MS, canLinkProvider, currentSession, startSession } from "@/lib/security/session";
+import { findUserById } from "@/lib/security/userStore";
 import { needsSecondFactor, sendLoginCode } from "@/lib/security/loginFlow";
 import { setLoginChallenge } from "@/lib/security/twoFactor";
 import { promoteConfiguredAdmin } from "@/lib/admin/audit";
@@ -22,9 +30,27 @@ function oauthFail(q: string) {
   return NextResponse.redirect(new URL(`/giris?oauth=${q}`, CANONICAL_ORIGIN));
 }
 
+function linkDone(code: string) {
+  const res = NextResponse.redirect(new URL(`${LINK_RETURN}&oauth=${code}`, CANONICAL_ORIGIN));
+  res.cookies.set("ap_oauth_nonce", "", { path: "/", maxAge: 0 });
+  return res;
+}
+
+/** Same user, same session that started the link, still freshly re-authenticated (state lives up to 10 min). */
+async function finishLink(link: OAuthLinkIntent, identity: VerifiedOAuthIdentity) {
+  const current = await currentSession();
+  if (!current || current.session.id !== link.sid || current.claims.sub !== link.uid) return linkDone("session");
+  const user = await findUserById(link.uid);
+  if (!user || user.bannedAt) return linkDone("session");
+  if (!canLinkProvider(current.session, user.role, STEP_UP_WINDOW_MS + 10 * 60 * 1000)) return linkDone("reauth");
+  const linked = await linkOAuthIdentity(user.id, identity);
+  if ("error" in linked) return linkDone(linked.error === "auth.err.oauthLinked" ? "linked" : "email");
+  return linkDone("linkok");
+}
+
 async function finish(req: Request, provider: OAuthProvider, code: string, state: string) {
   if (!code || !state) return oauthFail("bad");
-  let parsed: { next: string; nonce: string } | null = null;
+  let parsed: Awaited<ReturnType<typeof verifyOAuthState>> = null;
   try {
     parsed = await verifyOAuthState(state, provider);
   } catch {
@@ -37,8 +63,11 @@ async function finish(req: Request, provider: OAuthProvider, code: string, state
   const identity = await exchangeOAuthCode(provider, code);
   if ("error" in identity) return oauthFail("token");
 
+  if (parsed.link) return finishLink(parsed.link, identity);
+
   const upserted = await upsertVerifiedOAuthUser(identity, req);
-  if ("error" in upserted) return oauthFail("email");
+  if ("linkRequired" in upserted) return oauthFail("link");
+  if ("error" in upserted) return oauthFail(upserted.error === "auth.err.oauthLinked" ? "linked" : "email");
   if (upserted.user.bannedAt) return oauthFail("denied");
   const user = await promoteConfiguredAdmin(upserted.user);
 

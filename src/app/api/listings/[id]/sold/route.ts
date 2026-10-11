@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
 import { isUuid } from "@/lib/ids";
+import { adminActingGate } from "@/lib/listings/adminGate";
 import { markListingSold, resaleListingRecord } from "@/lib/listings/store";
 import { notifyFavoriters, notifyListingEvent } from "@/lib/listings/lifecycle";
 import { readJson } from "@/lib/security/parseBody";
@@ -16,6 +17,8 @@ export async function POST(req: Request, ctx: Ctx) {
   if ("error" in auth) return auth.error;
   const { id } = await ctx.params;
   if (!isUuid(id)) return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
+  const gated = await adminActingGate(auth, id);
+  if (gated) return gated;
   const limited = await throttle([{ key: `sold:${auth.user.id}`, ...THROTTLE.listing }], req);
   if (!limited.ok) return tooMany(limited.retryAfter);
 

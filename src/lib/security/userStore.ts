@@ -76,6 +76,7 @@ function toStored(row: UserRow): StoredUser | undefined {
     businessName: p.businessName || undefined,
     businessVerified: !!p.businessVerifiedAt,
     hasPassword: !!row.passwordHash,
+    socialLinked: !!row.providerSub,
     twoFactorEnabled: p.twoFactorEnabled,
     twoFactorMethod: p.twoFactorMethod === "sms" ? "sms" : "email",
     recoveryEmailMasked: p.recoveryEmail ? maskEmail(p.recoveryEmail) : undefined,
@@ -100,23 +101,48 @@ function toStored(row: UserRow): StoredUser | undefined {
 
 const withProfile = { include: { profile: true as const } };
 
-export async function findUserByIdentifier(identifier: string) {
-  const email = normalizeEmail(identifier);
-  const user = normalizeUsername(identifier);
-  const digits = identifier.replace(/\D/g, "");
+/** Exact (case-insensitive) e-mail match only. Account linking, sign-up and password reset must use this. */
+export async function findUserByEmail(email: string) {
+  const trimmed = email.trim();
+  if (!trimmed.includes("@")) return undefined;
+  const variants = [...new Set([trimmed, normalizeEmail(trimmed)])];
   const row = await prisma.user.findFirst({
-    where: {
-      OR: [
-        { email: { equals: email, mode: "insensitive" } },
-        { username: { equals: user, mode: "insensitive" } },
-        ...(digits.length >= 10
-          ? [{ profile: { is: { phone: { contains: digits.slice(-10) } } } }]
-          : []),
-      ],
-    },
+    where: { OR: variants.map((v) => ({ email: { equals: v, mode: "insensitive" as const } })) },
     ...withProfile,
   });
   return row ? toStored(row) : undefined;
+}
+
+export async function findUserByUsername(username: string) {
+  const name = normalizeUsername(username);
+  if (!name || name.includes("@")) return undefined;
+  const row = await prisma.user.findFirst({
+    where: { username: { equals: name, mode: "insensitive" } },
+    ...withProfile,
+  });
+  return row ? toStored(row) : undefined;
+}
+
+const PHONE_INPUT = /^\+?[\d\s().-]+$/;
+
+/**
+ * Password-login identifier: an e-mail (exact match), a username, or a phone number typed as a phone number.
+ * Digits are never pulled out of an e-mail address, and a phone shared by several accounts matches none.
+ */
+export async function findUserByIdentifier(identifier: string) {
+  const raw = identifier.trim();
+  if (!raw) return undefined;
+  if (raw.includes("@")) return findUserByEmail(raw);
+  const byName = await findUserByUsername(raw);
+  if (byName) return byName;
+  const digits = raw.replace(/\D/g, "");
+  if (!PHONE_INPUT.test(raw) || digits.length < 10 || digits.length > 13) return undefined;
+  const rows = await prisma.user.findMany({
+    where: { profile: { is: { phone: { endsWith: digits.slice(-10) } } } },
+    take: 2,
+    ...withProfile,
+  });
+  return rows.length === 1 ? toStored(rows[0]) : undefined;
 }
 
 export async function findUserById(id: string) {

@@ -276,6 +276,22 @@ export function stepUpError(session: Pick<UserSession, "stepUpAt" | "mfaAt">) {
   return fresh ? null : NextResponse.json({ ok: false, error: "auth.err.stepUp" }, { status: 403 });
 }
 
+/**
+ * Re-authentication gate for linking a sign-in provider: the owner signed in (or stepped up) within the window;
+ * admins additionally need a second factor on this session that is itself within the window.
+ */
+export function canLinkProvider(
+  session: Pick<UserSession, "createdAt" | "stepUpAt" | "mfaAt">,
+  role: Role,
+  windowMs = STEP_UP_WINDOW_MS,
+) {
+  if (role !== "admin") return sessionIsFresh(session, windowMs);
+  if (!session.mfaAt) return false;
+  return [session.mfaAt, session.stepUpAt]
+    .filter((d): d is Date => !!d)
+    .some((d) => Date.now() - d.getTime() < windowMs);
+}
+
 /** Fresh-login check for sensitive account changes without a current password (e.g. adding one to a Google account). */
 export function sessionIsFresh(session: Pick<UserSession, "createdAt" | "stepUpAt">, windowMs = STEP_UP_WINDOW_MS) {
   return [session.createdAt, session.stepUpAt]

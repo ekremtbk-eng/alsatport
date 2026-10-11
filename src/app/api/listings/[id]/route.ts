@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { claimsFromCookies, requireMutatingRequest, requireUser } from "@/lib/security/session";
 import { findUserById } from "@/lib/security/userStore";
+import { adminActingGate } from "@/lib/listings/adminGate";
 import { promoteConfiguredAdmin } from "@/lib/admin/audit";
 import { isUuid } from "@/lib/ids";
 import {
@@ -17,7 +18,6 @@ import { listingCreateBodySchema } from "@/lib/security/schemas";
 import { readJson } from "@/lib/security/parseBody";
 
 type Ctx = { params: Promise<{ id: string }> };
-
 export async function GET(_req: Request, ctx: Ctx) {
   const { id } = await ctx.params;
   if (!isUuid(id)) return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
@@ -46,6 +46,8 @@ export async function PUT(req: Request, ctx: Ctx) {
   if ("error" in auth) return auth.error;
   const { id } = await ctx.params;
   if (!isUuid(id)) return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
+  const gated = await adminActingGate(auth, id);
+  if (gated) return gated;
   const parsed = await readJson(req, listingCreateBodySchema.partial());
   if (!parsed.ok) return parsed.response;
   const updated = await updateListingRecord(auth.user, id, parsed.data as Record<string, unknown>);
@@ -72,6 +74,8 @@ export async function DELETE(req: Request, ctx: Ctx) {
   if ("error" in auth) return auth.error;
   const { id } = await ctx.params;
   if (!isUuid(id)) return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
+  const gated = await adminActingGate(auth, id);
+  if (gated) return gated;
   const deleted = await deleteListingRecord(auth.user, id);
   if ("error" in deleted) {
     return NextResponse.json({ ok: false, error: deleted.error }, { status: deleted.status });
