@@ -9,6 +9,7 @@ import {
 } from "@/data/legal";
 import { categories, findCategory, hrefForCategory, parentOf, visibleChildren, type Category } from "@/data/categories";
 import { SITE_SITELINKS } from "@/data/sitelinks";
+import { isKktcCity } from "@/data/locations";
 import { CANONICAL_ORIGIN } from "@/lib/site";
 
 export const SEO_TITLE = "AlSatPort — Al, Sat, Keşfet!";
@@ -318,6 +319,7 @@ export function listingJsonLd(input: {
   price: number;
   images: string[];
   city?: string;
+  currency?: string;
   categoryName?: string;
   categorySlug?: string;
 }) {
@@ -340,7 +342,7 @@ export function listingJsonLd(input: {
   const offer = {
     "@type": "Offer",
     url,
-    priceCurrency: "TRY",
+    priceCurrency: input.currency ?? "TRY",
     price: String(input.price),
     availability: "https://schema.org/InStock",
     itemOffered: {
@@ -355,6 +357,7 @@ export function listingJsonLd(input: {
     (offer.itemOffered as { areaServed?: unknown }).areaServed = {
       "@type": "City",
       name: input.city,
+      ...(isKktcCity(input.city) ? { containedInPlace: { "@type": "Place", name: "Kuzey Kıbrıs Türk Cumhuriyeti" } } : {}),
     };
   }
   return jsonLdGraph([

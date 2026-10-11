@@ -6,10 +6,11 @@ import { ArrowRight, MapPin, Store } from "lucide-react";
 import { BUSINESS_RETURN } from "@/lib/profile";
 import { StoreLogo, VerifiedBusinessBadge } from "@/components/business/StoreBits";
 import { catName, useI18n } from "@/context/I18nContext";
-import { TURKEY_CITIES, districtsOf } from "@/data/turkey";
+import { districtsOf } from "@/data/turkey";
+import { COUNTRIES, countryOfCity, isKktcCity, parseCountry, regionNamesFor } from "@/data/locations";
 import { businessCategories, businessCategoryName, type PublicStore } from "@/lib/business/shared";
 
-type Filters = { categoryId: string; city: string; district: string; verified: boolean };
+type Filters = { categoryId: string; city: string; district: string; country: string; verified: boolean };
 
 export function StoresDirectory({ stores, filters }: { stores: PublicStore[]; filters: Filters }) {
   const { t } = useI18n();
@@ -18,8 +19,13 @@ export function StoresDirectory({ stores, filters }: { stores: PublicStore[]; fi
   function apply(next: Partial<Filters>) {
     const f = { ...filters, ...next };
     if (next.city !== undefined) f.district = "";
+    if (next.country !== undefined && f.city && countryOfCity(f.city) !== parseCountry(f.country)) {
+      f.city = "";
+      f.district = "";
+    }
     const qs = new URLSearchParams();
     if (f.categoryId) qs.set("kategori", f.categoryId);
+    if (f.country) qs.set("ulke", COUNTRIES.find((c) => c.id === f.country)?.urlValue ?? "");
     if (f.city) qs.set("il", f.city);
     if (f.city && f.district) qs.set("ilce", f.district);
     if (f.verified) qs.set("dogrulanmis", "1");
@@ -57,12 +63,23 @@ export function StoresDirectory({ stores, filters }: { stores: PublicStore[]; fi
           </select>
         </label>
         <label>
+          <span>{t("loc.country")}</span>
+          <select value={filters.country} onChange={(e) => apply({ country: e.target.value })}>
+            <option value="">{t("biz.f.all")}</option>
+            {COUNTRIES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {t(c.labelKey)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
           <span>{t("biz.f.city")}</span>
           <select value={filters.city} onChange={(e) => apply({ city: e.target.value })}>
             <option value="">{t("biz.f.all")}</option>
-            {TURKEY_CITIES.map((c) => (
-              <option key={c.name} value={c.name}>
-                {c.name}
+            {regionNamesFor(parseCountry(filters.country)).map((name) => (
+              <option key={name} value={name}>
+                {name}
               </option>
             ))}
           </select>
@@ -97,7 +114,7 @@ export function StoresDirectory({ stores, filters }: { stores: PublicStore[]; fi
                   <span className="biz-dir-meta">{catName(t, s.categoryId, businessCategoryName(s.categoryId))}</span>
                   <span className="biz-dir-meta">
                     <MapPin aria-hidden="true" />
-                    {[s.district, s.city].filter(Boolean).join(", ")}
+                    {[s.district, s.city, isKktcCity(s.city) ? "KKTC" : ""].filter(Boolean).join(", ")}
                   </span>
                   <span className="biz-dir-count-pill">{t("biz.stores.active", { n: s.activeCount })}</span>
                 </span>

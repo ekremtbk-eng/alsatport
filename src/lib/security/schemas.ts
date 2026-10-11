@@ -2,6 +2,7 @@ import { z } from "zod";
 import { isDeletePhrase } from "@/lib/accountDelete";
 import { isValidEmail, normalizeEmail } from "@/lib/auth";
 import { UUID_RE } from "@/lib/ids";
+import { VEHICLE_REQUEST_SEGMENTS } from "@/data/vehicleRequests";
 import { looksLikeSqli } from "@/lib/security/inputGuard";
 import { isStrongPassword } from "@/lib/security/passwordPolicy";
 import {
@@ -156,6 +157,8 @@ export const listingQuerySchema = z.object({
   kategori: z.string().max(80).optional().default(""),
   city: z.string().max(40).optional().default(""),
   district: z.string().max(40).optional().default(""),
+  ulke: z.enum(["tr", "kktc"]).optional(),
+  para: z.enum(["TRY", "GBP", "EUR", "USD"]).optional(),
   priceMin: z.string().max(16).optional(),
   priceMax: z.string().max(16).optional(),
   posted: z.string().max(40).optional(),
@@ -178,6 +181,7 @@ export const listingCreateBodySchema = z
     lat: z.number().min(-90).max(90).nullable().optional(),
     lng: z.number().min(-180).max(180).nullable().optional(),
     price: z.union([z.number(), z.string()]),
+    currency: z.enum(["TRY", "GBP", "EUR", "USD"]).optional(),
     images: z.array(z.unknown()).max(16).optional(),
     specs: z.array(z.unknown()).max(48).optional(),
     features: z.array(z.unknown()).max(48).optional(),
@@ -356,6 +360,28 @@ export const adminBusinessActionSchema = z
   .object({
     action: z.enum(["approve", "reject", "revoke"]),
     reason: z.string().trim().max(500).optional().default(""),
+  })
+  .strict();
+
+const vehicleYear = z.number().int().min(1900).max(new Date().getFullYear() + 1).optional();
+
+export const vehicleRequestBodySchema = z
+  .object({
+    segment: z.enum(VEHICLE_REQUEST_SEGMENTS),
+    brand: z.string().trim().min(2).max(60),
+    model: z.string().trim().min(1).max(80),
+    series: z.string().trim().max(80).optional(),
+    engine: z.string().trim().max(80).optional(),
+    yearFrom: vehicleYear,
+    yearTo: vehicleYear,
+    note: z.string().trim().max(300).optional(),
+  })
+  .strict();
+
+export const adminVehicleRequestActionSchema = z
+  .object({
+    action: z.enum(["approve", "reject"]),
+    reason: z.string().trim().max(300).optional().default(""),
   })
   .strict();
 

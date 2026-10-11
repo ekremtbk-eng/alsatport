@@ -82,7 +82,7 @@ function SpecialRow({ listing, mode }: { listing: Listing; mode: SpecialMode }) 
           </p>
         ) : null}
         <p className={`acil-price ${unspecified ? "is-na" : ""}`}>
-          {unspecified ? t("acil.unspecified") : formatMoney(listing.price)}
+          {unspecified ? t("acil.unspecified") : formatMoney(listing.price, listing.currency)}
         </p>
         <p className="acil-meta">
           {t("acil.posted")} : {listing.createdAt}

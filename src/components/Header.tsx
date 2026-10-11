@@ -15,14 +15,15 @@ import { SiteSitelinksNav } from "@/components/SiteSitelinksNav";
 import { HOME_HERO_CATEGORIES } from "@/data/homeHubs";
 import { CategoryMegaMenu } from "@/components/CategoryMegaMenu";
 import { findCategory } from "@/data/categories";
-import { TURKEY_CITIES } from "@/data/turkey";
+import { applyLocationPick, locationPickFromParams } from "@/data/locations";
+import { LocationOptions } from "@/components/LocationOptions";
 import { useDevice } from "@/context/DeviceContext";
 
 function readUrlState(pathname: string) {
   if (typeof window === "undefined") return { q: "", city: "", catId: "" };
   const sp = new URLSearchParams(window.location.search);
   const q = (sp.get("q") ?? "").trim();
-  const city = (sp.get("city") ?? "").trim();
+  const city = locationPickFromParams(sp);
   const slug = (sp.get("kategori") ?? sp.get("cat") ?? "").trim();
   if (pathname.startsWith("/is-ilanlari")) return { q, city, catId: "jobs" };
   if (pathname.startsWith("/ustalar-hizmetler")) return { q, city, catId: "services" };
@@ -54,7 +55,7 @@ export function Header() {
     e.preventDefault();
     const params = new URLSearchParams();
     if (q.trim()) params.set("q", q.trim());
-    if (city) params.set("city", city);
+    applyLocationPick(params, city);
     if (catId === "jobs") {
       router.push(params.toString() ? `/is-ilanlari?${params}` : "/is-ilanlari");
       return;
@@ -93,7 +94,9 @@ export function Header() {
     <header className="site-header sticky top-0 z-40">
       <div className="hdr-utility">
         <div className="hdr-inner">
-          <span className="hdr-tr">{t("acil.turkey")}</span>
+          <span className="hdr-tr">
+            {t("acil.turkey")} · {t("loc.kktc")}
+          </span>
           <div className="hdr-utility-actions">
             <LanguageSwitcher bar />
             {!isPhone ? notifBtn : null}
@@ -138,7 +141,7 @@ export function Header() {
                   query={q}
                   active={suggestOn}
                   extraParams={{
-                    ...(city ? { city } : {}),
+                    ...(city && !city.startsWith("@") ? { city } : {}),
                     ...(catId && catId !== "jobs" && catId !== "services"
                       ? { kategori: findCategory(catId)?.slug ?? "" }
                       : {}),
@@ -157,14 +160,10 @@ export function Header() {
                 </select>
               </label>
               <label className="header-search-city">
-                <span className="sr-only">{t("acil.turkey")}</span>
+                <span className="sr-only">{t("loc.country")}</span>
                 <select value={city} onChange={(e) => setCity(e.target.value)}>
-                  <option value="">{t("acil.turkey")}</option>
-                  {TURKEY_CITIES.map((c) => (
-                    <option key={c.name} value={c.name}>
-                      {c.name}
-                    </option>
-                  ))}
+                  <option value="">{t("loc.allPlaces")}</option>
+                  <LocationOptions countryPicks />
                 </select>
               </label>
               <button type="submit" className="header-search-go">

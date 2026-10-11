@@ -1,7 +1,7 @@
 "use client";
 
 import { useApp } from "@/context/AppContext";
-import { TURKEY_CITIES } from "@/data/turkey";
+import { regionNamesFor } from "@/data/locations";
 import { SearchSelect } from "@/components/SearchSelect";
 import { MapPin } from "lucide-react";
 import Link from "next/link";
@@ -79,7 +79,7 @@ export default function NotificationSettingsPage() {
           <SearchSelect
             label={t("notif.city")}
             value={geo.city ?? ""}
-            options={TURKEY_CITIES.map((c) => c.name)}
+            options={regionNamesFor()}
             placeholder={t("notif.city")}
             onChange={setGeoCity}
           />

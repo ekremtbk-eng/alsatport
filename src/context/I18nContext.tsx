@@ -24,7 +24,8 @@ type I18nState = {
   dir: "ltr" | "rtl";
   t: (key: string, vars?: Record<string, string | number>) => string;
   setLocale: (locale: Locale) => void;
-  formatMoney: (amountTry: number) => string;
+  /** Amount in its own currency (default TRY); never converted. */
+  formatMoney: (amount: number, currency?: string) => string;
   inTurkeyHint: boolean;
   setInTurkeyHint: (v: boolean) => void;
 };
@@ -94,7 +95,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       dir,
       t,
       setLocale,
-      formatMoney: (n: number) => formatMoney(n, locale),
+      formatMoney: (n: number, currency?: string) => formatMoney(n, locale, currency),
       inTurkeyHint,
       setInTurkeyHint,
     }),

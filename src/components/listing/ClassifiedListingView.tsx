@@ -5,6 +5,7 @@ import { Check, ChevronRight, Flag, Heart, MessageCircle } from "lucide-react";
 import { maskPhone, phoneToTel, type Listing } from "@/data/store";
 import { catName, useI18n } from "@/context/I18nContext";
 import { hrefForCategory } from "@/data/categories";
+import { isKktcCity } from "@/data/locations";
 import { SafetyNotice } from "@/components/listing/SafetyNotice";
 import { ListingGallery } from "@/components/listing/ListingGallery";
 import { ListingShareTrigger } from "@/components/listing/ListingShare";
@@ -41,7 +42,7 @@ export function ClassifiedListingView({
   onTogglePhone: () => void;
   onReport?: () => void;
   onTab: (tab: "info" | "desc" | "region") => void;
-  formatMoney: (n: number) => string;
+  formatMoney: (n: number, currency?: string) => string;
 }) {
   const { t } = useI18n();
   const facts = classifiedFactRows(listing, t);
@@ -75,7 +76,7 @@ export function ClassifiedListingView({
             variant="toolbar"
             listingId={listing.id}
             title={listing.title}
-            priceLabel={formatMoney(listing.price)}
+            priceLabel={formatMoney(listing.price, listing.currency)}
             imageUrl={listing.images[0]}
             description={listing.description}
           />
@@ -87,20 +88,20 @@ export function ClassifiedListingView({
         <ListingGallery images={listing.images} alt={listing.title} layout="classified" />
 
         <div className="classified-mid">
-          <p className="classified-price">{formatMoney(listing.price)}</p>
+          <p className="classified-price">{formatMoney(listing.price, listing.currency)}</p>
           <div className="mt-3">
             <ListingShareTrigger
               variant="banner"
               listingId={listing.id}
               title={listing.title}
-              priceLabel={formatMoney(listing.price)}
+              priceLabel={formatMoney(listing.price, listing.currency)}
               imageUrl={listing.images[0]}
               description={listing.description}
             />
           </div>
           {listing.city ? (
             <p className="classified-loc">
-              {[listing.city, listing.district, listing.neighborhood].filter(Boolean).join(" / ")}
+              {[listing.city, listing.district, listing.neighborhood, isKktcCity(listing.city) ? "KKTC" : ""].filter(Boolean).join(" / ")}
             </p>
           ) : null}
           <dl className="classified-facts">

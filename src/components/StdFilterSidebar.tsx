@@ -4,7 +4,9 @@ import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 import { SearchSelect } from "@/components/SearchSelect";
 import { useI18n } from "@/context/I18nContext";
-import { TURKEY_CITIES, districtsOf } from "@/data/turkey";
+import { CountrySwitch } from "@/components/CountrySwitch";
+import { isKktcCity, parseCountry, regionNamesFor } from "@/data/locations";
+import { districtsOf } from "@/data/turkey";
 import { mahallelerOf } from "@/data/regionProfiles";
 
 function SheetAcc({
@@ -75,6 +77,8 @@ export function StdFilterSidebar({
   tail,
   afterPosted,
   moreButton,
+  country,
+  onCountry,
 }: {
   afterPosted?: ReactNode;
   /** Replaces the inline "more filters" toggle (e.g. a button that opens a dialog). */
@@ -105,12 +109,18 @@ export function StdFilterSidebar({
   onSearch: () => void;
   onClear?: () => void;
   tail?: ReactNode;
+  /** URL form of the country filter (`""`, `tr`, `kktc`); the switch is shown only with `onCountry`. */
+  country?: string;
+  onCountry?: (value: string) => void;
 }) {
   const { t } = useI18n();
+  const picked = parseCountry(country);
+  const kktc = picked === "KKTC" || isKktcCity(city);
   const districts = city ? districtsOf(city) : [];
   const hoods = onNeighborhood && city && district ? mahallelerOf(city, district) : [];
   const dateLabel = datePresets.find((p) => p.id === posted);
-  const locLabel = [city, district, neighborhood].filter(Boolean).join(" / ") || t("acil.turkey");
+  const anyPlace = picked === "KKTC" ? t("loc.kktcAll") : picked === "TR" ? t("loc.trAll") : t("loc.allPlaces");
+  const locLabel = [city, district, neighborhood].filter(Boolean).join(" / ") || anyPlace;
   const searchLabel =
     resultCount != null ? t("flt.apply", { n: resultCount }) : t("common.search");
   const hasMore = Boolean(extra || plugins);
@@ -119,25 +129,26 @@ export function StdFilterSidebar({
     <>
       {cats}
 
-      <SheetAcc title={t("acil.address")} value={locLabel} open={Boolean(city)}>
+      <SheetAcc title={t("acil.address")} value={locLabel} open={Boolean(city || picked)}>
+        {onCountry ? <CountrySwitch value={country ?? ""} onChange={onCountry} /> : null}
         <SearchSelect
-          label={t("acil.il")}
+          label={kktc ? t("loc.kktcRegion") : t("acil.il")}
           value={city}
-          options={TURKEY_CITIES.map((c) => c.name)}
-          placeholder={t("acil.turkey")}
-          anyLabel={t("acil.turkey")}
+          options={regionNamesFor(picked)}
+          placeholder={anyPlace}
+          anyLabel={anyPlace}
           onChange={(v) => {
             onCity(v);
             onDistrict("");
           }}
         />
         <SearchSelect
-          label={t("acil.ilce")}
+          label={kktc ? t("loc.kktcPlace") : t("acil.ilce")}
           value={district}
           options={districts}
-          placeholder={t("acil.ilce")}
+          placeholder={kktc ? t("loc.kktcPlace") : t("acil.ilce")}
           disabled={!city}
-          anyLabel={t("acil.ilce")}
+          anyLabel={kktc ? t("loc.kktcPlace") : t("acil.ilce")}
           onChange={onDistrict}
         />
         {onNeighborhood && hoods.length > 0 ? (

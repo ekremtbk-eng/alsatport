@@ -16,6 +16,8 @@ import { listingCreateBodySchema, listingQuerySchema } from "@/lib/security/sche
 import { filterFieldsForCategory, listingMatchesDynamicFilters } from "@/lib/categoryFilters";
 import { serverFilterState } from "@/lib/filterUrl";
 import { isPublicListing } from "@/lib/categoryCounts";
+import { parseCountry } from "@/data/locations";
+import { approvedVehicles } from "@/lib/vehicleRequests/store";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -41,6 +43,8 @@ export async function GET(req: Request) {
     categoryId: catHit?.id || sanitizeSlug(catRaw) || undefined,
     city: sanitizeText(query.city, 40) || undefined,
     district: sanitizeText(query.district, 40) || undefined,
+    country: parseCountry(query.ulke),
+    currency: query.para,
     priceMin: Number.isFinite(priceMin) ? priceMin : undefined,
     priceMax: Number.isFinite(priceMax) ? priceMax : undefined,
     posted: query.posted,
@@ -87,7 +91,7 @@ export async function POST(req: Request) {
   const parsedBody = await readJson(req, listingCreateBodySchema);
   if (!parsedBody.ok) return parsedBody.response;
   const body = parsedBody.data as Record<string, unknown>;
-  const parsed = parseListingInput(body);
+  const parsed = parseListingInput(body, undefined, await approvedVehicles());
   if ("error" in parsed) {
     return NextResponse.json({ ok: false, error: parsed.error }, { status: 400 });
   }

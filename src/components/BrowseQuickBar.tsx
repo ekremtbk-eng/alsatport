@@ -13,9 +13,10 @@ import {
   visibleChildren,
   type Category,
 } from "@/data/categories";
-import { TURKEY_CITIES } from "@/data/turkey";
+import { COUNTRIES, parseCountry, regionNamesFor } from "@/data/locations";
 import { mahallelerOf } from "@/data/regionProfiles";
-import { districtOptions, type FilterState } from "@/lib/categoryFilters";
+import { districtOptions, filterCountry, type FilterState } from "@/lib/categoryFilters";
+import { LISTING_CURRENCIES, listingCurrencySymbol } from "@/lib/listings/currency";
 import { isTutorCategoryId, tutorLevelsFor, tutorSubjectsFor, TUTOR_PLACES } from "@/data/tutorOptions";
 
 export function BrowseQuickBar({
@@ -59,7 +60,9 @@ export function BrowseQuickBar({
     if (!category || !grand || category.id === grand.id) return undefined;
     return category.parentId === grand.id ? category : undefined;
   })();
-  const cities = TURKEY_CITIES.map((c) => c.name);
+  const cities = regionNamesFor(parseCountry(state.country));
+  const kktc = filterCountry(state) === "KKTC";
+  const priceSymbol = listingCurrencySymbol(state.currency || "TRY");
   const isEstate = root?.id === "emlak";
 
   function goRoot(id: string) {
@@ -161,9 +164,20 @@ export function BrowseQuickBar({
           </select>
         </label>
       ) : null}
+      <label className="browse-quick-item">
+        <span className="flt-label">{t("loc.country")}</span>
+        <select className="flt-select" value={state.country ?? ""} onChange={(e) => onChange("country", e.target.value)}>
+          <option value="">{t("loc.all")}</option>
+          {COUNTRIES.map((c) => (
+            <option key={c.id} value={c.urlValue}>
+              {t(c.labelKey)}
+            </option>
+          ))}
+        </select>
+      </label>
       <div className="browse-quick-item">
         <SearchSelect
-          label={t("post.city")}
+          label={kktc ? t("loc.kktcRegion") : t("post.city")}
           value={state.city ?? ""}
           options={cities}
           placeholder={t("flt.any")}
@@ -173,7 +187,7 @@ export function BrowseQuickBar({
       </div>
       <div className="browse-quick-item">
         <SearchSelect
-          label={t("post.district")}
+          label={kktc ? t("loc.kktcPlace") : t("post.district")}
           value={state.district ?? ""}
           options={districtOptions(state.city)}
           placeholder={state.city ? t("flt.any") : t("flt.cityFirst")}
@@ -196,12 +210,23 @@ export function BrowseQuickBar({
         </div>
       ) : null}
       <label className="browse-quick-item">
+        <span className="flt-label">{t("cur.label")}</span>
+        <select className="flt-select" value={state.currency ?? ""} onChange={(e) => onChange("currency", e.target.value)}>
+          <option value="">{t("cur.any")}</option>
+          {LISTING_CURRENCIES.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.symbol} {c.id}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="browse-quick-item">
         <span className="flt-label">{t("flt.min")}</span>
         <input
           inputMode="numeric"
           value={state.priceMin ?? ""}
           onChange={(e) => onChange("priceMin", e.target.value.replace(/[^\d]/g, ""))}
-          placeholder="₺"
+          placeholder={priceSymbol}
           className="flt-input"
         />
       </label>
@@ -211,7 +236,7 @@ export function BrowseQuickBar({
           inputMode="numeric"
           value={state.priceMax ?? ""}
           onChange={(e) => onChange("priceMax", e.target.value.replace(/[^\d]/g, ""))}
-          placeholder="₺"
+          placeholder={priceSymbol}
           className="flt-input"
         />
       </label>

@@ -1,5 +1,6 @@
 import { findCategory, parentOf } from "@/data/categories";
 import { motoGearProductFromId, partsVehicleTypeFromId, schemaForCategoryId } from "@/data/listingSchema";
+import { declaresMiles } from "@/data/kktcVehicle";
 import { isSeaEquipCategoryId } from "@/data/seaEquip";
 import type { Listing } from "@/data/store";
 
@@ -167,7 +168,7 @@ const FACT_SKIP = new Set([
 /** Values that mean nothing without their label. */
 const FACT_AMBIGUOUS = new Set(["", "-", "—", "0", "undefined", "null", "yok", "var", "evet", "hayır", "belirtilmemiş"]);
 
-function formatFact(label: string, raw: string): string | undefined {
+function formatFact(label: string, raw: string, miles = false): string | undefined {
   const value = raw.trim();
   const key = value.toLocaleLowerCase("tr");
   const l = label.toLocaleLowerCase("tr");
@@ -184,7 +185,8 @@ function formatFact(label: string, raw: string): string | undefined {
   if (digitsOnly && !(n > 0)) return undefined;
   if (!digitsOnly) return value;
   const grouped = n.toLocaleString("tr-TR");
-  if (l === "km" || l === "menzil") return `${grouped} km`;
+  if (l === "km") return `${grouped} ${miles ? "mil" : "km"}`;
+  if (l === "menzil") return `${grouped} km`;
   if (l.includes("m²")) return `${grouped} m²`;
   if (l === "yaş (ay)") return `${n} ay`;
   if (l === "adet") return `${grouped} adet`;
@@ -204,6 +206,7 @@ export function compactListingFacts(listing: Listing, max = 5): string[] {
     if (k && s.value != null && !byLabel.has(k)) byLabel.set(k, String(s.value));
   }
   const title = listing.title.toLocaleLowerCase("tr");
+  const miles = declaresMiles(listing.specs);
   const order = [
     ...(FACT_PRIORITY[schema.family] ?? []),
     ...schema.fields.map((f) => f.specLabel),
@@ -218,7 +221,7 @@ export function compactListingFacts(listing: Listing, max = 5): string[] {
     const raw = byLabel.get(k);
     if (raw == null) continue;
     if ((k === "marka" || k === "model") && title.includes(raw.trim().toLocaleLowerCase("tr"))) continue;
-    const text = formatFact(label, raw);
+    const text = formatFact(label, raw, miles);
     if (!text || text.length > 40 || out.includes(text)) continue;
     out.push(text);
     if (out.length >= max) break;

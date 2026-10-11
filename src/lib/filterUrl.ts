@@ -10,9 +10,13 @@ const TO_URL: Record<string, string> = {
   fuel: "yakit",
   gear: "vites",
   trim: "seri",
+  country: "ulke",
+  currency: "para",
 };
 
 const FROM_URL: Record<string, string> = {
+  ulke: "country",
+  para: "currency",
   marka: "brand",
   ilce: "district",
   mahalle: "neighborhood",
@@ -50,7 +54,23 @@ export function filterQueryKey(params: URLSearchParams) {
   return new URLSearchParams(pairs).toString();
 }
 
-const SERVER_STD_KEYS = new Set(["city", "district", "neighborhood", "posted", "keyword", "includeDesc", "seller", "urgent", "mappedOnly"]);
+const SERVER_STD_KEYS = new Set([
+  "city",
+  "district",
+  "neighborhood",
+  "posted",
+  "keyword",
+  "includeDesc",
+  "seller",
+  "urgent",
+  "mappedOnly",
+  "country",
+  "currency",
+]);
+const FIXED_CHOICES: Record<string, Set<string>> = {
+  country: new Set(["tr", "kktc"]),
+  currency: new Set(["TRY", "GBP", "EUR", "USD"]),
+};
 
 /** Filter state from untrusted query params, limited to the category's own fields with bounded values. */
 export function serverFilterState(params: URLSearchParams, fields: FilterField[]): FilterState {
@@ -71,6 +91,11 @@ export function serverFilterState(params: URLSearchParams, fields: FilterField[]
   const state: FilterState = {};
   for (const [key, raw] of Object.entries(filtersFromSearchParams(params))) {
     if (!allowed.has(key) || !isSafeFilterKey(key)) continue;
+    const fixed = FIXED_CHOICES[key];
+    if (fixed) {
+      if (fixed.has(raw.trim())) state[key] = raw.trim();
+      continue;
+    }
     const opts = choices.get(key);
     const value = raw.trim().slice(0, opts ? 1200 : 200);
     if (!value) continue;

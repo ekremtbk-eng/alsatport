@@ -6,7 +6,7 @@ import { SearchPageClient } from "./SearchPageClient";
 type Ctx = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 const SEARCH_TITLE = "İlan ara · AlsatPort";
-const SEARCH_DESCRIPTION = "AlsatPort'ta kelime, il, ilçe ve kategoriye göre ilan arayın.";
+const SEARCH_DESCRIPTION = "AlsatPort'ta kelime, ülke (Türkiye / KKTC), il, ilçe ve kategoriye göre ilan arayın.";
 const VIEW_ONLY = new Set(["gorunum"]);
 
 function first(v: string | string[] | undefined) {
@@ -32,7 +32,7 @@ export async function generateMetadata({ searchParams }: Ctx): Promise<Metadata>
   const categoryOnly = keys.length === 1 && (keys[0] === "kategori" || keys[0] === "cat");
   return pageMetadata({
     title: `${cat.name} ilanları · AlsatPort`,
-    description: `${cat.name} ilanları AlsatPort'ta. Türkiye genelinde güncel ilanlara göz atın.`,
+    description: `${cat.name} ilanları AlsatPort'ta. Türkiye ve KKTC genelinde güncel ilanlara göz atın.`,
     path,
     index: categoryOnly,
     follow: true,

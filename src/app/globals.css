@@ -12500,6 +12500,69 @@ html[data-device="tablet"] .hdr-utility .header-guest {
 .hp-card-badge.is-cat {
   background: rgba(5, 150, 105, 0.92);
 }
+.hp-card-badge.is-rhd {
+  background: rgba(30, 64, 175, 0.92);
+}
+.rhd-badge {
+  position: absolute;
+  bottom: 0.4rem;
+  inset-inline-start: 0.4rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.35rem;
+  background: rgba(30, 64, 175, 0.92);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  pointer-events: none;
+}
+.rhd-badge.is-inline {
+  position: static;
+  align-self: center;
+}
+.country-switch {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+.country-switch button {
+  min-height: 2.35rem;
+  padding: 0.35rem 0.4rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.7rem;
+  background: #fff;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #111827;
+}
+.country-switch button:hover {
+  border-color: #00c853;
+  background: #f0fdf4;
+}
+.country-switch button.is-on {
+  border-color: #00c853;
+  background: linear-gradient(180deg, #ecfdf3, #dcfce7);
+  color: #047857;
+  box-shadow: 0 0 0 1px #00c853;
+}
+.currency-chips {
+  margin: 0 0 0.45rem;
+}
+.flt-note {
+  margin-top: 0.35rem;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: #6b7280;
+}
+.kktc-declared {
+  border: 1px solid rgba(30, 64, 175, 0.25);
+  background: rgba(219, 234, 254, 0.45);
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: #1e3a8a;
+}
 .hp-card-body {
   padding: 0.6rem 0.7rem 0.75rem;
 }

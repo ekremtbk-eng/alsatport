@@ -786,6 +786,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       title: listing.title,
       subtitle: listing.subtitle,
       price: listing.price,
+      currency: listing.currency,
       categoryId: listing.categoryId,
       city: listing.city,
       district: listing.district,

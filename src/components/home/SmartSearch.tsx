@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { Loader2, Sparkles } from "lucide-react";
 import { catName, useI18n } from "@/context/I18nContext";
 import { findCategory, hrefForCategoryListings, parentOf } from "@/data/categories";
+import { COUNTRIES, parseCountry } from "@/data/locations";
+import { listingCurrencyOf, listingCurrencySymbol } from "@/lib/listings/currency";
 import { SMART_HINTS, type SmartChip, type SmartHint } from "@/lib/smartSearch/hints";
 
 const MAX_LEN = 200;
@@ -73,6 +75,10 @@ export function SmartSearch({ variant = "hero" }: { variant?: "hero" | "phone" }
   }
 
   function chipText(chip: SmartChip) {
+    if (chip.labelKey === "loc.country" && chip.value) {
+      const c = parseCountry(chip.value);
+      return c ? t(COUNTRIES.find((x) => x.id === c)?.labelKey ?? "") : chip.value;
+    }
     if (chip.labelKey === "ai.lbl.cat" && chip.value) {
       const cat = findCategory(chip.value);
       if (!cat) return "";
@@ -84,7 +90,8 @@ export function SmartSearch({ variant = "hero" }: { variant?: "hero" | "phone" }
       const fmt = (v?: string) => {
         if (!v) return "";
         const n = Number(v);
-        const base = chip.unit && Number.isFinite(n) ? n.toLocaleString("tr-TR") : v;
+        const base = (chip.unit || chip.currency) && Number.isFinite(n) ? n.toLocaleString("tr-TR") : v;
+        if (chip.currency) return `${base} ${listingCurrencySymbol(listingCurrencyOf(chip.currency))}`;
         return chip.unit === "try" ? `${base} ₺` : chip.unit === "km" ? `${base} km` : chip.unit === "sqm" ? `${base} m²` : base;
       };
       if (chip.min && chip.max) return chip.min === chip.max ? fmt(chip.min) : `${fmt(chip.min)} – ${fmt(chip.max)}`;

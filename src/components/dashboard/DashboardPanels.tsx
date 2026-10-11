@@ -190,7 +190,7 @@ function OzetPanel() {
         </p>
         {live[0] ? (
           <p className="mt-3 text-sm">
-            {t("dash.lastAd")}: {live[0].title} — {formatMoney(live[0].price)}
+            {t("dash.lastAd")}: {live[0].title} — {formatMoney(live[0].price, live[0].currency)}
           </p>
         ) : null}
       </div>

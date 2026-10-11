@@ -357,7 +357,7 @@ export function CategoryHub({ cat }: { cat: Category }) {
                   <img src={l.images[0]} alt={l.title} />
                   <span className="vitrine-cap">
                     <span className="truncate">{l.title}</span>
-                    <span className="vitrine-price">{formatMoney(l.price)}</span>
+                    <span className="vitrine-price">{formatMoney(l.price, l.currency)}</span>
                   </span>
                 </Link>
               ))}

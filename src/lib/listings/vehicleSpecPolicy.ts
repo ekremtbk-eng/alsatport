@@ -1,5 +1,6 @@
 import { vehicleComboError, vehicleProfileFromCategoryId } from "@/data/vehicleIndex";
 import { vehicleProfileSpec } from "@/data/vehicleProfiles";
+import { isApprovedCombo, type ApprovedVehicle } from "@/data/vehicleRequests";
 
 type Spec = { label: string; value: string };
 
@@ -26,7 +27,12 @@ export function vehicleComboOf(categoryId: string, specs: Spec[]) {
  * Rejects a model that does not belong to the chosen catalog brand (or a package outside the model). Brands outside
  * the catalog are left alone. On edit, an unchanged combination is accepted so older listings stay editable.
  */
-export function vehicleSpecError(categoryId: string, specs: Spec[], previous?: { categoryId: string; specs: Spec[] }) {
+export function vehicleSpecError(
+  categoryId: string,
+  specs: Spec[],
+  previous?: { categoryId: string; specs: Spec[] },
+  approved?: ApprovedVehicle[],
+) {
   const combo = vehicleComboOf(categoryId, specs);
   if (!combo) return null;
   if (previous) {
@@ -35,5 +41,6 @@ export function vehicleSpecError(categoryId: string, specs: Spec[], previous?: {
       return null;
     }
   }
-  return vehicleComboError(combo.segment, combo) ? "post.vehicleModel" : null;
+  if (!vehicleComboError(combo.segment, combo)) return null;
+  return isApprovedCombo(approved, combo) ? null : "post.vehicleModel";
 }

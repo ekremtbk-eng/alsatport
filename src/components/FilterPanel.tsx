@@ -3,10 +3,14 @@
 import { ChevronDown, ChevronLeft, Settings2, X } from "lucide-react";
 import { useState } from "react";
 import { CategoryDrill } from "@/components/CategoryDrill";
+import { CurrencyChips } from "@/components/CurrencyChips";
+import { listingCurrencySymbol } from "@/lib/listings/currency";
 import { SearchSelect } from "@/components/SearchSelect";
 import { TutorFilterChips } from "@/components/TutorFilterChips";
 import { StdFilterSidebar } from "@/components/StdFilterSidebar";
+import { useApprovedVehicles } from "@/components/VehicleRequestBox";
 import { catName, useI18n } from "@/context/I18nContext";
+import { withApprovedOptions, type ApprovedVehicle } from "@/data/vehicleRequests";
 import { categoryPath, visibleChildren, type Category } from "@/data/categories";
 import {
   AGE_MONTH_PRESETS,
@@ -20,6 +24,7 @@ import {
   YEAR_OPTIONS,
   countActiveFilters,
   countFilterOption,
+  fieldOffered,
   type FilterField,
   type FilterState,
 } from "@/lib/categoryFilters";
@@ -79,9 +84,11 @@ function RangePair({
   hideLabel?: boolean;
 }) {
   const { t } = useI18n();
+  const isPrice = minField.key === "priceMin";
   return (
     <div className={hideLabel ? "" : "flt-group"}>
       {hideLabel ? null : <p className="flt-label">{fieldTitle(t, minField.labelKey)}</p>}
+      {isPrice ? <CurrencyChips value={state.currency ?? ""} onChange={(v) => onChange("currency", v)} /> : null}
       <div className="flt-range">
         <input
           inputMode="numeric"
@@ -109,13 +116,30 @@ function RangePair({
               onClick={() => onChange(maxField.key, state[maxField.key] === p ? "" : p)}
             >
               {p}
-              {minField.suffix ? ` ${minField.suffix}` : "+"}
+              {isPrice ? ` ${listingCurrencySymbol(state.currency || "TRY")}` : minField.suffix ? ` ${minField.suffix}` : "+"}
             </button>
           ))}
         </div>
       ) : null}
+      {isPrice ? (
+        <p className="flt-note">
+          {state.currency || state[minField.key] || state[maxField.key]
+            ? t("cur.priceIn", { c: state.currency || "TRY" })
+            : t("cur.note")}
+        </p>
+      ) : null}
     </div>
   );
+}
+
+/** Vehicle cascade level of a filter field, for merging admin-approved catalog requests into its options. */
+function approvedLevel(field: FilterField) {
+  if (!field.catalogKind) return null;
+  if (field.key === "brand") return "brand" as const;
+  if (field.optionSource === "vehicleModels") return "model" as const;
+  if (field.optionSource === "vehiclePackages") return "trim" as const;
+  if (field.optionSource === "vehicleEngines") return "engine" as const;
+  return null;
 }
 
 function FieldControl({
@@ -125,6 +149,7 @@ function FieldControl({
   onChange,
   hideLabel,
   listings,
+  approved,
 }: {
   field: FilterField;
   fields: FilterField[];
@@ -132,6 +157,7 @@ function FieldControl({
   onChange: (key: string, value: string) => void;
   hideLabel?: boolean;
   listings?: Listing[];
+  approved?: ApprovedVehicle[];
 }) {
   const { t } = useI18n();
   if (field.kind === "range" && field.pairKey && field.key.endsWith("Max")) return null;
@@ -234,7 +260,10 @@ function FieldControl({
   }
 
   const locked = Boolean(field.dependsOn && !state[field.dependsOn ?? ""]);
-  const options = field.kind === "district" ? districtOptions(state.city) : resolvedOptions(field, state);
+  const level = approvedLevel(field);
+  const baseOptions = field.kind === "district" ? districtOptions(state.city) : resolvedOptions(field, state);
+  const options =
+    level && field.catalogKind ? withApprovedOptions(level, baseOptions, approved, field.catalogKind, state) : baseOptions;
   const optionCounts =
     !locked && listings && listings.length && listings.length <= 800
       ? Object.fromEntries(
@@ -298,7 +327,7 @@ function FieldControl({
     </label>
   );
 }
-const STD_FIELD_KEYS = new Set(["city", "district", "neighborhood", "posted", "keyword", "hours24"]);
+const STD_FIELD_KEYS = new Set(["country", "city", "district", "neighborhood", "posted", "keyword", "hours24"]);
 const PRIMARY_FIELD_KEYS = new Set(["priceMin", "priceMax", "kimden", "species", "petProduct", "breed", "sex", "ageMin"]);
 const PLUGIN_FIELD_KEYS = new Set([
   "brand",
@@ -326,11 +355,12 @@ function renderExtraField(
   onChange: (key: string, value: string) => void,
   t: (key: string, vars?: Record<string, string | number>) => string,
   listings?: Listing[],
+  approved?: ApprovedVehicle[],
 ) {
   return (
     <div key={field.key} className="flt-field-block">
       <p className="flt-field-label">{fieldTitle(t, field.labelKey)}</p>
-      <FieldControl field={field} fields={fields} state={state} onChange={onChange} hideLabel listings={listings} />
+      <FieldControl field={field} fields={fields} state={state} onChange={onChange} hideLabel listings={listings} approved={approved} />
     </div>
   );
 }
@@ -385,6 +415,7 @@ export function FilterPanel({
   const { t } = useI18n();
   const [more, setMore] = useState(false);
   const [drill, setDrill] = useState(false);
+  const approved = useApprovedVehicles(fields.some((f) => f.key === "brand" && f.catalogKind));
   const [localDraft, setLocalDraft] = useState(state.keyword ?? "");
   const draft = wordDraft ?? localDraft;
   const setDraft = onWordDraft ?? setLocalDraft;
@@ -402,6 +433,7 @@ export function FilterPanel({
       : subcats ?? [];
   const extraFields = fields.filter((field) => {
     if (STD_FIELD_KEYS.has(field.key)) return false;
+    if (!fieldOffered(field, state)) return false;
     if (nav.treeKeys.includes(field.key) && !field.preferOpen && !PLUGIN_FIELD_KEYS.has(field.key)) return false;
     if (field.kind === "range" && field.key.endsWith("Max")) return false;
     return true;
@@ -462,7 +494,10 @@ export function FilterPanel({
   const primaryAcc = (field: FilterField) => {
     const title = fieldTitle(t, field.labelKey);
     const value =
-      field.key === "priceMin" ? (priceSummary ? `${priceSummary} TL` : undefined)
+      field.key === "priceMin"
+        ? priceSummary
+          ? `${priceSummary} ${state.currency || "TL"}`
+          : state.currency || undefined
       : field.key === "kimden" ? kimdenSummary.replaceAll(",", ", ") || undefined
       : field.kind === "range"
         ? [state[field.key], field.pairKey ? state[field.pairKey] : ""].filter(Boolean).join(" – ") || undefined
@@ -475,7 +510,7 @@ export function FilterPanel({
           <ChevronDown className="flt-acc-chev h-4 w-4" />
         </summary>
         <div className="flt-acc-body">
-          <FieldControl field={field} fields={fields} state={state} onChange={onChange} hideLabel listings={listings} />
+          <FieldControl field={field} fields={fields} state={state} onChange={onChange} hideLabel listings={listings} approved={approved} />
         </div>
       </details>
     );
@@ -501,7 +536,7 @@ export function FilterPanel({
               <ChevronDown className="flt-acc-chev h-4 w-4" />
             </summary>
             <div className="flt-acc-body">
-              <FieldControl field={field} fields={fields} state={state} onChange={onChange} hideLabel listings={listings} />
+              <FieldControl field={field} fields={fields} state={state} onChange={onChange} hideLabel listings={listings} approved={approved} />
             </div>
           </details>
         ))}
@@ -510,7 +545,7 @@ export function FilterPanel({
 
   const extra =
     !advanced && moreFields.length > 0 ? (
-      <>{moreFields.map((field) => renderExtraField(field, fields, state, onChange, t, listings))}</>
+      <>{moreFields.map((field) => renderExtraField(field, fields, state, onChange, t, listings, approved))}</>
     ) : null;
 
   return (
@@ -563,6 +598,8 @@ export function FilterPanel({
         primary={primary}
         extra={extra}
         plugins={plugins}
+        country={state.country ?? ""}
+        onCountry={(v) => onChange("country", v)}
         city={state.city ?? ""}
         district={state.district ?? ""}
         neighborhood={state.neighborhood ?? ""}

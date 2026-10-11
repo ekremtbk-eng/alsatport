@@ -95,7 +95,10 @@ import {
   YEARS,
   ZONING,
 } from "@/data/listingOptions";
-import { TURKEY_CITIES, districtsOf } from "@/data/turkey";
+import { districtsOf } from "@/data/turkey";
+import { cityInCountry, countryOfCity, parseCountry, regionNamesFor } from "@/data/locations";
+import { DISTANCE_MILE, DISTANCE_UNIT_LABEL, KKTC_FILTER_KEYS, KM_PER_MILE, kktcFieldsForSegment } from "@/data/kktcVehicle";
+import { listingCurrencyOf } from "@/lib/listings/currency";
 import { catalogForSegment } from "@/data/vehicleIndex";
 import { vehicleProfileSpec, type VehicleProfileSpec } from "@/data/vehicleProfiles";
 import type { VehicleModelLine } from "@/data/vehicleCatalog";
@@ -148,7 +151,7 @@ import {
   petProductTypesFor,
 } from "@/data/petCatalog";
 
-export type FilterKind = "select" | "range" | "toggle" | "city" | "district" | "multi" | "text";
+export type FilterKind = "select" | "range" | "toggle" | "city" | "district" | "multi" | "text" | "country";
 
 export type FilterField = {
   key: string;
@@ -177,6 +180,8 @@ export type FilterField = {
   /** Range over a spec that may hold a decimal value (12,5 m). */
   decimal?: boolean;
   currencyTabs?: boolean;
+  /** Only offered while the country filter (or the chosen city) is in this country. */
+  country?: "KKTC";
   ui?: "chips";
   chipKind?: "tutorSubject" | "tutorLevel" | "tutorPlace";
 };
@@ -206,6 +211,7 @@ export const ESTATE_FILTER_GROUPS = [
   "interior",
   "exterior",
   "location",
+  "kktc",
   "transport",
   "view",
   "finance",
@@ -213,7 +219,8 @@ export const ESTATE_FILTER_GROUPS = [
 ] as const;
 export type EstateFilterGroup = (typeof ESTATE_FILTER_GROUPS)[number];
 
-const CITIES = TURKEY_CITIES.map((c) => c.name);
+const CITIES = regionNamesFor();
+const COUNTRY_FIELD: FilterField = { key: "country", kind: "country", labelKey: "loc.country", options: ["tr", "kktc"], preferOpen: true };
 const SERVICE_TYPES = ["Keşif", "Montaj", "Tamir", "Nakliye", "Bakım"];
 const HELP_TYPES = ["Gündüzlü", "Yatılı", "Tam Zamanlı", "Yarı Zamanlı"];
 function sel(
@@ -242,6 +249,7 @@ function range(
 
 export function commonFilterFields(): FilterField[] {
   return [
+    COUNTRY_FIELD,
     { key: "city", kind: "city", labelKey: "post.city", options: CITIES, searchable: true, preferOpen: true },
     { key: "district", kind: "district", labelKey: "post.district", dependsOn: "city", searchable: true },
     ...range("priceMin", "priceMax", "flt.price", [], "₺", true),
@@ -372,6 +380,7 @@ function vehicleProfileFilterFields(spec: VehicleProfileSpec): FilterField[] {
   const segment = spec.segment;
   const out: FilterField[] = [
     ...range("priceMin", "priceMax", "flt.price", [], "₺", true).map((f) => ({ ...f, group: "basic" as const, primary: true })),
+    { ...COUNTRY_FIELD, group: "location" },
     { key: "city", kind: "city", labelKey: "post.city", options: CITIES, searchable: true, preferOpen: true, group: "location" },
     { key: "district", kind: "district", labelKey: "post.district", dependsOn: "city", searchable: true, group: "location" },
   ];
@@ -438,8 +447,25 @@ function vehicleProfileFilterFields(spec: VehicleProfileSpec): FilterField[] {
   for (const g of spec.groups) {
     out.push({ key: `${g.id}Feat`, kind: "multi", labelKey: g.title, options: g.items, strict: true, group: g.id });
   }
+  out.push(...kktcVehicleFilterFields(segment).map((f) => ({ ...f, group: "kktc" as const })));
   out.push({ key: "urgent", kind: "toggle", labelKey: "cat.filter-urgent", group: "other" });
   return out;
+}
+
+/** KKTC-only vasıta filters over the seller-declared specs written by the KKTC block of "İlan Ver". */
+function kktcVehicleFilterFields(segment: VehicleSegment): FilterField[] {
+  return kktcFieldsForSegment(segment)
+    .filter((f) => f.key !== "distUnit")
+    .map((f) => ({
+      key: f.key,
+      kind: "select" as const,
+      labelKey: `kktc.f.${f.key}`,
+      options: f.options,
+      specKeys: [f.specLabel],
+      strict: true,
+      multiPick: f.key !== "firstReg",
+      country: "KKTC" as const,
+    }));
 }
 
 function vehicleCore(segment: VehicleSegment): FilterField[] {
@@ -488,6 +514,7 @@ function classifiedShopFilters(): FilterField[] {
       options: [...CLASSIFIED_SHOP_OPTS],
       preferOpen: true,
     },
+    COUNTRY_FIELD,
     { key: "city", kind: "city", labelKey: "post.city", options: CITIES, searchable: true, preferOpen: true },
     { key: "district", kind: "district", labelKey: "post.district", dependsOn: "city", searchable: true },
     ...range("priceMin", "priceMax", "flt.price", [], "₺", true).map((f, i) => (i === 0 ? { ...f, currencyTabs: true } : f)),
@@ -608,8 +635,10 @@ function fieldsForCategoryNode(cat: Category): FilterField[] {
     const spec = vehicleProfileSpecFor(cat);
     if (spec) return vehicleProfileFilterFields(spec);
     const segment = vehicleSegmentFromCategoryId(id);
-    if (id !== "vasita" && (segment === "auto" || segment === "suv")) return carFilterFields(segment);
-    return vehicleCore(segment);
+    if (id !== "vasita" && (segment === "auto" || segment === "suv")) {
+      return [...carFilterFields(segment), ...kktcVehicleFilterFields(segment)];
+    }
+    return [...vehicleCore(segment), ...kktcVehicleFilterFields(segment)];
   }
 
   if (root === "emlak") return estateFilterFields(id);
@@ -1285,7 +1314,10 @@ function listingYear(listing: Listing) {
 
 function listingKm(listing: Listing) {
   const fromSpec = digits(specOf(listing, ["Km", "Kilometre"]));
-  if (fromSpec !== undefined) return fromSpec;
+  if (fromSpec !== undefined) {
+    const miles = listing.specs.some((s) => s.label === DISTANCE_UNIT_LABEL && s.value === DISTANCE_MILE);
+    return miles ? Math.round(fromSpec * KM_PER_MILE) : fromSpec;
+  }
   const m = listing.subtitle.match(/([\d.]+)\s*km/i);
   return m ? digits(m[1]) : undefined;
 }
@@ -1324,7 +1356,18 @@ export function resolvedOptions(field: FilterField, state: FilterState) {
     return extraTrimsFor({ id: field.catalogId ?? "" }, state.brand, state.model);
   }
   if (field.kind === "district") return districtOptions(state.city);
+  if (field.kind === "city") return regionNamesFor(parseCountry(state.country));
   return field.options ?? [];
+}
+
+/** Country of the current filter: the explicit country, else the chosen city's country. */
+export function filterCountry(state: FilterState) {
+  return parseCountry(state.country) ?? countryOfCity(state.city);
+}
+
+/** False for country-specific fields while another (or no) country is selected. */
+export function fieldOffered(field: FilterField, state: FilterState) {
+  return !field.country || filterCountry(state) === field.country;
 }
 
 export function applyFilterChange(prev: FilterState, key: string, value: string): FilterState {
@@ -1350,16 +1393,32 @@ export function applyFilterChange(prev: FilterState, key: string, value: string)
   if (key === "body") {
     next.drive = "";
   }
+  if (key === "country") {
+    const country = parseCountry(value);
+    if (country && next.city && countryOfCity(next.city) !== country) {
+      next.city = "";
+      next.district = "";
+      next.neighborhood = "";
+    }
+  }
   if (key === "city") {
     next.district = "";
     next.neighborhood = "";
+  }
+  if ((key === "country" || key === "city") && filterCountry(next) !== "KKTC") {
+    for (const k of KKTC_FILTER_KEYS) if (next[k]) next[k] = "";
   }
   if (key === "district") next.neighborhood = "";
   return next;
 }
 
 export function listingMatchesDynamicFilters(listing: Listing, state: FilterState, fields: FilterField[]) {
+  const country = parseCountry(state.country);
+  if (country && !cityInCountry(listing.city, country)) return false;
   if (state.city && listing.city !== state.city) return false;
+  const currency = listingCurrencyOf(listing.currency);
+  if (state.currency && currency !== state.currency) return false;
+  if ((state.priceMin || state.priceMax) && currency !== (state.currency || "TRY")) return false;
   if (state.district && listing.district !== state.district) return false;
   if (state.mappedOnly === "1" && !(listing.city && listing.district)) return false;
   const postedHours = postedFilterHours(state.posted);

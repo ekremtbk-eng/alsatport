@@ -1,6 +1,7 @@
 import { haversineKm } from "@/lib/geo";
 import { DISTRICT_COORDS, keyOf } from "@/data/regionProfiles";
 import { CITY_COORDS } from "@/data/cityCoords";
+import { isKktcCity } from "@/data/locations";
 import type { NearbyItem, NearbyKind } from "@/lib/regionClient";
 
 export type { NearbyItem, NearbyKind } from "@/lib/regionClient";
@@ -59,6 +60,14 @@ function inTurkey(lat: number, lng: number) {
   return lat >= 35.8 && lat <= 42.4 && lng >= 25.6 && lng <= 45;
 }
 
+function inNorthCyprus(lat: number, lng: number) {
+  return lat >= 34.95 && lat <= 35.75 && lng >= 32.25 && lng <= 34.65;
+}
+
+function inCountryOf(city: string, lat: number, lng: number) {
+  return isKktcCity(norm(city)) ? inNorthCyprus(lat, lng) : inTurkey(lat, lng);
+}
+
 /** Nominatim usage policy: at most one request per second per application. */
 async function nominatimSlot() {
   const now = Date.now();
@@ -67,10 +76,10 @@ async function nominatimSlot() {
   if (at > now) await new Promise((r) => setTimeout(r, at - now));
 }
 
-async function nominatimSearch<T>(params: string): Promise<T[] | null> {
+async function nominatimSearch<T>(params: string, countryCode = "tr"): Promise<T[] | null> {
   await nominatimSlot();
   try {
-    const res = await fetch(`${NOMINATIM}?format=jsonv2&countrycodes=tr&${params}`, {
+    const res = await fetch(`${NOMINATIM}?format=jsonv2&countrycodes=${countryCode}&${params}`, {
       headers: { "User-Agent": UA, Accept: "application/json", "Accept-Language": "tr" },
       signal: AbortSignal.timeout(6000),
     });
@@ -83,7 +92,7 @@ async function nominatimSearch<T>(params: string): Promise<T[] | null> {
 
 export function validListingCoords(lat: unknown, lng: unknown, city: string): { lat: number; lng: number } | null {
   if (typeof lat !== "number" || typeof lng !== "number") return null;
-  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !inTurkey(lat, lng)) return null;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !inCountryOf(city, lat, lng)) return null;
   const center = CITY_COORDS[norm(city)];
   if (center && haversineKm(center, { lat, lng }) > MAX_KM_FROM_CITY) return null;
   return { lat: Math.round(lat * 1e7) / 1e7, lng: Math.round(lng * 1e7) / 1e7 };
@@ -98,33 +107,44 @@ function bareNeighborhood(s: string) {
 }
 
 /** Returns a point, null when nothing matched, or undefined when the request itself failed. */
-async function geocodePlace(q: string): Promise<GeoPoint | null | undefined> {
+async function geocodePlace(q: string, kktc: boolean): Promise<GeoPoint | null | undefined> {
+  // OSM tags the north of the island under Cyprus (cy), not Türkiye.
   const rows = await nominatimSearch<{ lat?: string; lon?: string; category?: string }>(
     `limit=5&addressdetails=0&q=${encodeURIComponent(q)}`,
+    kktc ? "cy" : "tr",
   );
   if (!rows) return undefined;
   for (const row of rows) {
     if (row.category !== "place" && row.category !== "boundary") continue;
     const lat = Number(row.lat);
     const lng = Number(row.lon);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng) || !inTurkey(lat, lng)) continue;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    if (kktc ? !inNorthCyprus(lat, lng) : !inTurkey(lat, lng)) continue;
     return { lat, lng, source: "geocode" };
   }
   return null;
 }
 
 async function geocodeListingPlace(city: string, district: string, neighborhood: string) {
-  const queries = [
-    neighborhood && district ? `${neighborhood} Mahallesi, ${district}, ${city}, Türkiye` : "",
-    neighborhood ? `${neighborhood}, ${district || city}, Türkiye` : "",
-    district ? `${district}, ${city}, Türkiye` : "",
-    !district || district === "Merkez" ? `${city}, Türkiye` : "",
-  ].filter(Boolean);
+  const kktc = isKktcCity(city);
+  const country = kktc ? "Kuzey Kıbrıs" : "Türkiye";
+  const queries = kktc
+    ? [
+        neighborhood && district ? `${neighborhood}, ${district}, ${country}` : "",
+        district ? `${district}, ${city}, ${country}` : "",
+        !district || district === city ? `${city}, ${country}` : "",
+      ].filter(Boolean)
+    : [
+        neighborhood && district ? `${neighborhood} Mahallesi, ${district}, ${city}, Türkiye` : "",
+        neighborhood ? `${neighborhood}, ${district || city}, Türkiye` : "",
+        district ? `${district}, ${city}, Türkiye` : "",
+        !district || district === "Merkez" ? `${city}, Türkiye` : "",
+      ].filter(Boolean);
 
   let failed = false;
   let point: GeoPoint | null = null;
   for (const q of queries) {
-    const hit = await geocodePlace(q);
+    const hit = await geocodePlace(q, kktc);
     if (hit === undefined) failed = true;
     if (hit) {
       point = hit;
@@ -135,7 +155,7 @@ async function geocodeListingPlace(city: string, district: string, neighborhood:
     const pinned = DISTRICT_COORDS[keyOf(city, district)];
     if (pinned) point = { ...pinned, source: "district" };
   }
-  if (!point && (!district || district === "Merkez")) {
+  if (!point && (!district || district === "Merkez" || (kktc && district === city))) {
     const cityPt = CITY_COORDS[city];
     if (cityPt) point = { ...cityPt, source: "city" };
   }
@@ -328,6 +348,7 @@ async function nominatimKind(origin: { lat: number; lng: number }, kind: NearbyK
   for (const q of NOMINATIM_QUERIES[kind]) {
     const hits = await nominatimSearch<{ lat?: string; lon?: string; name?: string; category?: string; type?: string }>(
       `limit=40&bounded=1&viewbox=${viewbox}&q=${encodeURIComponent(q)}`,
+      inNorthCyprus(origin.lat, origin.lng) ? "cy" : "tr",
     );
     if (!hits) {
       failed = true;

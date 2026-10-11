@@ -34,7 +34,9 @@ import {
 import { catalogForSegment, VEHICLE_OTHER, vehicleComboError } from "@/data/vehicleIndex";
 import { vehicleProfileSpec } from "@/data/vehicleProfiles";
 import { vehicleProfileFromCategoryId } from "@/data/vehicleIndex";
+import { kktcFieldsForSegment } from "@/data/kktcVehicle";
 import {
+  fieldOffered,
   filterFieldsForCategory,
   hasAdvancedFilters,
   listingMatchesDynamicFilters,
@@ -233,11 +235,13 @@ function unitTests() {
     const spec = vehicleProfileSpec(vehicleProfileFromCategoryId(id));
 
     // Form ↔ filter coverage
-    const labels = new Set(schema.fields.map((f) => f.specLabel));
+    // The ilan-ver KKTC block writes these specs for KKTC locations (same segment rule as the form).
+    const kktcLabels = kktcFieldsForSegment(schema.catalogKind ?? "auto").map((f) => f.specLabel);
+    const labels = new Set([...schema.fields.map((f) => f.specLabel), ...kktcLabels]);
     const items = new Set(schema.groups.flatMap((g) => g.items));
     const misses: string[] = [];
     for (const f of fields) {
-      if (["city", "district", "urgent", "paint"].includes(f.key) || f.key.startsWith("price")) continue;
+      if (["country", "city", "district", "urgent", "paint"].includes(f.key) || f.key.startsWith("price")) continue;
       if (f.kind === "multi") {
         if ((f.options ?? []).some((o) => !items.has(o))) misses.push(f.key);
         continue;
@@ -248,6 +252,11 @@ function unitTests() {
     check(`F.${s}`, `${s}: ${schema.fields.length} form fields, ${fields.length} filters; every filter maps to a stored spec/feature, all grouped`,
       Boolean(spec) && schema.vehicleProfile === true && misses.length === 0 && fields.every((f) => f.group) && formFilterable > 5 && hasAdvancedFilters(findCategory(id)),
       misses.join(","));
+
+    const kktcFilters = fields.filter((f) => f.country === "KKTC");
+    check(`K.${s}`, `${s}: ${kktcFilters.length} KKTC filters hidden for Türkiye/all, offered for KKTC`,
+      kktcFilters.every((f) => !fieldOffered(f, {}) && !fieldOffered(f, { country: "TR" }) && fieldOffered(f, { country: "KKTC" })),
+      kktcFilters.filter((f) => fieldOffered(f, {})).map((f) => f.key).join(","));
 
     // Per-field matching on two form-built listings
     const A = fakeListing(id, 0);

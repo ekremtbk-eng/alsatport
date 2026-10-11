@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { listPublicStores } from "@/lib/business/store";
 import { isBusinessCategory, isKnownCity, isKnownDistrict } from "@/lib/business/shared";
 import { pageMetadata } from "@/lib/seo";
+import { parseCountry } from "@/data/locations";
 import { StoresDirectory } from "./StoresDirectory";
 
 type Ctx = { searchParams: Promise<Record<string, string | string[] | undefined>> };
@@ -15,12 +16,13 @@ function readFilters(sp: Record<string, string | string[] | undefined>) {
   const categoryId = isBusinessCategory(kategori) ? kategori : "";
   const city = isKnownCity(il) ? il : "";
   const district = city && ilce && isKnownDistrict(city, ilce) ? ilce : "";
-  return { categoryId, city, district, verified: one(sp.dogrulanmis) === "1" };
+  const country = parseCountry(one(sp.ulke));
+  return { categoryId, city, district, country: country ?? "", verified: one(sp.dogrulanmis) === "1" };
 }
 
 export async function generateMetadata({ searchParams }: Ctx): Promise<Metadata> {
   const f = readFilters(await searchParams);
-  const filtered = !!(f.categoryId || f.city || f.verified);
+  const filtered = !!(f.categoryId || f.city || f.country || f.verified);
   return pageMetadata({
     title: "Mağazalar · Doğrulanmış İşletmeler · AlsatPort",
     description: "AlsatPort'ta yönetici onaylı doğrulanmış işletme mağazaları. Kategoriye, ile ve ilçeye göre filtreleyin.",
@@ -33,6 +35,6 @@ export async function generateMetadata({ searchParams }: Ctx): Promise<Metadata>
 export default async function StoresPage({ searchParams }: Ctx) {
   const f = readFilters(await searchParams);
   // Only admin-approved stores are ever public, so every listed store is verified.
-  const stores = await listPublicStores(f);
+  const stores = await listPublicStores({ ...f, country: parseCountry(f.country) });
   return <StoresDirectory stores={stores} filters={f} />;
 }

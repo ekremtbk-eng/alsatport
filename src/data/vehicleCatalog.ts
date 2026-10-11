@@ -1,3 +1,5 @@
+import { withKktcMarket } from "./vehicleCatalogKktc";
+
 export type VehicleModelLine = {
   name: string;
   packages: string[];
@@ -69,7 +71,7 @@ function brand(name: string, models: VehicleModelLine[]): VehicleBrand {
   };
 }
 
-export const VEHICLE_BRANDS: VehicleBrand[] = [
+const BASE_BRANDS: VehicleBrand[] = [
   brand("Abarth", [
     line("595", ["595", "595 Turismo", "595 Competizione"], E1, HB),
     line("124 Spider", ["124 Spider"], ["1.4"], CB),
@@ -573,7 +575,9 @@ export const VEHICLE_BRANDS: VehicleBrand[] = [
     line("X", ["X"], EE, SUV),
     line("7X", ["7X"], EE, SUV),
   ]),
-].sort((a, b) => a.name.localeCompare(b.name, "en"));
+];
+
+export const VEHICLE_BRANDS: VehicleBrand[] = withKktcMarket(BASE_BRANDS);
 
 function findBrand(brandName?: string) {
   if (!brandName) return undefined;
