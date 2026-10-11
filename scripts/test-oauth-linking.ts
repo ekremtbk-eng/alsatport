@@ -79,8 +79,8 @@ async function main() {
     check("L7", "Identifier: +90 phone still logs in", (await store.findUserByIdentifier("+90 532 123 4567"))?.id === victim.id);
     check("L8", "Identifier: text with digits is not treated as a phone", !(await store.findUserByIdentifier(`user${VICTIM_PHONE}x`)));
     const twin = await makeUser("twin", { phone: "05559998877" });
-    await makeUser("twin2", { phone: "05559998877" });
-    check("L9", "Identifier: a phone shared by two accounts matches none", !(await store.findUserByIdentifier("05559998877")), `twin=${twin.id.slice(0, 8)}`);
+    await makeUser("twin2", { phone: "905559998877" });
+    check("L9", "Identifier: a number stored on two accounts (0… / 90…) matches none", !(await store.findUserByIdentifier("05559998877")), `twin=${twin.id.slice(0, 8)}`);
     check("L10", "findUserByUsername ignores e-mail-shaped input", !(await store.findUserByUsername(victim.email)));
 
     // ---------------- Social sign-in ----------------
