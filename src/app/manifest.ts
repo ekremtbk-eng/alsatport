@@ -17,6 +17,9 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: "tr",
     dir: "ltr",
     categories: ["shopping", "business", "lifestyle"],
+    // Lets Chromium's getInstalledRelatedApps() report this same web app as installed; resolved per origin.
+    related_applications: [{ platform: "webapp", url: "/manifest.webmanifest" }],
+    prefer_related_applications: false,
     icons: [
       { src: brandIcon("/favicon-16x16.png"), sizes: "16x16", type: "image/png" },
       { src: brandIcon("/favicon-32x32.png"), sizes: "32x32", type: "image/png" },

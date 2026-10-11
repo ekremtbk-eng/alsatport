@@ -4,7 +4,11 @@
  */
 const KEY = "alsatport-install-welcome-v1";
 
-export type WelcomeChoice = "dismissed" | "later" | "install";
+/**
+ * dismissed = X / Esc, later = "Not now", prompted = download pressed (install dialog or steps shown,
+ * not proof of installation), installed = the browser confirmed an installed app.
+ */
+export type WelcomeChoice = "dismissed" | "later" | "prompted" | "installed";
 
 /** True once a choice is stored. Unreadable storage also counts, so the screen can't reappear on every page. */
 export function welcomeDecided(): boolean {

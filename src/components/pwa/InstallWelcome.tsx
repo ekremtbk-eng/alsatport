@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import {
   Check,
@@ -21,7 +22,7 @@ import { useI18n } from "@/context/I18nContext";
 import { nativeAppUrl } from "@/data/appDistribution";
 import { BRAND_MARK_SRC, BRAND_NAME } from "@/lib/brand";
 import { detectPlatform, installPath, type InstallPath, type PlatformInfo } from "@/lib/pwa/platform";
-import { useInstall } from "@/lib/pwa/useInstall";
+import { detectInstalled, useInstall } from "@/lib/pwa/useInstall";
 import { rememberWelcome, screenBusy, welcomeAllowedOn, welcomeDecided, type WelcomeChoice } from "@/lib/pwa/installWelcome";
 
 const FIRST_DELAY_MS = 2500;
@@ -69,16 +70,19 @@ const GUIDES: Record<Guide, { titleKey: string; leadKey: string; steps: { icon: 
   },
 };
 
+const NON_VISUAL = new Set(["SCRIPT", "STYLE", "LINK", "META", "TITLE", "TEMPLATE", "NOSCRIPT"]);
+
 /** Stops a second opening in this tab even when localStorage is unavailable. */
 let handledThisLoad = false;
 
 export function InstallWelcome() {
-  const { t } = useI18n();
+  const { t, dir } = useI18n();
   const path = usePathname();
   const { canPrompt, installed, prompt } = useInstall();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<View>("intro");
   const [info, setInfo] = useState<PlatformInfo | null>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const primaryRef = useRef<HTMLElement | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
@@ -93,27 +97,49 @@ export function InstallWelcome() {
   useEffect(() => {
     if (open || handledThisLoad || !welcomeAllowedOn(path) || welcomeDecided()) return;
     let timer = 0;
-    const attempt = () => {
+    let cancelled = false;
+    const attempt = async () => {
       if (handledThisLoad || welcomeDecided() || installedRef.current) return;
       if (screenBusy()) {
         timer = window.setTimeout(attempt, RETRY_MS);
         return;
       }
+      const alreadyInstalled = await detectInstalled();
+      if (cancelled || handledThisLoad || welcomeDecided()) return;
       handledThisLoad = true;
+      if (alreadyInstalled || installedRef.current) return;
+      if (screenBusy()) {
+        handledThisLoad = false;
+        timer = window.setTimeout(attempt, RETRY_MS);
+        return;
+      }
       returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setView("intro");
       setOpen(true);
     };
     timer = window.setTimeout(attempt, FIRST_DELAY_MS);
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [path, open]);
 
   const close = useCallback((choice?: WelcomeChoice) => {
     if (choice) rememberWelcome(choice);
     setOpen(false);
     const back = returnFocusRef.current;
+    returnFocusRef.current = null;
     if (back && document.contains(back)) back.focus({ preventScroll: true });
   }, []);
+
+  useEffect(() => {
+    const onInstalled = () => {
+      handledThisLoad = true;
+      close("installed");
+    };
+    window.addEventListener("appinstalled", onInstalled);
+    return () => window.removeEventListener("appinstalled", onInstalled);
+  }, [close]);
 
   useEffect(() => {
     if (!open) return;
@@ -124,6 +150,11 @@ export function InstallWelcome() {
     root.classList.add("iw-lock");
     // iOS Safari ignores overflow:hidden for touch scrolling; pinning the body is the reliable lock.
     Object.assign(body.style, { position: "fixed", top: `-${y}px`, left: "0", right: "0", width: "100%" });
+    // aria-modal alone is not honoured by every screen reader; inert hides the page behind the dialog.
+    const inerted = Array.from(body.children).filter(
+      (el) => el !== overlayRef.current && !NON_VISUAL.has(el.tagName) && !el.hasAttribute("inert"),
+    );
+    inerted.forEach((el) => el.setAttribute("inert", ""));
     primaryRef.current?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -151,6 +182,7 @@ export function InstallWelcome() {
     return () => {
       document.removeEventListener("keydown", onKey);
       root.classList.remove("iw-lock");
+      inerted.forEach((el) => el.removeAttribute("inert"));
       if (prevBody === null) body.removeAttribute("style");
       else body.setAttribute("style", prevBody);
       window.scrollTo({ top: y, behavior: "instant" });
@@ -162,7 +194,7 @@ export function InstallWelcome() {
   }, [open, view]);
 
   useEffect(() => {
-    if (open && installed) close();
+    if (open && installed) close("installed");
   }, [open, installed, close]);
 
   if (!open || !info) return null;
@@ -171,7 +203,7 @@ export function InstallWelcome() {
   const nativeUrl = nativeAppUrl(platform);
 
   function onDownload() {
-    rememberWelcome("install");
+    rememberWelcome("prompted");
     if (canPrompt) {
       close();
       void prompt();
@@ -184,8 +216,8 @@ export function InstallWelcome() {
   const guide = view !== "intro" && view !== "unsupported" ? GUIDES[view] : null;
   const showIosBrowserNote = view === "ios-share" && !info.isSafari;
 
-  return (
-    <div className="iw-overlay">
+  return createPortal(
+    <div ref={overlayRef} className="iw-overlay" dir={dir}>
       <div
         ref={dialogRef}
         role="dialog"
@@ -242,7 +274,7 @@ export function InstallWelcome() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="iw-cta"
-                    onClick={() => close("install")}
+                    onClick={() => close("prompted")}
                   >
                     <Download aria-hidden="true" />
                     {t("iw.download")}
@@ -322,6 +354,7 @@ export function InstallWelcome() {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
