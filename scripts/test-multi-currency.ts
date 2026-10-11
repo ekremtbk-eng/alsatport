@@ -192,7 +192,8 @@ async function main() {
         email: FIXTURE_EMAIL,
         username: `currency_fixture_${Date.now().toString(36)}`,
         role: "seller",
-        provider: "email",
+        provider: "google",
+        providerSub: "currency-fixture",
         emailVerifiedAt: new Date(),
         profile: { create: { displayName: "Kur Test", fullName: "Kur Test", profileComplete: true } },
       },
@@ -205,7 +206,7 @@ async function main() {
         data: {
           listingNo: `9${Date.now().toString().slice(-7)}${i}`,
           sellerId: seller.id,
-          categoryId: "phones",
+          categoryId: "vasita-otomobil",
           title: `${FIXTURE_TITLE} ${c.currency || "eski TRY"}`,
           description: "Sahte kur testi ilanı (yalnızca yerel test veritabanı).",
           price: c.price,
