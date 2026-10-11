@@ -43,3 +43,14 @@ export function safeAppUrl(url: string | null): string | null {
     return null;
   }
 }
+
+const NATIVE_TARGETS: Partial<Record<string, AppTargetId[]>> = { android: ["play", "apk"], ios: ["appstore"] };
+
+/** Published native app for this phone platform, or null while none exists (the web app is offered instead). */
+export function nativeAppUrl(platform: string): string | null {
+  for (const id of NATIVE_TARGETS[platform] ?? []) {
+    const url = safeAppUrl(APP_TARGETS.find((t) => t.id === id)?.url ?? null);
+    if (url) return url;
+  }
+  return null;
+}
