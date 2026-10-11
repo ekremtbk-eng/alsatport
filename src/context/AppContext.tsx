@@ -18,6 +18,7 @@ import {
 } from "@/data/store";
 import { seedReviews, type SellerReview } from "@/data/reviews";
 import { cityPoint, isNearbyListing, nearestCity } from "@/lib/geo";
+import { priceDropOf, readWatchedPrices, watchedPriceOf, type WatchedPrice } from "@/lib/priceWatch";
 import { hasConsent } from "@/lib/consent";
 import { isBlockedLiveAnimalListing } from "@/lib/liveAnimalPolicy";
 import {
@@ -173,7 +174,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [notifPrefs, setNotifPrefsState] = useState<NotifPrefs>(DEFAULT_NOTIF_PREFS);
   const [geo, setGeo] = useState<GeoState>({ status: "idle" });
-  const [watchedPrices, setWatchedPrices] = useState<Record<string, number>>({});
+  const [watchedPrices, setWatchedPrices] = useState<Record<string, WatchedPrice>>({});
   const [hydrated, setHydrated] = useState(false);
   const [alertsReady, setAlertsReady] = useState(false);
 
@@ -268,7 +269,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (parsed.notifications) setNotifications(parsed.notifications);
           if (parsed.notifPrefs) setNotifPrefsState({ ...DEFAULT_NOTIF_PREFS, ...parsed.notifPrefs });
           if (parsed.geo) setGeo(parsed.geo);
-          if (parsed.watchedPrices) setWatchedPrices(parsed.watchedPrices);
+          if (parsed.watchedPrices) setWatchedPrices(readWatchedPrices(parsed.watchedPrices));
         }
       } catch {
         /* ignore corrupt cache */
@@ -345,7 +346,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setWatchedPrices((prev) => {
         const next = { ...prev };
         for (const l of listings) {
-          if (next[l.id] == null) next[l.id] = l.price;
+          if (next[l.id] == null) next[l.id] = watchedPriceOf(l);
         }
         return next;
       });
@@ -538,7 +539,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const isNew = !known.has(l.id);
       if (isNew) {
         known.add(l.id);
-        nextPrices[l.id] = l.price;
+        nextPrices[l.id] = watchedPriceOf(l);
         if (me && l.sellerId === me) continue;
 
         if (prefs.savedSearch) {
@@ -579,26 +580,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         continue;
       }
 
-      const prevPrice = nextPrices[l.id];
-      if (
-        prefs.priceDrop &&
-        prevPrice != null &&
-        l.price < prevPrice &&
-        favoritesRef.current.includes(l.id) &&
-        l.sellerId !== me
-      ) {
+      const drop = priceDropOf(nextPrices[l.id], l);
+      if (prefs.priceDrop && drop && favoritesRef.current.includes(l.id) && l.sellerId !== me) {
         incoming.push({
           id: crypto.randomUUID(),
           kind: "price",
           title: "Favori ilanda fiyat düştü",
-          body: `${l.title} ${prevPrice.toLocaleString("tr-TR")} TL → ${l.price.toLocaleString("tr-TR")} TL`,
+          body: `${l.title} ${drop.from} → ${drop.to}`,
           href: `/ilan/${l.id}`,
           createdAt: Date.now(),
           read: false,
           listingId: l.id,
         });
       }
-      nextPrices[l.id] = l.price;
+      nextPrices[l.id] = watchedPriceOf(l);
     }
 
     setWatchedPrices(nextPrices);

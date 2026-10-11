@@ -1,4 +1,5 @@
 import { brandsForCategory, lookupCategory, rootOf } from "@/data/categories";
+import { fieldUnit } from "@/lib/listings/currency";
 import {
   APPLIANCE_BRANDS,
   AUDIO_BRANDS,
@@ -118,6 +119,8 @@ export type AttrField = {
   searchable?: boolean;
   /** Shown after number values (km, kWh, ₺ …); the stored spec keeps it so detail pages read naturally. */
   unit?: string;
+  /** Amount in the listing's currency: shown and stored with that currency's symbol instead of `unit`. */
+  money?: boolean;
   /** Number field that accepts one decimal separator (e.g. 12,5 m). */
   decimal?: boolean;
 };
@@ -562,7 +565,7 @@ function estateFields(kind: "home" | "land" | "office", categoryId = ""): AttrFi
     f("usage", "Kullanım durumu", "select", { options: USAGE_STATUS, specLabel: "Kullanım durumu" }),
     f("site", "Site içerisinde", "select", { options: CREDIT, specLabel: "Site içerisinde" }),
     f("siteName", "Site adı", "text", { specLabel: "Site adı" }),
-    f("dues", "Aidat (TL)", "number", { specLabel: "Aidat" }),
+    f("dues", "Aidat", "number", { specLabel: "Aidat", unit: "₺", money: true }),
     f("credit", "Krediye uygun", "select", { options: CREDIT }),
     f("deed", "Tapu durumu", "select", { options: DEED_STATUS, specLabel: "Tapu durumu" }),
     swap,
@@ -1076,6 +1079,7 @@ function attrFromVehicleDef(def: VehicleSpecDef, segment: VehicleSegment): AttrF
     ...(def.optionSource ? { optionSource: def.optionSource } : {}),
     ...(catalog ? { catalogKind: segment, searchable: true } : {}),
     ...(def.unit ? { unit: def.unit } : {}),
+    ...(def.money ? { money: true } : {}),
     ...(def.decimal ? { decimal: true } : {}),
   });
 }
@@ -1093,6 +1097,11 @@ export function numberAttrValue(field: Pick<AttrField, "decimal">, raw: string) 
 /** Value to prefill the edit form from a stored spec. */
 export function attrValueFromSpec(field: AttrField, value: string) {
   return field.kind === "number" ? numberAttrValue(field, value) : value;
+}
+
+/** Amounts are stored with a currency symbol ("5.000 £"); the edit form needs the bare number back. */
+export function editAttrValue(field: AttrField, value: string, vehicleProfile?: boolean) {
+  return vehicleProfile || field.money ? attrValueFromSpec(field, value) : value;
 }
 
 /**
@@ -1472,7 +1481,8 @@ export function chassisSummary(map?: Record<string, ChassisStatus>) {
   return { painted, changed, local };
 }
 
-export function specsFromAttrs(schema: ListingSchema, attrs: Record<string, string>) {
+/** `currency` is the listing's own currency; amount fields are stored with its symbol (TRY when omitted). */
+export function specsFromAttrs(schema: ListingSchema, attrs: Record<string, string>, currency?: string) {
   const specs: { label: string; value: string }[] = [];
   for (const field of schema.fields) {
     const raw = attrs[field.key]?.trim();
@@ -1482,8 +1492,9 @@ export function specsFromAttrs(schema: ListingSchema, attrs: Record<string, stri
     if (!kmDigits && field.kind === "number" && field.unit !== undefined) {
       const n = numberAttrValue(field, raw);
       if (!n) continue;
-      const shown = field.decimal ? n : Number(n).toLocaleString("tr-TR", { useGrouping: field.unit === "₺" || field.unit === "kg" });
-      value = field.unit ? `${shown} ${field.unit}` : shown;
+      const unit = fieldUnit(field, currency);
+      const shown = field.decimal ? n : Number(n).toLocaleString("tr-TR", { useGrouping: field.money || field.unit === "kg" });
+      value = unit ? `${shown} ${unit}` : shown;
     }
     specs.push({ label: field.specLabel, value });
   }
@@ -1494,8 +1505,9 @@ export function specsWithChassis(
   schema: ListingSchema,
   attrs: Record<string, string>,
   chassis?: Record<string, ChassisStatus>,
+  currency?: string,
 ) {
-  const specs = specsFromAttrs(schema, attrs);
+  const specs = specsFromAttrs(schema, attrs, currency);
   if (schema.chassis && chassis) {
     const s = chassisSummary(chassis);
     specs.push({ label: "Boyalı parça", value: String(s.painted) });

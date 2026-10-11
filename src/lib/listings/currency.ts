@@ -34,3 +34,13 @@ export function listingCurrencySymbol(value: unknown) {
   const id = listingCurrencyOf(value);
   return LISTING_CURRENCIES.find((c) => c.id === id)!.symbol;
 }
+
+/** Suggested currency for a new listing in this country; the user can still pick any other. */
+export function defaultCurrencyForCountry(country: string | undefined): ListingCurrency {
+  return country === "KKTC" ? "GBP" : "TRY";
+}
+
+/** Unit shown next to a field: amounts (`money`) carry the listing's own currency, everything else its fixed unit. */
+export function fieldUnit(field: { unit?: string; money?: boolean }, currency?: unknown) {
+  return field.money ? listingCurrencySymbol(currency) : field.unit;
+}

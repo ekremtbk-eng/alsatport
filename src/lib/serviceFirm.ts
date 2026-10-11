@@ -17,7 +17,8 @@ export function serviceFirmHref(listingId: string) {
   return `${SERVICE_FIRM_PATH}/${encodeURIComponent(listingId)}`;
 }
 
-export type FirmPriceRow = { title: string; unit?: string; min: number; max?: number };
+/** `currency` is omitted for the firm's own price list, which is entered in TL. */
+export type FirmPriceRow = { title: string; unit?: string; min: number; max?: number; currency?: string };
 export type FirmQa = { q: string; a: string };
 export type FirmCheck = { label: string };
 export type FirmDetail = { label: string; value: string };
@@ -102,7 +103,7 @@ export function buildFirmProfile(
   const prices: FirmPriceRow[] = firm?.priceList.length
     ? firm.priceList
     : listing.price > 0
-      ? [{ title: listing.title, min: listing.price }]
+      ? [{ title: listing.title, min: listing.price, currency: listing.currency }]
       : [];
 
   const gallery = listing.images.filter(Boolean);

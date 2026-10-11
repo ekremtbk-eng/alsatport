@@ -13,6 +13,7 @@ import {
   applyFilterChange,
   districtOptions,
   fieldOffered,
+  rangeSuffix,
   resolvedOptions,
   type EstateFilterGroup,
   type FilterField,
@@ -75,6 +76,7 @@ function normalizeRanges(fields: FilterField[], state: FilterState): FilterState
 
 function RangeControl({ field, maxKey, draft, set, t }: { field: FilterField; maxKey: string; draft: FilterState; set: (k: string, v: string) => void; t: T }) {
   const title = t(field.labelKey);
+  const suffix = rangeSuffix(field, draft);
   return (
     <div className="adv-range">
       {[field.key, maxKey].map((key, i) => (
@@ -88,7 +90,7 @@ function RangeControl({ field, maxKey, draft, set, t }: { field: FilterField; ma
               value={draft[key] ?? ""}
               onChange={(e) => set(key, e.target.value.replace(/[^\d]/g, "").slice(0, 12))}
             />
-            {field.suffix ? <span className="adv-range-sfx">{field.suffix}</span> : null}
+            {suffix ? <span className="adv-range-sfx">{suffix}</span> : null}
           </span>
         </label>
       ))}

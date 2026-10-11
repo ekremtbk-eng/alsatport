@@ -113,7 +113,7 @@ export function ListingPoster({
           {place}
         </p>
       ) : null}
-      <p className="pp-price">{posterPrice(listing.price, period)}</p>
+      <p className="pp-price">{posterPrice(listing.price, period, listing.currency)}</p>
       {features.length ? (
         <ul className="pp-feats">
           {features.map((f) => {

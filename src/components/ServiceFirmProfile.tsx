@@ -111,10 +111,10 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
   const firmPrices = !!firm?.priceList.length;
   function priceText(row: FirmPriceRow) {
     const range = row.max
-      ? `${formatMoney(row.min)} – ${formatMoney(row.max)}`
+      ? `${formatMoney(row.min, row.currency)} – ${formatMoney(row.max, row.currency)}`
       : firmPrices
-        ? t("firm.price.from", { v: formatMoney(row.min) })
-        : formatMoney(row.min);
+        ? t("firm.price.from", { v: formatMoney(row.min, row.currency) })
+        : formatMoney(row.min, row.currency);
     return row.unit ? `${range} / ${row.unit}` : range;
   }
   const dateText = (at: number) => new Date(at).toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric" });

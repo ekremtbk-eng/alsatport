@@ -72,6 +72,8 @@ export type VehicleSpecDef = {
   dependsOn?: string;
   optionSource?: VehicleCascade;
   unit?: string;
+  /** Amount in the listing's currency: shown and stored with that currency's symbol instead of `unit`. */
+  money?: boolean;
   decimal?: boolean;
   filter?: VehicleSpecFilter;
 };
@@ -332,6 +334,8 @@ const sel = (key: string, label: string, options: string[], group: VehicleFilter
   d(key, label, "select", { options, filter: pick(group), ...extra });
 const num = (key: string, label: string, unit: string, group: VehicleFilterGroup = "special", extra: Partial<VehicleSpecDef> = {}) =>
   d(key, label, "number", { unit, filter: { group, mode: "range" }, ...extra });
+const amount = (key: string, label: string, group: VehicleFilterGroup = "special", extra: Partial<VehicleSpecDef> = {}) =>
+  num(key, label, "₺", group, { money: true, ...extra });
 
 /** Brand → model → paket → motor → kasa chain plus the shared car fields, for car-based sub-categories. */
 function carBase(segment: VehicleSegment, opts: { years?: string[]; trimRequired?: boolean; kmRequired?: boolean } = {}): VehicleSpecDef[] {
@@ -540,12 +544,12 @@ function buildProfileSpec(profile: VehicleProfile): VehicleProfileSpec | null {
         chassis: true,
         fields: [
           ...carBase("auto", { kmRequired: false }),
-          num("dailyPrice", "Günlük fiyat", "₺", "special", { required: true, filter: { group: "special", primary: true, mode: "range" } }),
-          num("weeklyPrice", "Haftalık fiyat", "₺"),
-          num("monthlyPrice", "Aylık fiyat", "₺"),
+          amount("dailyPrice", "Günlük fiyat", "special", { required: true, filter: { group: "special", primary: true, mode: "range" } }),
+          amount("weeklyPrice", "Haftalık fiyat"),
+          amount("monthlyPrice", "Aylık fiyat"),
           sel("rentPeriod", "Kiralama dönemi", RENT_PERIODS, "special", { specLabel: "Süre", aliases: ["Dönem"] }),
           sel("minRent", "Minimum kiralama süresi", RENT_MIN),
-          num("deposit", "Depozito", "₺"),
+          amount("deposit", "Depozito"),
           sel("kmLimit", "Kilometre limiti", RENT_KM_LIMIT),
           sel("fuelPolicy", "Yakıt politikası", RENT_FUEL_POLICY),
           sel("minAge", "Yaş sınırı", RENT_MIN_AGE),
@@ -567,7 +571,7 @@ function buildProfileSpec(profile: VehicleProfile): VehicleProfileSpec | null {
           sel("runs", "Çalışır durumda mı", RUN_STATES),
           sel("airbag", "Airbag durumu", AIRBAG_STATES),
           yn("missingParts", "Eksik parça"),
-          num("tramer", "Tramer tutarı", "₺"),
+          amount("tramer", "Tramer tutarı"),
           ...tail(true),
         ],
         groups: carGroupsAll(),

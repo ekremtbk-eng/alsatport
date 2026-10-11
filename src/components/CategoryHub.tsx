@@ -25,6 +25,7 @@ import { FilterCategoryTree } from "@/components/FilterCategoryTree";
 import { ServicesHome } from "@/components/ServicesHome";
 import { StdFilterSidebar } from "@/components/StdFilterSidebar";
 import { listingMatchesDynamicFilters } from "@/lib/categoryFilters";
+import { currencyOrder } from "@/lib/listings/currency";
 import { isSeaEquipCategoryId } from "@/data/seaEquip";
 import { CompactListingList, CompactListingRow } from "@/components/CompactListingRow";
 import { MobileResultsBar, usePhoneView } from "@/components/MobileResultsBar";
@@ -191,8 +192,8 @@ export function CategoryHub({ cat }: { cat: Category }) {
     );
   }, [pool, city, district, posted, mappedOnly, word, includeDesc]);
   const sorted = useMemo(() => {
-    if (sort === "ucuz") return [...vitrine].sort((a, b) => a.price - b.price);
-    if (sort === "pahali") return [...vitrine].sort((a, b) => b.price - a.price);
+    if (sort === "ucuz") return [...vitrine].sort((a, b) => currencyOrder(a, b) || a.price - b.price);
+    if (sort === "pahali") return [...vitrine].sort((a, b) => currencyOrder(a, b) || b.price - a.price);
     if (sort === "yeni") return [...vitrine].sort((a, b) => (b.postedAt ?? 0) - (a.postedAt ?? 0));
     return vitrine;
   }, [vitrine, sort]);
