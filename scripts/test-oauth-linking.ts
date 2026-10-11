@@ -55,8 +55,16 @@ async function main() {
     });
     return row;
   }
+  // saveUser re-stamps emailVerifiedAt on every save, so only the verified state is compared.
   const snapshot = (id: string) =>
-    prisma.user.findUnique({ where: { id }, select: { email: true, provider: true, providerSub: true, passwordHash: true, role: true, emailVerifiedAt: true } });
+    prisma.user
+      .findUnique({ where: { id }, select: { email: true, provider: true, providerSub: true, passwordHash: true, role: true, emailVerifiedAt: true } })
+      .then((row) => row && { ...row, emailVerifiedAt: !!row.emailVerifiedAt });
+  const diff = (a: Record<string, unknown> | null, b: Record<string, unknown> | null) =>
+    Object.keys({ ...a, ...b })
+      .filter((k) => JSON.stringify(a?.[k]) !== JSON.stringify(b?.[k]))
+      .map((k) => (k === "passwordHash" ? k : `${k}:${JSON.stringify(a?.[k])}->${JSON.stringify(b?.[k])}`))
+      .join(" ") || "unchanged";
   const identity = (email: string, sub: string, verified = true) => ({
     provider: "google" as const,
     sub,
@@ -172,6 +180,7 @@ async function main() {
       "B2",
       "Admin with a linked Google id signs in by that id; role, e-mail and password kept; second factor still required",
       "user" in rb2 && rb2.user.id === linkedAdmin.id && JSON.stringify(laBefore) === JSON.stringify(laAfter) && (await needsSecondFactor(rb2.user)) === true,
+      diff(laBefore, laAfter),
     );
 
     const googleOnly = await prisma.user.create({
@@ -187,10 +196,12 @@ async function main() {
     });
     const goBefore = await snapshot(googleOnly.id);
     const rb3 = await oauth.upsertVerifiedOAuthUser(identity(googleOnly.email, `sub-googleonly-${TAG}`), req);
+    const goAfter = await snapshot(googleOnly.id);
     check(
       "B3",
       "Existing Google-only account signs in by its id; stays passwordless and unchanged",
-      "user" in rb3 && rb3.user.id === googleOnly.id && JSON.stringify(goBefore) === JSON.stringify(await snapshot(googleOnly.id)),
+      "user" in rb3 && rb3.user.id === googleOnly.id && JSON.stringify(goBefore) === JSON.stringify(goAfter) && goAfter?.passwordHash === null,
+      diff(goBefore, goAfter),
     );
 
     // ---------------- Explicit linking ----------------
