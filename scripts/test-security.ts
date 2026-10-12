@@ -136,6 +136,22 @@ async function rawCall(method: string, path: string, s?: Sess | null, body?: unk
   return { status: res.status, json, text, headers: res.headers };
 }
 
+async function resetStamp(passwordHash: string) {
+  const { createHash } = await import("node:crypto");
+  return createHash("sha256").update(`${SECRET.trim()}:reset:${passwordHash}`).digest("hex").slice(0, 32);
+}
+
+async function resetToken(userId: string, opts: { typ?: string; expSeconds?: number } = {}) {
+  const row = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { passwordHash: true } });
+  const now = Math.floor(Date.now() / 1000);
+  return new SignJWT({ typ: opts.typ ?? "reset", ps: await resetStamp(row.passwordHash ?? "") })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(userId)
+    .setIssuedAt(now - 120)
+    .setExpirationTime(now + (opts.expSeconds ?? 1800))
+    .sign(key);
+}
+
 async function guestCsrf() {
   const csrf = randomBytes(32).toString("hex");
   return { sid: "", cookie: `ap_csrf=${csrf}`, csrf } satisfies Sess;
@@ -405,6 +421,47 @@ async function main() {
     r = await call("GET", "/api/auth/oauth/google/start?intent=link", await makeSession(b));
     check("O9", "Already-linked account cannot start another link", (r.headers.get("location") ?? "").includes("oauth=linked"), r.headers.get("location") ?? `status ${r.status}`);
     await prisma.user.update({ where: { id: b.id }, data: { providerSub: null } });
+
+    // ---------------- Password reset ----------------
+    await prisma.rateLimitBucket.deleteMany({});
+    const ru = await makeUser("resetu", "member");
+    const ruBefore = await prisma.user.findUniqueOrThrow({ where: { id: ru.id }, select: { passwordHash: true } });
+    const ruSession = await makeSession(ru);
+    const good = await resetToken(ru.id);
+    r = await call("POST", "/api/auth/reset/check", await guestCsrf(), { token: good });
+    check("R1", "Fresh reset link is accepted", r.status === 200 && r.json.ok === true, `status ${r.status} ${String(r.json.error ?? "")}`);
+    // Mail scanners / link previews fetch the page (GET/HEAD); the token lives in the #fragment and must survive.
+    await call("GET", "/sifre-sifirla");
+    await call("HEAD", "/sifre-sifirla");
+    await call("GET", `/sifre-sifirla?token=${encodeURIComponent(good)}`);
+    r = await call("POST", "/api/auth/reset/check", await guestCsrf(), { token: good });
+    check("R2", "Opening the link (scanner/preview) does not consume it", r.status === 200, `status ${r.status}`);
+    r = await call("POST", "/api/auth/reset/check", await guestCsrf(), { token: `${good.slice(0, -2)}${good.endsWith("A") ? "B" : "A"}x` });
+    check("R3", "Tampered reset token rejected", r.status === 400 && r.json.error === "auth.reset.invalid", `status ${r.status}`);
+    r = await call("POST", "/api/auth/reset/check", await guestCsrf(), { token: await resetToken(ru.id, { expSeconds: -5 }) });
+    check("R4", "Expired reset token rejected", r.status === 400 && r.json.error === "auth.reset.invalid", `status ${r.status}`);
+    r = await call("POST", "/api/auth/reset/check", await guestCsrf(), { token: await resetToken(ru.id, { typ: "access" }) });
+    check("R5", "Non-reset token type rejected", r.status === 400 && r.json.error === "auth.reset.invalid", `status ${r.status}`);
+    const NEW_PASSWORD = `New!${randomBytes(6).toString("base64url")}7b`;
+    r = await call("POST", "/api/auth/reset", null, { token: good, password: NEW_PASSWORD, confirm: NEW_PASSWORD });
+    const ruNoCsrf = await prisma.user.findUniqueOrThrow({ where: { id: ru.id }, select: { passwordHash: true } });
+    check("R6", "Reset without CSRF token rejected, password unchanged", r.status === 403 && ruNoCsrf.passwordHash === ruBefore.passwordHash, `status ${r.status}`);
+    r = await call("POST", "/api/auth/reset", await guestCsrf(), { token: good, password: NEW_PASSWORD, confirm: NEW_PASSWORD });
+    const ruAfter = await prisma.user.findUniqueOrThrow({ where: { id: ru.id }, select: { passwordHash: true } });
+    const oldSession = await call("GET", "/api/account/sessions", ruSession);
+    check(
+      "R7",
+      "Valid reset changes the password and ends existing sessions",
+      r.status === 200 && ruAfter.passwordHash !== ruBefore.passwordHash && oldSession.status === 401,
+      `status ${r.status} session=${oldSession.status}`,
+    );
+    r = await call("POST", "/api/auth/reset", await guestCsrf(), { token: good, password: `${NEW_PASSWORD}x`, confirm: `${NEW_PASSWORD}x` });
+    const ruReuse = await prisma.user.findUniqueOrThrow({ where: { id: ru.id }, select: { passwordHash: true } });
+    check("R8", "Used reset link cannot be used again", r.status === 400 && r.json.error === "auth.reset.invalid" && ruReuse.passwordHash === ruAfter.passwordHash, `status ${r.status}`);
+    r = await call("POST", "/api/auth/reset/check", await guestCsrf(), { token: good });
+    check("R9", "Used reset link reports invalid on check", r.status === 400 && r.json.error === "auth.reset.invalid", `status ${r.status}`);
+    r = await call("POST", "/api/auth/login", await guestCsrf(), { identifier: ru.email, password: NEW_PASSWORD });
+    check("R10", "New password signs in", r.status === 200, `status ${r.status} ${String(r.json.error ?? "")}`);
 
     // ---------------- Admin acting on others' listings ----------------
     r = await call("PUT", `/api/listings/${listing.id}`, await makeSession(admin), { title: "admin edit without 2FA" });

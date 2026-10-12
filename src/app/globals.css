@@ -2716,6 +2716,17 @@ html[data-device="tablet"] .cat-mega {
   font-size: 0.75rem !important;
   white-space: nowrap;
 }
+.loc-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+.loc-banner-select {
+  height: 2.35rem;
+  min-width: 10rem;
+  font-size: 16px;
+}
 .loc-banner-x {
   display: grid;
   width: 2.5rem;
@@ -2743,10 +2754,19 @@ html[data-device="phone"] .loc-banner-row.has-allow,
 html[data-device="tablet"] .loc-banner-row.has-allow {
   grid-template-columns: auto minmax(0, 1fr) 2.75rem;
 }
-html[data-device="phone"] .loc-banner-allow,
-html[data-device="tablet"] .loc-banner-allow {
+html[data-device="phone"] .loc-banner-actions,
+html[data-device="tablet"] .loc-banner-actions {
   grid-column: 1 / 3;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+}
+html[data-device="phone"] .loc-banner-allow,
+html[data-device="tablet"] .loc-banner-allow,
+html[data-device="phone"] .loc-banner-select,
+html[data-device="tablet"] .loc-banner-select {
   width: 100%;
+  min-width: 0;
   min-height: 2.6rem !important;
   height: 2.6rem !important;
 }

@@ -65,7 +65,11 @@ export default function NotificationSettingsPage() {
               ? t("notif.geo.denied")
               : geo.status === "unavailable"
                 ? t("notif.geo.na")
-                : t("notif.geo.off")}
+                : geo.status === "timeout"
+                  ? t("loc.timeout")
+                  : geo.status === "error"
+                    ? t("loc.err")
+                    : t("notif.geo.off")}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button type="button" className="btn-primary h-10 px-4 text-sm" onClick={requestLocation}>

@@ -1119,23 +1119,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setGeo((g) => ({ ...g, status: "unavailable" }));
       return;
     }
+    const onFix = (pos: GeolocationPosition) => {
+      // City-level matching only; ~1 km precision is all that is kept (and only on this device).
+      const lat = Math.round(pos.coords.latitude * 100) / 100;
+      const lng = Math.round(pos.coords.longitude * 100) / 100;
+      setGeo({ status: "granted", lat, lng, city: nearestCity(lat, lng).name, source: "gps", dismissed: false });
+    };
+    const fail = (err: GeolocationPositionError) => {
+      const status = err.code === err.PERMISSION_DENIED ? "denied" : err.code === err.TIMEOUT ? "timeout" : "error";
+      setGeo((g) => ({ ...g, status, dismissed: false }));
+    };
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude, longitude } = pos.coords;
-        const near = nearestCity(latitude, longitude);
-        setGeo({
-          status: "granted",
-          lat: latitude,
-          lng: longitude,
-          city: near.name,
-          source: "gps",
-          dismissed: false,
-        });
+      onFix,
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) return fail(err);
+        // Coarse (Wi-Fi/cell) fixes often fail indoors or with Wi-Fi off on iPhone; GPS gets one more try.
+        navigator.geolocation.getCurrentPosition(onFix, fail, { enableHighAccuracy: true, timeout: 20_000, maximumAge: 600_000 });
       },
-      () => {
-        setGeo((g) => ({ ...g, status: "denied", dismissed: false }));
-      },
-      { enableHighAccuracy: false, timeout: 12_000, maximumAge: 300_000 },
+      { enableHighAccuracy: false, timeout: 15_000, maximumAge: 600_000 },
     );
   }, []);
 
@@ -1143,11 +1144,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const c = cityPoint(city);
     setGeo((g) => ({
       ...g,
-      status: g.status === "denied" ? "denied" : "granted",
+      status: "granted",
       city,
       lat: c?.lat ?? g.lat,
       lng: c?.lng ?? g.lng,
-      source: g.source === "gps" ? "gps" : "manual",
+      source: "manual",
       dismissed: false,
     }));
   }, []);
