@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Filter, X } from "lucide-react";
+import { Filter, Search, X } from "lucide-react";
+import { CategoryIcon, iconTone } from "@/components/CategoryIcon";
+import { sanitizeSearchQuery } from "@/lib/security/inputGuard";
 import {
   findCategory,
   formatListingCount,
@@ -36,6 +38,13 @@ import type { Listing } from "@/data/store";
 function HubCount({ cat }: { cat: Category }) {
   const { categoryCounts } = useApp();
   return <span className="text-[11px] tabular-nums text-muted">({formatListingCount(liveCount(categoryCounts, cat))})</span>;
+}
+
+function HubCardCount({ cat }: { cat: Category }) {
+  const { t } = useI18n();
+  const { categoryCounts } = useApp();
+  const n = liveCount(categoryCounts, cat);
+  return n > 0 ? <span className="m-cat-card-n">{t("browse.count", { n: formatListingCount(n) })}</span> : null;
 }
 
 function HubNavLink({ cat }: { cat: Category }) {
@@ -205,7 +214,16 @@ export function CategoryHub({ cat }: { cat: Category }) {
   });
   const showcase = cat.id === "services-event" || kids.some((c) => c.hubFeatured);
   const classifiedHub = isSeaEquipCategoryId(cat.id) && cat.id === "parts-sea";
+  const listingsHref = hrefForCategoryListings(cat);
+  /** On phones the hub hands filtering to the listing page, which has the full two-tab panel for this category. */
+  const phonePanel = compact && !showcase && listingsHref.startsWith("/ara?");
   if (cat.id === "services") return <ServicesHome />;
+
+  const searchInHub = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const text = sanitizeSearchQuery(String(new FormData(e.currentTarget).get("q") ?? ""));
+    router.push(text ? `${listingsHref}&keyword=${encodeURIComponent(text)}` : listingsHref);
+  };
 
   const filterBody = (compact = false) => (
     <StdFilterSidebar
@@ -253,7 +271,7 @@ export function CategoryHub({ cat }: { cat: Category }) {
   );
 
   return (
-    <div className="hub-page">
+    <div className={`hub-page ${phonePanel ? "browse-v2" : ""}`}>
       <BreadcrumbNav
         items={[
           { href: "/", label: t("nav.home") },
@@ -321,6 +339,10 @@ export function CategoryHub({ cat }: { cat: Category }) {
               }}
               activeFilters={activeFilters}
               onFilter={() => {
+                if (phonePanel) {
+                  router.push(`${listingsHref}&filtre=1`);
+                  return;
+                }
                 setSheetCat(cat);
                 setSheetOpen(true);
               }}
@@ -334,8 +356,38 @@ export function CategoryHub({ cat }: { cat: Category }) {
               onSort={setSort}
               view={phoneView.view}
               onToggleView={phoneView.toggle}
+              shortLabels={phonePanel}
             />
           )}
+          {phonePanel && kids.length ? (
+            <>
+              <form className="hub-msearch" role="search" onSubmit={searchInHub}>
+                <Search className="h-4 w-4 shrink-0" aria-hidden />
+                <input
+                  name="q"
+                  type="search"
+                  enterKeyHint="search"
+                  autoComplete="off"
+                  maxLength={80}
+                  placeholder={t("cat.hub.searchIn", { name })}
+                  aria-label={t("cat.hub.searchIn", { name })}
+                />
+              </form>
+              <ul className="m-cat-grid hub-subcats" aria-label={t("cat.hub.subcats", { name })}>
+                {kids.map((ch) => (
+                  <li key={ch.id}>
+                    <Link href={hrefForCategory(ch)} className="m-cat-card">
+                      <span className={`m-cat-card-ico cat-ico ${iconTone(ch.icon)}`} aria-hidden>
+                        <CategoryIcon name={ch.icon} className="h-6 w-6" />
+                      </span>
+                      <span className="m-cat-card-name">{catName(t, ch.id, ch.name)}</span>
+                      <HubCardCount cat={ch} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
           {showcase ? (
             <ServiceHubShowcase cat={cat} kids={kids} />
           ) : (

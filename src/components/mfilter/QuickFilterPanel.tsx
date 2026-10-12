@@ -21,11 +21,13 @@ import {
   Flame,
   Fuel,
   Gauge,
+  Gpu,
   GraduationCap,
   Handshake,
   HardDrive,
   HeartHandshake,
   Hourglass,
+  House,
   Image as ImageIcon,
   Landmark,
   Languages,
@@ -91,6 +93,7 @@ import {
   type FilterState,
 } from "@/lib/categoryFilters";
 import {
+  popularOptions,
   rangeBuckets,
   resolveMobileLayout,
   rowActive,
@@ -141,7 +144,7 @@ const ROW_ICONS: Record<string, LucideIcon> = {
   jobType: Briefcase,
   sector: Building2,
   exp: Award,
-  place: MapPin,
+  place: House,
   helpType: HeartHandshake,
   helpGender: Users,
   helpLang: Languages,
@@ -163,7 +166,7 @@ const ROW_ICONS: Record<string, LucideIcon> = {
   storage: HardDrive,
   ram: MemoryStick,
   cpu: Cpu,
-  gpu: Cpu,
+  gpu: Gpu,
   screen: Monitor,
   os: Smartphone,
   tvSize: Tv,
@@ -391,13 +394,13 @@ export function QuickFilterPanel({
     </div>
   );
 
-  const foot = (clearLabel: string, clear: () => void, apply: () => void, applyLabel: ReactNode, clearDisabled = false) => (
+  const foot = (clearLabel: string, clear: () => void, apply: () => void, applyLabel: ReactNode, clearDisabled = false, empty = false) => (
     <div className="filter-sheet-foot qf-foot sticky bottom-0">
       <div className="flt-apply-row is-sheet">
         <button type="button" className="flt-clear-btn" onClick={clear} disabled={clearDisabled}>
           {clearLabel}
         </button>
-        <button type="button" className="acil-search-btn" onClick={apply}>
+        <button type="button" className={`acil-search-btn ${empty ? "is-empty" : ""}`} onClick={apply}>
           {applyLabel}
         </button>
       </div>
@@ -413,7 +416,7 @@ export function QuickFilterPanel({
   const showLabel = (
     <span className="qf-apply-label">
       <span>{t("mf.show")}</span>
-      <span className="qf-apply-n">{t("browse.count", { n: resultCount.toLocaleString("tr-TR") })}</span>
+      <span className="qf-apply-n">{resultCount ? t("browse.count", { n: resultCount.toLocaleString("tr-TR") }) : t("mf.noResults")}</span>
     </span>
   );
 
@@ -470,7 +473,7 @@ export function QuickFilterPanel({
             )}
           </div>,
         )}
-        {foot(t("flt.clearShort"), onClear, onApply, showLabel)}
+        {foot(t("flt.clearShort"), onClear, onApply, showLabel, false, resultCount === 0)}
       </>
     );
   } else if (screen.kind === "pick") {
@@ -487,31 +490,47 @@ export function QuickFilterPanel({
           )
         : undefined;
     const modelField = f.key === "brand" ? fieldOf("model") : undefined;
+    const parent = f.dependsOn && state[f.dependsOn] ? fieldOf(f.dependsOn) : undefined;
     content = (
       <>
         {head(fieldTitle(t, f.labelKey), true)}
         {body(
-          <OptionPicker
-            key={f.key}
-            label={fieldTitle(t, f.labelKey)}
-            options={options}
-            value={state[f.key] ?? ""}
-            multi={multi}
-            counts={counts}
-            hideEmpty={!f.searchable}
-            anyLabel={t("flt.any")}
-            lockedHint={locked}
-            searchable={f.searchable || options.length > 8}
-            onPick={(v) => {
-              set(f.key, v);
-              if (multi) return;
-              if (v && modelField && stack.length === 1) {
-                setStack([{ kind: "pick", key: modelField.key }]);
-                return;
-              }
-              pop();
-            }}
-          />,
+          <>
+            {parent ? (
+              <div className="qf-pick-ctx">
+                <p className="qf-pick-ctx-label">
+                  {fieldTitle(t, parent.labelKey)}: <span>{state[parent.key]}</span>
+                </p>
+                <button type="button" onClick={() => setStack((prev) => [...prev.slice(0, -1), { kind: "pick", key: parent.key }])}>
+                  {t("mf.change")}
+                </button>
+              </div>
+            ) : null}
+            <OptionPicker
+              key={f.key}
+              label={fieldTitle(t, f.labelKey)}
+              options={options}
+              value={state[f.key] ?? ""}
+              multi={multi}
+              counts={counts}
+              hideEmpty={!f.searchable}
+              anyLabel={t("flt.any")}
+              lockedHint={locked}
+              searchable={f.searchable || options.length > 8}
+              popular={popularOptions(f.key, options)}
+              popularLabel={t("mf.popularBrands")}
+              allLabel={t("mf.allBrands")}
+              onPick={(v) => {
+                set(f.key, v);
+                if (multi) return;
+                if (v && modelField && stack.length === 1) {
+                  setStack([{ kind: "pick", key: modelField.key }]);
+                  return;
+                }
+                pop();
+              }}
+            />
+          </>,
         )}
         {backFoot([f.key])}
       </>

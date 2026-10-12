@@ -10,8 +10,8 @@ import {
 
 /**
  * Phone/tablet filter layout per category: a short "quick" list first, everything else in labelled groups.
- * Categories with the advanced estate/vehicle dialog keep their current panel; every other category uses an
- * explicit layout from MOBILE_FILTER_LAYOUTS or one derived from its own fields (defaultLayout).
+ * Every category uses an explicit layout from MOBILE_FILTER_LAYOUTS or one derived from its own fields:
+ * advancedLayout for categories with the desktop estate/vehicle dialog, defaultLayout for the rest.
  *
  * Keys are filter field keys (ranges by their Min key) plus these pseudo rows, which bundle several URL keys
  * or have no FilterField of their own.
@@ -174,6 +174,39 @@ export function rowStateKeys(row: MobileFilterRow): string[] {
 
 export function rowActive(row: MobileFilterRow, state: FilterState) {
   return rowStateKeys(row).some((k) => Boolean(state[k]));
+}
+
+/** Active rows in the whole panel, so the Filtrele badge matches the panel tabs (a price range counts once). */
+export function countActiveRows(layout: MobileFilterLayout, fields: FilterField[], state: FilterState) {
+  const { quick, groups } = resolveMobileLayout(layout, fields, state);
+  return [...quick, ...groups.flatMap((g) => g.rows)].filter((r) => rowActive(r, state)).length;
+}
+
+/** Brands most searched in Turkey across vehicles and electronics; only those in the category's own list are shown. */
+const POPULAR_BRANDS = [
+  "Renault",
+  "Fiat",
+  "Volkswagen",
+  "Toyota",
+  "Ford",
+  "Hyundai",
+  "BMW",
+  "Mercedes-Benz",
+  "Honda",
+  "Yamaha",
+  "Apple",
+  "Samsung",
+  "Xiaomi",
+  "Lenovo",
+  "HP",
+  "Asus",
+];
+
+export function popularOptions(key: string, options: string[]) {
+  if (key !== "brand") return [];
+  const offered = new Set(options);
+  const hits = POPULAR_BRANDS.filter((b) => offered.has(b)).slice(0, 8);
+  return hits.length >= 4 ? hits : [];
 }
 
 /** Number shown on a picker chip: Turkish "250 bin / 1,5 milyon", other locales use the compact form. */

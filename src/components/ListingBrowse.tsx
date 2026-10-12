@@ -12,7 +12,7 @@ import { ServiceListingRow, serviceRating } from "@/components/ServiceListingRow
 import { CompactListingList, CompactListingRow } from "@/components/CompactListingRow";
 import { MobileResultsBar, usePhoneView } from "@/components/MobileResultsBar";
 import { QuickFilterPanel } from "@/components/mfilter/QuickFilterPanel";
-import { mobileFilterLayout } from "@/lib/mobileFilters";
+import { countActiveRows, mobileFilterLayout } from "@/lib/mobileFilters";
 import { useDevice } from "@/context/DeviceContext";
 import { catName, useI18n } from "@/context/I18nContext";
 import { useApp } from "@/context/AppContext";
@@ -262,6 +262,18 @@ export function ListingBrowse({
 
   const estateCat = category && hasAdvancedFilters(category) ? category : null;
   const [advOpen, setAdvOpen] = useState(false);
+
+  const wantsPanel = searchParams.get("filtre") === "1";
+  useEffect(() => {
+    if (!wantsPanel || !mounted) return;
+    if (mobileV2) {
+      setSheetCat(category ?? undefined);
+      setSheetOpen(true);
+    }
+    const qs = new URLSearchParams(searchParams.toString());
+    qs.delete("filtre");
+    router.replace(qs.size ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [wantsPanel, mounted, mobileV2, category, searchParams, pathname, router]);
   const estateCountQuery = (draft: FilterState) => {
     const qs = new URLSearchParams(mergeFilterQuery(searchParams, draft));
     qs.delete("filter");
@@ -365,7 +377,7 @@ export function ListingBrowse({
             router.push(up ? hrefForCategoryListings(up) : "/");
           }
         }}
-        activeFilters={active}
+        activeFilters={mobileV2 && category ? countActiveRows(mobileFilterLayout(category)!, filterFieldsForCategory(category), filters) : active}
         onFilter={() => {
           if (estateCat && !mobileV2) {
             setAdvOpen(true);

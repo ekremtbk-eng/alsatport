@@ -14822,21 +14822,29 @@ html[data-reduced-motion="1"] .iw-card {
   color: #047857;
 }
 .qf-row-text {
-  display: grid;
+  display: flex;
   min-width: 0;
   flex: 1;
-  gap: 0.1rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 .qf-row-label {
+  min-width: 0;
+  flex: 1 1 auto;
   color: var(--color-ink);
   font-size: 0.9rem;
   font-weight: 750;
+  line-height: 1.25;
 }
 .qf-row-val {
   overflow: hidden;
+  max-width: 55%;
+  flex: 0 1 auto;
   color: #64748b;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 500;
+  text-align: end;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -14883,12 +14891,19 @@ html[data-reduced-motion="1"] .iw-card {
   justify-content: center;
   gap: 0.45rem;
   margin-top: 0.75rem;
-  border: 1px solid #bbf7d0;
+  border: 1px solid #047857;
   border-radius: 0.9rem;
-  background: #f0fdf4;
-  color: #047857;
-  font-size: 0.86rem;
+  background: #047857;
+  color: #fff;
+  font-size: 0.9rem;
   font-weight: 750;
+  box-shadow: 0 2px 6px -2px rgb(4 120 87 / 0.45);
+}
+.qf-more:active {
+  background: #065f46;
+}
+.qf-more:focus-visible {
+  outline-offset: 2px;
 }
 .qf-group + .qf-group {
   margin-top: 1.1rem;
@@ -15097,6 +15112,165 @@ html[data-reduced-motion="1"] .iw-card {
   font-size: 0.72rem;
   font-weight: 600;
   opacity: 0.9;
+}
+.qf-foot .acil-search-btn.is-empty {
+  border-color: #cbd5e1;
+  background: #e2e8f0;
+  color: #475569;
+  box-shadow: none;
+}
+.qf-pick-ctx {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 0.6rem;
+  padding: 0.35rem 0.4rem 0.35rem 0.75rem;
+  border: 1px solid #a7f3d0;
+  border-radius: 0.85rem;
+  background: #ecfdf5;
+}
+.qf-pick-ctx-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: #065f46;
+  font-size: 0.86rem;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.qf-pick-ctx-label span {
+  color: #047857;
+  font-weight: 600;
+}
+.qf-pick-ctx button {
+  min-height: 2.5rem;
+  padding: 0 0.75rem;
+  border-radius: 0.65rem;
+  color: #047857;
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+.qf-pick-ctx button:focus-visible {
+  outline: 2px solid #047857;
+  outline-offset: -2px;
+}
+.qf-opt-section {
+  margin: 0.75rem 0.3rem 0.15rem;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.qf-search + .qf-opt-section {
+  margin-top: 0.35rem;
+}
+.qf-slider {
+  position: relative;
+  height: 2.75rem;
+  margin: 0.9rem 0.6rem 0.2rem;
+}
+.qf-slider-track,
+.qf-slider-fill {
+  position: absolute;
+  top: 50%;
+  height: 0.3rem;
+  border-radius: 999px;
+  transform: translateY(-50%);
+}
+.qf-slider-track {
+  right: 0;
+  left: 0;
+  background: #e2e8f0;
+}
+.qf-slider-fill {
+  background: #059669;
+}
+.qf-slider input[type="range"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  pointer-events: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.qf-slider input[type="range"]::-webkit-slider-thumb {
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  background: #059669;
+  box-shadow: 0 1px 4px rgb(15 23 42 / 0.3);
+  cursor: pointer;
+  pointer-events: auto;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.qf-slider input[type="range"]::-moz-range-thumb {
+  width: 1.3rem;
+  height: 1.3rem;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  background: #059669;
+  box-shadow: 0 1px 4px rgb(15 23 42 / 0.3);
+  cursor: pointer;
+  pointer-events: auto;
+}
+.qf-slider input[type="range"]::-moz-range-track {
+  background: transparent;
+}
+.qf-slider input[type="range"]:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid #047857;
+  outline-offset: 2px;
+}
+.qf-slider input[type="range"]:focus-visible::-moz-range-thumb {
+  outline: 2px solid #047857;
+  outline-offset: 2px;
+}
+.qf-slider-ends {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 0.2rem;
+  color: #94a3b8;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+/* Phone category hub (CategoryHub with .browse-v2): in-category search and subcategory cards. */
+.hub-msearch {
+  display: flex;
+  min-height: 3rem;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.2rem 0 0.75rem;
+  padding: 0 0.9rem;
+  border: 1px solid #dbe4ea;
+  border-radius: 0.95rem;
+  background: #fff;
+  color: #64748b;
+}
+.hub-msearch:focus-within {
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgb(5 150 105 / 0.15);
+}
+.hub-msearch input {
+  width: 0;
+  min-width: 0;
+  flex: 1;
+  min-height: 2.9rem;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 1rem;
+  outline: none;
+}
+.hub-subcats {
+  margin-bottom: 1rem;
 }
 
 /* Phone/tablet results for categories on the new mobile filter layout (ListingBrowse adds .browse-v2). */
