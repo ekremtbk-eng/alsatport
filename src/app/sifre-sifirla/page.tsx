@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Lock } from "lucide-react";
@@ -9,7 +9,7 @@ import { apiPost } from "@/lib/security/client";
 import { useI18n } from "@/context/I18nContext";
 import { isStrongPassword } from "@/lib/security/passwordPolicy";
 
-type Phase = "checking" | "invalid" | "form" | "done";
+type Phase = "checking" | "invalid" | "unreachable" | "form" | "done";
 
 const TOKEN_KEY = "ap-reset-token";
 
@@ -51,6 +51,25 @@ export default function ResetPasswordPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  const checkToken = useCallback((value: string) => {
+    setPhase("checking");
+    apiPost<{ ok?: boolean; error?: string }>("/api/auth/reset/check", { token: value })
+      .then((res) => {
+        if (res.ok) {
+          setPhase("form");
+          return;
+        }
+        // Only the server's verdict on the token itself means the link is dead; anything else is retryable.
+        if (res.error === "auth.reset.invalid") {
+          forgetToken();
+          setPhase("invalid");
+          return;
+        }
+        setPhase("unreachable");
+      })
+      .catch(() => setPhase("unreachable"));
+  }, []);
+
   useEffect(() => {
     const value = readToken();
     setToken(value);
@@ -58,11 +77,8 @@ export default function ResetPasswordPage() {
       setPhase("invalid");
       return;
     }
-    void apiPost<{ ok?: boolean }>("/api/auth/reset/check", { token: value }).then((res) => {
-      if (!res.ok) forgetToken();
-      setPhase(res.ok ? "form" : "invalid");
-    });
-  }, []);
+    checkToken(value);
+  }, [checkToken]);
 
   useEffect(() => {
     if (phase !== "done") return;
@@ -82,7 +98,10 @@ export default function ResetPasswordPage() {
       return;
     }
     setBusy(true);
-    const res = await apiPost<{ ok?: boolean; error?: string }>("/api/auth/reset", { token, password, confirm });
+    const res = await apiPost<{ ok?: boolean; error?: string }>("/api/auth/reset", { token, password, confirm }).catch(() => ({
+      ok: false,
+      error: "auth.reset.checkFailed",
+    }));
     setBusy(false);
     if (!res.ok) {
       if (res.error === "auth.reset.invalid") {
@@ -110,6 +129,17 @@ export default function ResetPasswordPage() {
             <Link href="/giris?forgot=1" className="btn-primary inline-flex h-11 w-full items-center justify-center">
               {t("auth.reset.again")}
             </Link>
+          </div>
+        ) : null}
+
+        {phase === "unreachable" ? (
+          <div className="mt-4 space-y-4">
+            <p role="alert" className="text-sm font-semibold text-orange">
+              {t("auth.reset.checkFailed")}
+            </p>
+            <button type="button" className="btn-primary h-11 w-full" onClick={() => checkToken(token)}>
+              {t("auth.reset.retry")}
+            </button>
           </div>
         ) : null}
 

@@ -30,7 +30,8 @@ export type NotifPrefs = {
 };
 
 export type GeoState = {
-  status: "idle" | "granted" | "denied" | "unavailable";
+  /** denied = the user/OS refused; unavailable = no Geolocation API; timeout / error = permission ok but no fix. */
+  status: "idle" | "granted" | "denied" | "unavailable" | "timeout" | "error";
   lat?: number;
   lng?: number;
   city?: string;

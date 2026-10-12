@@ -2,18 +2,48 @@
 
 import { deviceFingerprint } from "@/lib/security/fingerprint";
 
-let csrfToken = "";
+/**
+ * Every /api/auth/csrf response rotates the cookie, so concurrent callers must share one request:
+ * otherwise an earlier caller keeps a token the cookie no longer matches and its POST gets a 403.
+ */
+let csrfRequest: Promise<string> | null = null;
 
-export async function getCsrfToken() {
-  if (csrfToken) return csrfToken;
+async function fetchCsrfToken() {
   const res = await fetch("/api/auth/csrf", { credentials: "include", cache: "no-store" });
   const data = (await res.json()) as { token?: string };
-  csrfToken = data.token ?? "";
-  return csrfToken;
+  return data.token ?? "";
+}
+
+export function getCsrfToken() {
+  if (!csrfRequest) {
+    const pending = fetchCsrfToken().then(
+      (token) => {
+        if (!token && csrfRequest === pending) csrfRequest = null;
+        return token;
+      },
+      () => {
+        if (csrfRequest === pending) csrfRequest = null;
+        return "";
+      },
+    );
+    csrfRequest = pending;
+  }
+  return csrfRequest;
 }
 
 export function resetCsrfToken() {
-  csrfToken = "";
+  csrfRequest = null;
+}
+
+/** The cookie can be dropped or rotated (another tab, storage cleanup); one retry with a fresh token. */
+async function withCsrfRetry(send: (token: string) => Promise<Response>) {
+  const used = await getCsrfToken();
+  const res = await send(used);
+  if (res.status !== 403) return res;
+  const data = (await res.clone().json().catch(() => null)) as { error?: string } | null;
+  if (data?.error !== "auth.err.csrf") return res;
+  if ((await getCsrfToken()) === used) resetCsrfToken();
+  return send(await getCsrfToken());
 }
 
 export async function apiUpload<T>(
@@ -21,7 +51,6 @@ export async function apiUpload<T>(
   file: File,
   extra?: Record<string, string>,
 ): Promise<T & { status: number }> {
-  const token = await getCsrfToken();
   const fp = await deviceFingerprint();
   const body = new FormData();
   body.append("file", file);
@@ -30,16 +59,18 @@ export async function apiUpload<T>(
       if (value) body.append(key, value);
     }
   }
-  const res = await fetch(url, {
-    method: "POST",
-    credentials: "include",
-    cache: "no-store",
-    headers: {
-      "X-CSRF-Token": token,
-      ...(fp ? { "X-Device-Fp": fp } : {}),
-    },
-    body,
-  });
+  const res = await withCsrfRetry((token) =>
+    fetch(url, {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      headers: {
+        "X-CSRF-Token": token,
+        ...(fp ? { "X-Device-Fp": fp } : {}),
+      },
+      body,
+    }),
+  );
   const data = (await res.json().catch(() => ({ ok: false, error: "auth.err.server" }))) as T;
   return { ...data, status: res.status };
 }
@@ -66,19 +97,21 @@ export async function apiDelete<T>(url: string, body?: unknown): Promise<T & { s
 }
 
 async function apiSend<T>(method: string, url: string, body?: unknown): Promise<T & { status: number }> {
-  const token = await getCsrfToken();
   const fp = await deviceFingerprint();
-  const res = await fetch(url, {
-    method,
-    credentials: "include",
-    cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRF-Token": token,
-      ...(fp ? { "X-Device-Fp": fp } : {}),
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  const payload = body === undefined ? undefined : JSON.stringify(body);
+  const res = await withCsrfRetry((token) =>
+    fetch(url, {
+      method,
+      credentials: "include",
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": token,
+        ...(fp ? { "X-Device-Fp": fp } : {}),
+      },
+      body: payload,
+    }),
+  );
   const data = (await res.json().catch(() => ({ ok: false, error: "auth.err.server" }))) as T;
   return { ...data, status: res.status };
 }

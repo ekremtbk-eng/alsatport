@@ -7,23 +7,10 @@ async function sha256Hex(value: string) {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-function canvasHint() {
-  try {
-    const c = document.createElement("canvas");
-    c.width = 120;
-    c.height = 20;
-    const ctx = c.getContext("2d");
-    if (!ctx) return "nocanvas";
-    ctx.textBaseline = "top";
-    ctx.font = "14px Arial";
-    ctx.fillStyle = "#111827";
-    ctx.fillText("AlsatPort", 2, 2);
-    return c.toDataURL().slice(-48);
-  } catch {
-    return "nocanvas";
-  }
-}
-
+/**
+ * Coarse abuse hint only (free-quota heuristic), never used for sign-in. No canvas/WebGL/audio read-back:
+ * Safari's fingerprinting protection treats those as tracking and randomises them anyway.
+ */
 export async function deviceFingerprint() {
   if (typeof window === "undefined") return "";
   try {
@@ -38,7 +25,6 @@ export async function deviceFingerprint() {
       `${screen.width}x${screen.height}x${screen.colorDepth}`,
       String(nav.hardwareConcurrency ?? 0),
       String((nav as Navigator & { deviceMemory?: number }).deviceMemory ?? 0),
-      canvasHint(),
     ].join("|");
     const hash = await sha256Hex(raw);
     sessionStorage.setItem(KEY, hash);
