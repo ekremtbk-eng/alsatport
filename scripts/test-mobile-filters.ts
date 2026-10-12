@@ -213,8 +213,11 @@ const OPEN_SHEET = String.raw`
   if (!btn) return 'no-button';
   btn.click();
   for (let i = 0; i < 40 && !document.querySelector('.filter-sheet'); i++) await new Promise((r) => setTimeout(r, 100));
-  return document.querySelector('.filter-sheet') ? (document.querySelector('.filter-sheet.is-adv') ? 'adv' : 'std') : 'no-sheet';
+  const s = document.querySelector('.filter-sheet');
+  return s ? (s.classList.contains('is-adv') ? 'adv' : s.querySelector('.qf-tabs') ? 'quick' : 'std') : 'no-sheet';
 })()`;
+
+const SHEET_KINDS = ["std", "adv", "quick"];
 
 /** Layout facts for the open sheet, with the keyboard closed. */
 const LAYOUT = String.raw`
@@ -317,10 +320,22 @@ async function keyboardScenario(page: Page, d: Device, kind: string, tag: string
     check(`${tag} overscroll at the top stays inside the sheet`, chained.top === 0 && chained.y === 0 && chained.sheetTop === 0, JSON.stringify(chained));
   }
 
+  if (kind === "quick") {
+    const opened = await page.eval<boolean>(`(async () => {
+      const row = __mf.sheet().querySelector('.qf-row[data-row=brand]');
+      if (!row) return false;
+      row.click(); await new Promise((r) => setTimeout(r, 300));
+      return !!__mf.sheet().querySelector('.qf-search input');
+    })()`);
+    check(`${tag} quick: Marka opens a searchable list`, opened);
+    if (!opened) return;
+  }
   const brandSel =
     kind === "adv"
       ? "__mf.sheet().querySelector('.adv-search input')"
-      : "([...__mf.sheet().querySelectorAll('input[role=combobox]')].find((i) => !i.disabled && /marka/i.test(i.closest('details, label')?.innerText || '')) || __mf.sheet().querySelector('input[role=combobox]:not(:disabled)'))";
+      : kind === "quick"
+        ? "__mf.sheet().querySelector('.qf-search input')"
+        : "([...__mf.sheet().querySelectorAll('input[role=combobox]')].find((i) => !i.disabled && /marka/i.test(i.closest('details, label')?.innerText || '')) || __mf.sheet().querySelector('input[role=combobox]:not(:disabled)'))";
   const focused = await page.eval<boolean>(`(() => {
     const el = ${brandSel};
     if (!el) return false;
@@ -391,6 +406,35 @@ async function keyboardScenario(page: Page, d: Device, kind: string, tag: string
     }
   }
 
+  if (kind === "quick") {
+    const esc = { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 };
+    await page.send("Input.dispatchKeyEvent", esc);
+    await page.send("Input.dispatchKeyEvent", { ...esc, type: "keyUp" });
+    await sleep(300);
+    const back = await page.eval<{ sheet: boolean; main: boolean }>("({ sheet: !!document.querySelector('.filter-sheet'), main: !!document.querySelector('.filter-sheet .qf-tabs') })");
+    check(`${tag} quick: Escape goes back one screen, the sheet stays`, back.sheet && back.main, JSON.stringify(back));
+    if (!back.sheet) return;
+    const price = await page.eval<boolean>(`(async () => {
+      __mf.sheet().querySelector('.qf-row[data-row=priceMin]')?.click();
+      await new Promise((r) => setTimeout(r, 300));
+      const inp = __mf.sheet().querySelector('#qf-priceMin');
+      if (!inp) return false;
+      inp.focus();
+      await new Promise((r) => setTimeout(r, 300));
+      return document.activeElement === inp;
+    })()`);
+    check(`${tag} quick: price min field focusable`, price);
+    if (price) {
+      await page.send("Input.insertText", { text: "250000" });
+      await sleep(400);
+      const pv = await page.eval<{ value: string; inView: boolean; kb: boolean }>(`(() => {
+        const el = document.activeElement; const r = el.getBoundingClientRect(); const v = (el.closest('[data-filter-scroll]') || __mf.sheet()).getBoundingClientRect();
+        return { value: el.value || '', inView: r.top >= v.top - 1 && r.bottom <= Math.min(v.bottom, innerHeight) + 1 && r.right <= innerWidth + 1 && r.left >= -1, kb: __mf.sheet().classList.contains('is-kb') };
+      })()`);
+      check(`${tag} keyboard: price typed into a visible field`, pv.value === "250.000" && pv.inView && pv.kb, JSON.stringify(pv));
+    }
+  }
+
   await page.eval("document.activeElement && document.activeElement.blur(), true");
   await page.emulate(d);
   await sleep(600);
@@ -433,6 +477,38 @@ async function keyboardScenario(page: Page, d: Device, kind: string, tag: string
     })()`);
     // Pages without a clear action (e.g. /acil) simply have nothing to test here.
     if (cleared !== "no-clear") check(`${tag} Temizle clears the location`, cleared === "", `il="${cleared}"`);
+  }
+
+  if (kind === "quick") {
+    const loc = await page.eval<{ city: string; district: string; keptPrice: boolean }>(`(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const s = __mf.sheet();
+      const back = () => s.querySelector('.qf-head .qf-icon-btn[aria-label]:not(.filter-x)');
+      while (!s.querySelector('.qf-tabs') && back()) { back().click(); await wait(250); }
+      s.querySelector('.qf-row[data-row=location]')?.click(); await wait(250);
+      const pick = async (row, want) => {
+        const r = s.querySelector('.qf-row[data-row=' + row + ']');
+        if (!r || r.disabled) return '';
+        r.click(); await wait(250);
+        const opt = [...s.querySelectorAll('.qf-opt')].find((o) => o.innerText.trim() === want);
+        if (!opt) return '';
+        opt.click(); await wait(400);
+        return s.querySelector('.qf-row[data-row=' + row + '] .qf-row-val')?.innerText.trim() || '';
+      };
+      const city = await pick('city', 'Ankara');
+      const district = await pick('district', 'Çankaya');
+      while (!s.querySelector('.qf-tabs') && back()) { back().click(); await wait(250); }
+      return { city, district, keptPrice: /priceMin=250000/.test(location.search) };
+    })()`);
+    check(`${tag} quick: il and ilçe can be chosen`, loc.city === "Ankara" && loc.district === "Çankaya", JSON.stringify(loc));
+    check(`${tag} quick: changing location keeps the other filters`, loc.keptPrice, JSON.stringify(loc));
+
+    const cleared = await page.eval<{ url: string; val: string }>(`(async () => {
+      __mf.sheet().querySelector('.filter-sheet-foot .flt-clear-btn')?.click();
+      await new Promise((r) => setTimeout(r, 500));
+      return { url: location.search, val: __mf.sheet().querySelector('.qf-row[data-row=location] .qf-row-val')?.innerText.trim() || '' };
+    })()`);
+    check(`${tag} quick: Temizle clears every filter`, !/(city|district|priceMin|marka)=/.test(cleared.url), JSON.stringify(cleared));
   }
 }
 
@@ -489,7 +565,9 @@ async function iosViewportModel(page: Page, d: Device, url: string, tag: string)
   const r = await page.eval<{ panned: string; zoomed: string; back: string }>(`(async () => {
     const s = __mf.sheet(); const vv = window.__fakeVV; const wait = (ms) => new Promise((r) => setTimeout(r, ms));
     const box = () => { const b = s.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)].join(','); };
-    const input = s.querySelector('input[role=combobox]:not(:disabled), .adv-search input');
+    const brandRow = s.querySelector('.qf-row[data-row=brand]');
+    if (brandRow) { brandRow.click(); await wait(300); }
+    const input = s.querySelector('input[role=combobox]:not(:disabled), .adv-search input, .qf-search input');
     if (input && input.closest('details')) input.closest('details').open = true;
     input && input.focus();
     if (document.activeElement !== input) return { panned: 'focus-failed', zoomed: '', back: '' };
@@ -535,7 +613,7 @@ async function main() {
         if (ONLY_PAGES.length && !ONLY_PAGES.some((p) => url.includes(p))) continue;
         const tag = `[${d.width}x${d.height} ${url}]`;
         const kind = await openFilters(page, url);
-        if (kind !== "std" && kind !== "adv") {
+        if (!SHEET_KINDS.includes(kind)) {
           check(`${tag} filter sheet opens`, false, kind);
           continue;
         }
@@ -554,7 +632,7 @@ async function main() {
       for (const url of listingUrls()) {
         const kind = await openFilters(page, url);
         const tag = `[all ${url}]`;
-        if (kind !== "std" && kind !== "adv") {
+        if (!SHEET_KINDS.includes(kind)) {
           check(`${tag} filter sheet opens`, false, kind);
           continue;
         }

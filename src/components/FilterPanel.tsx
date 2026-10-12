@@ -31,7 +31,7 @@ import {
 } from "@/lib/categoryFilters";
 import type { Listing } from "@/data/store";
 
-function fieldTitle(t: (key: string, vars?: Record<string, string | number>) => string, key: string) {
+export function fieldTitle(t: (key: string, vars?: Record<string, string | number>) => string, key: string) {
   const label = t(key);
   if (label !== key) return label;
   const tail = key.includes(".") ? key.slice(key.lastIndexOf(".") + 1) : key;
@@ -135,7 +135,7 @@ function RangePair({
 }
 
 /** Vehicle cascade level of a filter field, for merging admin-approved catalog requests into its options. */
-function approvedLevel(field: FilterField) {
+export function approvedLevel(field: FilterField) {
   if (!field.catalogKind) return null;
   if (field.key === "brand") return "brand" as const;
   if (field.optionSource === "vehicleModels") return "model" as const;
