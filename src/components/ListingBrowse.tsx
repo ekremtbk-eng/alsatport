@@ -367,7 +367,7 @@ export function ListingBrowse({
         }}
         activeFilters={active}
         onFilter={() => {
-          if (estateCat) {
+          if (estateCat && !mobileV2) {
             setAdvOpen(true);
             return;
           }

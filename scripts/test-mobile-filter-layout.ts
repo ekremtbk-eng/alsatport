@@ -29,8 +29,11 @@ walkCategories(categories, (c) => {
 
 const advanced = all.filter((c) => hasAdvancedFilters(c));
 const opted = all.filter((c) => mobileFilterLayout(c));
-check("advanced-dialog categories keep the current panel", advanced.every((c) => !mobileFilterLayout(c)), advanced.filter((c) => mobileFilterLayout(c)).map((c) => c.id).join(","));
-check("every other category gets the new panel", opted.length === all.length - advanced.length, `${opted.length} of ${all.length - advanced.length}`);
+check("every category gets the new panel", opted.length === all.length, `${opted.length} of ${all.length}`);
+check(
+  "advanced-dialog categories keep the dialog's group titles",
+  advanced.every((c) => mobileFilterLayout(c)!.groups.every((g) => g.labelKey === `flt.grp.${g.id}`)),
+);
 check("Otomobil is opted in", opted.some((c) => c.id === "vasita-otomobil"));
 check("null category has no layout", mobileFilterLayout(null) === null && mobileFilterLayout(undefined) === null);
 
@@ -65,7 +68,7 @@ for (const cat of opted) {
     check(`${cat.id}/${label}: quick tab has location`, resolved.quick.some((r) => r.key === "location"));
     check(`${cat.id}/${label}: quick tab has at most 7 rows`, resolved.quick.length <= 7, String(resolved.quick.length));
     if (fields.some((f) => f.key === "priceMin")) check(`${cat.id}/${label}: quick tab has price`, resolved.quick.some((r) => r.key === "priceMin"));
-    check(`${cat.id}/${label}: no auto "other" group needed`, !resolved.groups.some((g) => g.id === "other"), resolved.groups.find((g) => g.id === "other")?.rows.map((r) => r.key).join(","));
+    check(`${cat.id}/${label}: no auto "other" group needed`, !resolved.groups.some((g) => g.id === "_rest"), resolved.groups.find((g) => g.id === "_rest")?.rows.map((r) => r.key).join(","));
     check(`${cat.id}/${label}: std rows (date, map, keyword, category) present`, ["posted", "mappedOnly", "keyword", "category"].every((k) => keys.includes(k)));
   }
 }

@@ -1,5 +1,12 @@
 import { rootOf, type Category } from "@/data/categories";
-import { fieldOffered, filterFieldsForCategory, hasAdvancedFilters, type FilterField, type FilterState } from "@/lib/categoryFilters";
+import {
+  ESTATE_FILTER_GROUPS,
+  fieldOffered,
+  filterFieldsForCategory,
+  hasAdvancedFilters,
+  type FilterField,
+  type FilterState,
+} from "@/lib/categoryFilters";
 
 /**
  * Phone/tablet filter layout per category: a short "quick" list first, everything else in labelled groups.
@@ -70,15 +77,43 @@ function defaultLayout(fields: FilterField[]): MobileFilterLayout {
   };
 }
 
+const ESTATE_QUICK = ["priceMin", "rooms", "sqmMin", "homeType", "deal", "zoning", "age"];
+
+/**
+ * Categories with the advanced dialog: same groups and titles as the dialog (flt.grp.*), so the structure users
+ * know stays; only the most used fields move to the quick tab.
+ */
+function advancedLayout(cat: Category, fields: FilterField[]): MobileFilterLayout {
+  const has = new Set(fields.map((f) => f.key));
+  const quick =
+    rootOf(cat).id === "vasita"
+      ? [...VEHICLE_LAYOUT.quick]
+      : [...ESTATE_QUICK.filter((k) => has.has(k)).slice(0, 5), "location"];
+  const taken = new Set([...quick, ...Object.values(PSEUDO_ROW_KEYS).flat()]);
+  const groups: MobileFilterGroup[] = [];
+  for (const g of ESTATE_FILTER_GROUPS) {
+    const keys: string[] = [];
+    for (const f of fields) {
+      if (f.group !== g || taken.has(f.key) || keys.includes(f.key) || (f.kind === "range" && f.key.endsWith("Max"))) continue;
+      keys.push(f.key);
+    }
+    if (g === "basic") keys.push("posted");
+    if (g === "other") keys.push("mappedOnly", "keyword", "category");
+    if (keys.length) groups.push({ id: g, labelKey: `flt.grp.${g}`, keys });
+  }
+  return { quick, groups };
+}
+
 const derived = new Map<string, MobileFilterLayout>();
 
 export function mobileFilterLayout(cat?: Category | null): MobileFilterLayout | null {
-  if (!cat || hasAdvancedFilters(cat)) return null;
+  if (!cat) return null;
   const fixed = MOBILE_FILTER_LAYOUTS[cat.id];
   if (fixed) return fixed;
   let layout = derived.get(cat.id);
   if (!layout) {
-    layout = defaultLayout(filterFieldsForCategory(cat));
+    const fields = filterFieldsForCategory(cat);
+    layout = hasAdvancedFilters(cat) ? advancedLayout(cat, fields) : defaultLayout(fields);
     derived.set(cat.id, layout);
   }
   return layout;
@@ -124,7 +159,7 @@ export function resolveMobileLayout(layout: MobileFilterLayout, fields: FilterFi
   const rest = fields
     .filter((f) => !placed.has(f.key) && !owned.has(f.key) && fieldOffered(f, state))
     .map((f) => ({ key: f.key, field: f }));
-  if (rest.length) groups.push({ id: "other", labelKey: "mf.g.other", rows: rest });
+  if (rest.length) groups.push({ id: "_rest", labelKey: "mf.g.other", rows: rest });
   return { quick, groups };
 }
 

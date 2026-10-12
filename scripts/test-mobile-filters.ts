@@ -44,7 +44,7 @@ const DEVICES: Device[] = [
 ];
 
 /** Representative categories for the full keyboard scenario; MOBILE_FILTER_SCOPE=all adds every listing category. */
-const SCENARIO_SLUGS = ["otomobil", "satilik-konut", "cep-telefonu", "motosiklet", "is-makineleri"];
+const SCENARIO_SLUGS = ["otomobil", "satilik-konut", "cep-telefonu", "motosiklet", "is-makineleri", "arazi-suv-pickup"];
 const EXTRA_PAGES = ["/ara?q=telefon", "/acil"];
 
 // ---------------------------------------------------------------- CDP plumbing
@@ -417,10 +417,17 @@ async function keyboardScenario(page: Page, d: Device, kind: string, tag: string
     await page.send("Input.dispatchKeyEvent", esc);
     await page.send("Input.dispatchKeyEvent", { ...esc, type: "keyUp" });
     await sleep(300);
-    const back = await page.eval<{ sheet: boolean; main: boolean }>("({ sheet: !!document.querySelector('.filter-sheet'), main: !!document.querySelector('.filter-sheet .qf-tabs') })");
+    // Without a brand row the scenario went two screens deep (Adres → İl), so one step back lands on Adres.
+    const back = await page.eval<{ sheet: boolean; main: boolean }>(`({
+      sheet: !!document.querySelector('.filter-sheet'),
+      main: !!document.querySelector('.filter-sheet ' + (document.querySelector('.filter-sheet .qf-row[data-row=brand], .filter-sheet .qf-tabs') ? '.qf-tabs' : '.qf-row[data-row=city]')),
+    })`);
     check(`${tag} quick: Escape goes back one screen, the sheet stays`, back.sheet && back.main, JSON.stringify(back));
     if (!back.sheet) return;
     const price = await page.eval<boolean>(`(async () => {
+      const s = __mf.sheet();
+      const backBtn = () => s.querySelector('.qf-head .qf-icon-btn[aria-label]:not(.filter-x)');
+      while (!s.querySelector('.qf-tabs') && backBtn()) { backBtn().click(); await new Promise((r) => setTimeout(r, 250)); }
       __mf.sheet().querySelector('.qf-row[data-row=priceMin]')?.click();
       await new Promise((r) => setTimeout(r, 300));
       const inp = __mf.sheet().querySelector('#qf-priceMin');
