@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Bell, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import {
   categories,
+  formatListingCount,
   hrefForCategoryListings,
   parentOf,
   visibleChildren,
@@ -13,11 +14,11 @@ import {
 } from "@/data/categories";
 import { CategoryIcon, iconTone } from "@/components/CategoryIcon";
 import { catName, useI18n } from "@/context/I18nContext";
-import { childSummary } from "@/components/home/HomeCategoryRail";
 import { useApp } from "@/context/AppContext";
 import { NotificationPanel } from "@/components/NotificationPanel";
 import { Logo } from "@/components/Logo";
 import { SmartSearch } from "@/components/home/SmartSearch";
+import { liveCount } from "@/lib/categoryCounts";
 
 function labelOf(t: (key: string, vars?: Record<string, string | number>) => string, cat: Category) {
   return catName(t, cat.id, cat.name).trim() || cat.name;
@@ -26,7 +27,7 @@ function labelOf(t: (key: string, vars?: Record<string, string | number>) => str
 export function MobileCategoryHome() {
   const { t } = useI18n();
   const router = useRouter();
-  const { unreadNotifications } = useApp();
+  const { unreadNotifications, categoryCounts } = useApp();
   const roots = useMemo(() => categories.filter((c) => !c.filter && !c.navHidden), []);
   const [cursor, setCursor] = useState<Category | null>(null);
   const [q, setQ] = useState("");
@@ -122,26 +123,46 @@ export function MobileCategoryHome() {
 
       {query && !hits.length ? <p className="m-cat-empty">{t("nav.cat.empty")}</p> : null}
 
-      <ul className="m-cat-list">
-        {rows.map((cat) => {
-          const kids = visibleChildren(cat);
-          const summary = query ? "" : childSummary(t, cat);
-          return (
-            <li key={cat.id}>
-              <button type="button" className="m-cat-row" onClick={() => choose(cat)}>
-                <span className={`cat-ico ${iconTone(cat.icon)}`}>
-                  <CategoryIcon name={cat.icon} className="h-5 w-5" />
-                </span>
-                <span className="m-cat-copy">
-                  <span className="m-cat-name">{labelOf(t, cat)}</span>
-                  {summary ? <span className="m-cat-sub">{summary}</span> : null}
-                </span>
-                {kids.length ? <ChevronRight className="m-cat-chev" aria-hidden /> : null}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+      {query ? null : (
+        <ul className="m-cat-grid" aria-label={cursor ? labelOf(t, cursor) : t("nav.catHome")}>
+          {rows.map((cat) => {
+            const n = liveCount(categoryCounts, cat);
+            return (
+              <li key={cat.id}>
+                <button type="button" className="m-cat-card" onClick={() => choose(cat)}>
+                  <span className={`m-cat-card-ico cat-ico ${iconTone(cat.icon)}`} aria-hidden>
+                    <CategoryIcon name={cat.icon} className="h-6 w-6" />
+                  </span>
+                  <span className="m-cat-card-name">{labelOf(t, cat)}</span>
+                  {n > 0 ? <span className="m-cat-card-n">{t("browse.count", { n: formatListingCount(n) })}</span> : null}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {query ? (
+        <ul className="m-cat-list">
+          {hits.map((cat) => {
+            const up = parentOf(cat);
+            return (
+              <li key={cat.id}>
+                <button type="button" className="m-cat-row" onClick={() => choose(cat)}>
+                  <span className={`cat-ico ${iconTone(cat.icon)}`}>
+                    <CategoryIcon name={cat.icon} className="h-5 w-5" />
+                  </span>
+                  <span className="m-cat-copy">
+                    <span className="m-cat-name">{labelOf(t, cat)}</span>
+                    {up ? <span className="m-cat-sub">{labelOf(t, up)}</span> : null}
+                  </span>
+                  <ChevronRight className="m-cat-chev" aria-hidden />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
     </div>
   );
 }

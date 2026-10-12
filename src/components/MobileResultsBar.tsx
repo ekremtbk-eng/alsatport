@@ -48,7 +48,10 @@ export function MobileResultsBar({
   onSave,
   saved = false,
   hint,
+  shortLabels = false,
 }: {
+  /** One-word button labels so the pill toolbar fits a 320–390px screen; the full text stays as the accessible name. */
+  shortLabels?: boolean;
   title: string;
   /** True once the page is known to be on phone/tablet, where the desktop heading (and its h1) is hidden. */
   titleAsHeading?: boolean;
@@ -96,17 +99,23 @@ export function MobileResultsBar({
         </label>
         <button
           type="button"
-          className="mres-tool"
+          className={`mres-tool ${shortLabels ? "is-icon" : ""}`}
           onClick={onToggleView}
           aria-label={view === "rows" ? t("browse.view.cards") : t("browse.view.rows")}
         >
           {view === "rows" ? <LayoutGrid className="h-4 w-4" aria-hidden /> : <List className="h-4 w-4" aria-hidden />}
-          <span>{t("browse.view")}</span>
+          <span className={shortLabels ? "sr-only" : undefined}>{t("browse.view")}</span>
         </button>
         {onSave ? (
-          <button type="button" className={`mres-tool ${saved ? "is-on" : ""}`} onClick={onSave} aria-pressed={saved}>
+          <button
+            type="button"
+            className={`mres-tool ${saved ? "is-on" : ""}`}
+            onClick={onSave}
+            aria-pressed={saved}
+            aria-label={shortLabels && !saved ? t("common.saveSearch") : undefined}
+          >
             {saved ? <BookmarkCheck className="h-4 w-4" aria-hidden /> : <Bookmark className="h-4 w-4" aria-hidden />}
-            <span>{saved ? t("common.saved") : t("common.saveSearch")}</span>
+            <span>{saved ? t("common.saved") : shortLabels ? t("mf.save") : t("common.saveSearch")}</span>
           </button>
         ) : null}
       </div>

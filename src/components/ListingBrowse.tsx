@@ -11,6 +11,8 @@ import { ListingGrid } from "@/components/ListingGrid";
 import { ServiceListingRow, serviceRating } from "@/components/ServiceListingRow";
 import { CompactListingList, CompactListingRow } from "@/components/CompactListingRow";
 import { MobileResultsBar, usePhoneView } from "@/components/MobileResultsBar";
+import { QuickFilterPanel } from "@/components/mfilter/QuickFilterPanel";
+import { countActiveRows, mobileFilterLayout } from "@/lib/mobileFilters";
 import { useDevice } from "@/context/DeviceContext";
 import { catName, useI18n } from "@/context/I18nContext";
 import { useApp } from "@/context/AppContext";
@@ -226,22 +228,52 @@ export function ListingBrowse({
   }
 
   function setFilter(key: string, value: string) {
+    setFilterValues([[key, value]]);
+  }
+
+  /** Several keys in one history entry (e.g. a price range preset sets min and max together). */
+  function setFilterValues(pairs: [string, string][]) {
     const estate = (filterCat ?? category) && rootOf(filterCat ?? category!).id === "emlak";
-    const field = fields.find((f) => f.key === key || f.pairKey === key);
-    if (!user && !BASIC.has(key) && !field && !estate) {
-      requireAuth("filter");
-      return;
+    let typing = pairs.length > 0;
+    for (const [key] of pairs) {
+      const field = fields.find((f) => f.key === key || f.pairKey === key);
+      if (!user && !BASIC.has(key) && !field && !estate) {
+        requireAuth("filter");
+        return;
+      }
+      if (!(field?.kind === "range" || field?.kind === "text") || pairs.length > 1) typing = false;
     }
-    const typing = field?.kind === "range" || field?.kind === "text";
     setFilters((prev) => {
-      const next = applyFilterChange(prev, key, value);
+      const next = pairs.reduce((acc, [key, value]) => applyFilterChange(acc, key, value), prev);
       commit(next, sort, view, 1, typing ? "replace" : "push");
       return next;
     });
   }
 
+  function clearAll() {
+    setFilters(emptyFilterState());
+    setWordDraft("");
+    commit(emptyFilterState());
+  }
+
+  const sheetLayout = compact ? mobileFilterLayout(filterCat) : null;
+  /** Phone/tablet redesign is opt-in per category; desktop and other categories keep the current layout. */
+  const mobileV2 = compact && Boolean(mobileFilterLayout(category));
+
   const estateCat = category && hasAdvancedFilters(category) ? category : null;
   const [advOpen, setAdvOpen] = useState(false);
+
+  const wantsPanel = searchParams.get("filtre") === "1";
+  useEffect(() => {
+    if (!wantsPanel || !mounted) return;
+    if (mobileV2) {
+      setSheetCat(category ?? undefined);
+      setSheetOpen(true);
+    }
+    const qs = new URLSearchParams(searchParams.toString());
+    qs.delete("filtre");
+    router.replace(qs.size ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [wantsPanel, mounted, mobileV2, category, searchParams, pathname, router]);
   const estateCountQuery = (draft: FilterState) => {
     const qs = new URLSearchParams(mergeFilterQuery(searchParams, draft));
     qs.delete("filter");
@@ -322,7 +354,7 @@ export function ListingBrowse({
   };
 
   return (
-    <div>
+    <div className={mobileV2 ? "browse-v2" : undefined}>
       <div className="browse-heading">
         {serviceTree && category ? (
           <div className="browse-pagehead">
@@ -345,9 +377,9 @@ export function ListingBrowse({
             router.push(up ? hrefForCategoryListings(up) : "/");
           }
         }}
-        activeFilters={active}
+        activeFilters={mobileV2 && category ? countActiveRows(mobileFilterLayout(category)!, filterFieldsForCategory(category), filters) : active}
         onFilter={() => {
-          if (estateCat) {
+          if (estateCat && !mobileV2) {
             setAdvOpen(true);
             return;
           }
@@ -365,6 +397,7 @@ export function ListingBrowse({
         onSave={onSaveSearch}
         saved={saved}
         hint={saveHint}
+        shortLabels={mobileV2}
       />
       {extra}
       {category ? (
@@ -401,6 +434,7 @@ export function ListingBrowse({
           });
         }}
         clearLabelKey={estateCat ? "flt.clearAll" : undefined}
+        clearFirst={mobileV2}
         onClear={() => {
           setFilters(emptyFilterState());
           setWordDraft("");
@@ -570,7 +604,27 @@ export function ListingBrowse({
       </div>
 
       <FilterSheet open={sheetOpen} onClose={() => setSheetOpen(false)} label={t("cat.filter")}>
-        {filterPanel("sheet")}
+        {sheetLayout && filterCat ? (
+          <QuickFilterPanel
+            key={filterCat.id}
+            category={filterCat}
+            layout={sheetLayout}
+            fields={fields}
+            state={filters}
+            listings={scopedListings}
+            resultCount={items.length}
+            onSet={setFilterValues}
+            onClear={clearAll}
+            onClose={() => setSheetOpen(false)}
+            onPickCategory={(cat) => setSheetCat(cat)}
+            onApply={() => {
+              setSheetOpen(false);
+              if (sheetCat && sheetCat.id !== category?.id) router.push(hrefForCategoryListings(sheetCat));
+            }}
+          />
+        ) : (
+          filterPanel("sheet")
+        )}
       </FilterSheet>
       {estateCat ? (
         <EstateFilterDialog

@@ -1,7 +1,8 @@
 import type { FilterField, FilterState } from "@/lib/categoryFilters";
 
 const RESERVED = new Set(["q", "kategori", "cat", "filter", "next", "type", "edit"]);
-const META = new Set(["sira", "gorunum", "sayfa"]);
+/** `filtre=1` asks the phone listing page to open its filter panel once (sent by category hubs). */
+const META = new Set(["sira", "gorunum", "sayfa", "filtre"]);
 
 const TO_URL: Record<string, string> = {
   brand: "marka",

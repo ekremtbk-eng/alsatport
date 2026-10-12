@@ -41,6 +41,7 @@ export function FilterChips({
   onRemove,
   onClear,
   clearLabelKey = "flt.clear",
+  clearFirst = false,
 }: {
   fields: FilterField[];
   state: FilterState;
@@ -48,6 +49,8 @@ export function FilterChips({
   onRemove: (key: string, value?: string) => void;
   onClear: () => void;
   clearLabelKey?: string;
+  /** Puts the clear chip first so it stays visible in a horizontally scrolling row. */
+  clearFirst?: boolean;
 }) {
   const { t } = useI18n();
   const skip = new Set(["hours24", "includeDesc", "mappedOnly", "renoSub"]);
@@ -118,8 +121,14 @@ export function FilterChips({
     chips.push({ id: key, key, text: `${labelOf(t, field, key)}: ${value.replaceAll(",", ", ")}` });
   }
   if (!chips.length) return null;
+  const clear = (
+    <button type="button" className="flt-chip is-clear" onClick={onClear}>
+      {t(clearLabelKey)}
+    </button>
+  );
   return (
-    <div className="flt-chips">
+    <div className="flt-chips is-active">
+      {clearFirst && clear}
       {chips.map((c) => (
         <button
           key={c.id}
@@ -132,9 +141,7 @@ export function FilterChips({
           <X className="h-3.5 w-3.5" aria-hidden />
         </button>
       ))}
-      <button type="button" className="flt-chip is-clear" onClick={onClear}>
-        {t(clearLabelKey)}
-      </button>
+      {!clearFirst && clear}
     </div>
   );
 }
