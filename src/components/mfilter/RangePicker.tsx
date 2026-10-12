@@ -3,7 +3,7 @@
 import { CurrencyChips } from "@/components/CurrencyChips";
 import { useI18n } from "@/context/I18nContext";
 import { rangeSuffix, type FilterField, type FilterState } from "@/lib/categoryFilters";
-import { compactAmount, RANGE_BUCKETS } from "@/lib/mobileFilters";
+import { compactAmount } from "@/lib/mobileFilters";
 
 const digits = (v: string) => v.replace(/[^\d]/g, "");
 
@@ -36,11 +36,13 @@ export function RangePicker({
   minField,
   maxField,
   state,
+  buckets,
   onSet,
 }: {
   minField: FilterField;
   maxField: FilterField;
   state: FilterState;
+  buckets: [string, string][];
   onSet: (pairs: [string, string][]) => void;
 }) {
   const { t, locale } = useI18n();
@@ -50,7 +52,6 @@ export function RangePicker({
   const max = state[maxField.key] ?? "";
   const bad = Boolean(min && max && Number(min) > Number(max));
   const show = (v: string) => (v && grouped(minField.key) ? Number(v).toLocaleString("tr-TR") : v);
-  const buckets = RANGE_BUCKETS[minField.key] ?? [];
   const minId = `qf-${minField.key}`;
   const maxId = `qf-${maxField.key}`;
 

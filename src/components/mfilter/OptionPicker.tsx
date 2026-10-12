@@ -108,7 +108,7 @@ export function OptionPicker({
                 {multi && on ? <Check className="h-3.5 w-3.5" /> : null}
               </span>
               <span className="qf-opt-name">{o}</span>
-              {counts ? <span className="qf-opt-count">{(counts[o] ?? 0).toLocaleString("tr-TR")}</span> : null}
+              {counts?.[o] ? <span className="qf-opt-count">{counts[o].toLocaleString("tr-TR")}</span> : null}
             </button>
           );
         })}

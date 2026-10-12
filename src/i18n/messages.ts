@@ -1501,6 +1501,8 @@ export const MESSAGES = pack({
   "mf.g.kktc": ["KKTC Bilgileri", "TRNC details", "TRNC-Angaben", "تفاصيل شمال قبرص", "Данные ТРСК"],
   "mf.g.search": ["Arama ve Kategori", "Search & category", "Suche & Kategorie", "البحث والفئة", "Поиск и категория"],
   "mf.g.other": ["Diğer Filtreler", "Other filters", "Weitere Filter", "فلاتر أخرى", "Другие фильтры"],
+  "mf.g.details": ["Detaylar", "Details", "Details", "التفاصيل", "Подробности"],
+  "mf.salary": ["Maaş", "Salary", "Gehalt", "الراتب", "Зарплата"],
   "flt.adv.search": ["Filtre ara…", "Search filters…", "Filter suchen…", "ابحث في الفلاتر…", "Поиск фильтра…"],
   "flt.adv.show": ["{n} İlanı Göster", "Show {n} listings", "{n} Anzeigen zeigen", "عرض {n} إعلان", "Показать {n}"],
   "flt.adv.showAny": ["Sonuçları Göster", "Show results", "Ergebnisse zeigen", "عرض النتائج", "Показать результаты"],

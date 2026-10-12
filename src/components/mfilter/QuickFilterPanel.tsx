@@ -1,32 +1,60 @@
 "use client";
 
 import {
+  Award,
+  BadgeCheck,
   Banknote,
+  Briefcase,
+  Building2,
   Calendar,
   CalendarClock,
   Car,
   CarFront,
   ChevronLeft,
   Cog,
+  Cpu,
   Flag,
   Flame,
   Fuel,
   Gauge,
+  GraduationCap,
+  HardDrive,
+  HeartHandshake,
+  Hourglass,
+  Image as ImageIcon,
+  Languages,
   Layers,
   LayoutGrid,
   ListTree,
   Map as MapIcon,
   MapPin,
+  MemoryStick,
+  Monitor,
   Move,
+  Package,
   PaintBucket,
   Palette,
+  PawPrint,
+  Recycle,
+  Repeat,
+  Ruler,
   Search,
   Settings2,
   ShieldAlert,
+  ShieldCheck,
+  ShoppingBag,
   SlidersHorizontal,
+  Smartphone,
   Sparkles,
   Store,
+  Tag,
+  Timer,
+  Tractor,
+  Tv,
   User,
+  Users,
+  Video,
+  Wrench,
   X,
   Zap,
   type LucideIcon,
@@ -55,6 +83,7 @@ import {
   type FilterState,
 } from "@/lib/categoryFilters";
 import {
+  rangeBuckets,
   resolveMobileLayout,
   rowActive,
   rowStateKeys,
@@ -95,6 +124,45 @@ const ROW_ICONS: Record<string, LucideIcon> = {
   kktcReg: Flag,
   plateType: Flag,
   firstReg: Flag,
+  engine: Settings2,
+  body: CarFront,
+  service: Wrench,
+  subject: GraduationCap,
+  level: GraduationCap,
+  education: GraduationCap,
+  jobType: Briefcase,
+  sector: Building2,
+  exp: Award,
+  place: MapPin,
+  helpType: HeartHandshake,
+  helpGender: Users,
+  helpLang: Languages,
+  species: PawPrint,
+  breed: PawPrint,
+  sex: Users,
+  ageMin: Hourglass,
+  petProduct: Package,
+  product: Package,
+  partBrand: Tag,
+  usedPart: Recycle,
+  cond: BadgeCheck,
+  swap: Repeat,
+  warranty: ShieldCheck,
+  shopOpts: ShoppingBag,
+  hasPhoto: ImageIcon,
+  hasVideo: Video,
+  size: Ruler,
+  storage: HardDrive,
+  ram: MemoryStick,
+  cpu: Cpu,
+  gpu: Cpu,
+  screen: Monitor,
+  os: Smartphone,
+  tvSize: Tv,
+  tvRes: Tv,
+  era: Hourglass,
+  hoursMin: Timer,
+  tractor: Tractor,
 };
 
 type Screen =
@@ -175,6 +243,7 @@ export function QuickFilterPanel({
   const set = (key: string, value: string) => onSet([[key, value]]);
 
   const fieldOf = (key: string) => fields.find((f) => f.key === key);
+  const jobs = rootOf(category).id === "jobs";
   const country = parseCountry(state.country);
   const kktc = country === "KKTC" || isKktcCity(state.city ?? "");
   const anyPlace = country === "KKTC" ? t("loc.kktcAll") : country === "TR" ? t("loc.trAll") : t("loc.allPlaces");
@@ -185,7 +254,7 @@ export function QuickFilterPanel({
     if (row.key === "mappedOnly") return t("acil.mapOnly");
     if (row.key === "keyword") return t("acil.word");
     if (row.key === "category") return t("flt.cat");
-    if (row.key === "priceMin") return t("flt.price");
+    if (row.key === "priceMin") return jobs ? t("mf.salary") : t("flt.price");
     return fieldTitle(t, row.field?.labelKey ?? row.key);
   };
 
@@ -242,7 +311,7 @@ export function QuickFilterPanel({
   };
 
   const renderRow = (row: MobileFilterRow) => {
-    const icon = ROW_ICONS[row.key] ?? SlidersHorizontal;
+    const icon = row.key === "brand" && rootOf(category).id !== "vasita" ? Tag : (ROW_ICONS[row.key] ?? SlidersHorizontal);
     const title = rowTitle(row);
     if (row.key === "mappedOnly" || row.field?.kind === "toggle") {
       const on = state[row.key] === "1";
@@ -433,8 +502,8 @@ export function QuickFilterPanel({
     const keys = rowStateKeys({ key: f.key, field: f });
     content = (
       <>
-        {head(f.key === "priceMin" ? t("mf.priceRange") : fieldTitle(t, f.labelKey), true)}
-        {body(pair ? <RangePicker minField={f} maxField={pair} state={state} onSet={onSet} /> : null)}
+        {head(f.key === "priceMin" ? (jobs ? t("mf.salary") : t("mf.priceRange")) : fieldTitle(t, f.labelKey), true)}
+        {body(pair ? <RangePicker minField={f} maxField={pair} state={state} buckets={rangeBuckets(f.key, category)} onSet={onSet} /> : null)}
         {backFoot(keys)}
       </>
     );

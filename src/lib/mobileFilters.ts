@@ -1,9 +1,10 @@
-import type { Category } from "@/data/categories";
-import { fieldOffered, type FilterField, type FilterState } from "@/lib/categoryFilters";
+import { rootOf, type Category } from "@/data/categories";
+import { fieldOffered, filterFieldsForCategory, hasAdvancedFilters, type FilterField, type FilterState } from "@/lib/categoryFilters";
 
 /**
  * Phone/tablet filter layout per category: a short "quick" list first, everything else in labelled groups.
- * Only categories listed in MOBILE_FILTER_LAYOUTS use the new panel; the rest keep FilterPanel unchanged.
+ * Categories with the advanced estate/vehicle dialog keep their current panel; every other category uses an
+ * explicit layout from MOBILE_FILTER_LAYOUTS or one derived from its own fields (defaultLayout).
  *
  * Keys are filter field keys (ranges by their Min key) plus these pseudo rows, which bundle several URL keys
  * or have no FilterField of their own.
@@ -23,21 +24,64 @@ export const PSEUDO_ROW_KEYS: Record<PseudoRow, string[]> = {
 export type MobileFilterGroup = { id: string; labelKey: string; keys: string[] };
 export type MobileFilterLayout = { quick: string[]; groups: MobileFilterGroup[] };
 
-const MOBILE_FILTER_LAYOUTS: Record<string, MobileFilterLayout> = {
-  "vasita-otomobil": {
-    quick: ["brand", "model", "priceMin", "yearMin", "kmMin", "location"],
-    groups: [
-      { id: "vehicle", labelKey: "mf.g.vehicle", keys: ["trim", "fuel", "gear", "bodyType", "engineSize", "power", "drive", "color"] },
-      { id: "condition", labelKey: "mf.g.condition", keys: ["damage", "paint", "equip"] },
-      { id: "listing", labelKey: "mf.g.listing", keys: ["kimden", "seller", "posted", "urgent", "mappedOnly"] },
-      { id: "kktc", labelKey: "mf.g.kktc", keys: ["steering", "origin", "importStatus", "customs", "kktcReg", "plateType", "firstReg"] },
-      { id: "search", labelKey: "mf.g.search", keys: ["keyword", "category"] },
-    ],
-  },
+const LISTING_KEYS = ["kimden", "seller", "swap", "warranty", "shopOpts", "posted", "urgent", "hasPhoto", "hasVideo", "mappedOnly"];
+const SEARCH_KEYS = ["keyword", "category"];
+
+const VEHICLE_LAYOUT: MobileFilterLayout = {
+  quick: ["brand", "model", "priceMin", "yearMin", "kmMin", "location"],
+  groups: [
+    { id: "vehicle", labelKey: "mf.g.vehicle", keys: ["trim", "engine", "body", "fuel", "gear", "bodyType", "engineSize", "power", "drive", "color"] },
+    { id: "condition", labelKey: "mf.g.condition", keys: ["damage", "paint", "equip"] },
+    { id: "listing", labelKey: "mf.g.listing", keys: ["kimden", "seller", "posted", "urgent", "mappedOnly"] },
+    { id: "kktc", labelKey: "mf.g.kktc", keys: ["steering", "origin", "importStatus", "customs", "kktcReg", "plateType", "firstReg"] },
+    { id: "search", labelKey: "mf.g.search", keys: SEARCH_KEYS },
+  ],
 };
 
+const MOBILE_FILTER_LAYOUTS: Record<string, MobileFilterLayout> = {
+  vasita: VEHICLE_LAYOUT,
+  "vasita-otomobil": VEHICLE_LAYOUT,
+};
+
+/** The field that names "what" is listed (service, subject, species…); it leads the quick tab. */
+const LEAD_KEYS = ["service", "subject", "jobType", "helpType", "species", "petProduct", "product", "brand", "model", "breed", "tractor"];
+/** Numeric/condition fields worth a quick row right after the price. */
+const SECOND_KEYS = ["yearMin", "kmMin", "hoursMin", "ageMin", "cond", "sector", "level", "place", "exp"];
+
+/** Layout derived from the category's own fields, so no category gets filters it does not have. */
+function defaultLayout(fields: FilterField[]): MobileFilterLayout {
+  const has = new Set(fields.map((f) => f.key));
+  const lead = LEAD_KEYS.filter((k) => has.has(k)).slice(0, 3);
+  const second = SECOND_KEYS.filter((k) => has.has(k)).slice(0, 5 - lead.length);
+  const quick = [...lead, ...(has.has("priceMin") ? ["priceMin"] : []), ...second, "location"];
+  const taken = new Set([...quick, ...LISTING_KEYS, ...SEARCH_KEYS, ...Object.values(PSEUDO_ROW_KEYS).flat()]);
+  const details: string[] = [];
+  for (const f of fields) {
+    if (taken.has(f.key) || details.includes(f.key) || (f.kind === "range" && f.key.endsWith("Max"))) continue;
+    details.push(f.key);
+  }
+  return {
+    quick,
+    groups: [
+      { id: "details", labelKey: "mf.g.details", keys: details },
+      { id: "listing", labelKey: "mf.g.listing", keys: LISTING_KEYS },
+      { id: "search", labelKey: "mf.g.search", keys: SEARCH_KEYS },
+    ],
+  };
+}
+
+const derived = new Map<string, MobileFilterLayout>();
+
 export function mobileFilterLayout(cat?: Category | null): MobileFilterLayout | null {
-  return (cat && MOBILE_FILTER_LAYOUTS[cat.id]) || null;
+  if (!cat || hasAdvancedFilters(cat)) return null;
+  const fixed = MOBILE_FILTER_LAYOUTS[cat.id];
+  if (fixed) return fixed;
+  let layout = derived.get(cat.id);
+  if (!layout) {
+    layout = defaultLayout(filterFieldsForCategory(cat));
+    derived.set(cat.id, layout);
+  }
+  return layout;
 }
 
 export function isPseudoRow(key: string): key is PseudoRow {
@@ -107,15 +151,68 @@ export function compactAmount(n: number, locale: string) {
   return new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 }).format(n);
 }
 
-/** Ready-made ranges per range field; [min, max] with "" for an open end. */
-export const RANGE_BUCKETS: Record<string, [string, string][]> = {
-  priceMin: [
+type Buckets = [string, string][];
+
+/** Price presets by root category; amounts differ by orders of magnitude between cars, phones and services. */
+const PRICE_BUCKETS: Record<string, Buckets> = {
+  vasita: [
     ["", "250000"],
     ["250000", "500000"],
     ["500000", "1000000"],
     ["1000000", "2000000"],
     ["2000000", "3000000"],
     ["3000000", ""],
+  ],
+  machines: [
+    ["", "250000"],
+    ["250000", "500000"],
+    ["500000", "1000000"],
+    ["1000000", "2500000"],
+    ["2500000", "5000000"],
+    ["5000000", ""],
+  ],
+  services: [
+    ["", "500"],
+    ["500", "1000"],
+    ["1000", "2500"],
+    ["2500", "5000"],
+    ["5000", "10000"],
+    ["10000", ""],
+  ],
+  jobs: [
+    ["", "25000"],
+    ["25000", "35000"],
+    ["35000", "50000"],
+    ["50000", "75000"],
+    ["75000", ""],
+  ],
+  default: [
+    ["", "1000"],
+    ["1000", "5000"],
+    ["5000", "10000"],
+    ["10000", "25000"],
+    ["25000", "50000"],
+    ["50000", ""],
+  ],
+};
+const PRICE_ROOT: Record<string, string> = { tutors: "services", helpers: "services" };
+
+/** Ready-made ranges for a range field in this category; [min, max] with "" for an open end. */
+export function rangeBuckets(key: string, cat?: Category | null): Buckets {
+  if (key === "priceMin") {
+    const root = cat ? rootOf(cat).id : "";
+    return PRICE_BUCKETS[PRICE_ROOT[root] ?? root] ?? PRICE_BUCKETS.default;
+  }
+  return RANGE_BUCKETS[key] ?? [];
+}
+
+const RANGE_BUCKETS: Record<string, Buckets> = {
+  hoursMin: [
+    ["", "1000"],
+    ["", "3000"],
+    ["", "5000"],
+    ["", "10000"],
+    ["10000", ""],
   ],
   yearMin: [
     ["2022", ""],

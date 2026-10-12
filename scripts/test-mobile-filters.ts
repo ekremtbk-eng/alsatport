@@ -219,6 +219,10 @@ const OPEN_SHEET = String.raw`
 
 const SHEET_KINDS = ["std", "adv", "quick"];
 
+/** The filter button is visible and hydrated; a click on server-rendered markup before React attaches is dropped. */
+const FILTER_BUTTON_READY =
+  "[...document.querySelectorAll('button')].some((b) => b.offsetParent && /^(Filtrele|Filtreler)\\b/.test((b.innerText || '').trim()) && Object.keys(b).some((k) => k.startsWith('__reactProps')))";
+
 /** Layout facts for the open sheet, with the keyboard closed. */
 const LAYOUT = String.raw`
 (() => {
@@ -276,7 +280,7 @@ async function prepare(page: Page, d: Device) {
 
 async function openFilters(page: Page, url: string) {
   if (!(await page.goto(`${BASE}${url}`))) return "load-failed";
-  await page.waitFor("[...document.querySelectorAll('button')].some((b) => b.offsetParent && /^(Filtrele|Filtreler)\\b/.test((b.innerText || '').trim()))", 12000);
+  await page.waitFor(FILTER_BUTTON_READY, 12000);
   await page.eval(PROBE);
   return page.eval<string>(OPEN_SHEET);
 }
@@ -322,12 +326,14 @@ async function keyboardScenario(page: Page, d: Device, kind: string, tag: string
 
   if (kind === "quick") {
     const opened = await page.eval<boolean>(`(async () => {
-      const row = __mf.sheet().querySelector('.qf-row[data-row=brand]');
-      if (!row) return false;
-      row.click(); await new Promise((r) => setTimeout(r, 300));
-      return !!__mf.sheet().querySelector('.qf-search input');
+      const s = __mf.sheet(); const wait = () => new Promise((r) => setTimeout(r, 300));
+      const brand = s.querySelector('.qf-row[data-row=brand]');
+      if (brand) brand.click();
+      else { s.querySelector('.qf-row[data-row=location]')?.click(); await wait(); s.querySelector('.qf-row[data-row=city]')?.click(); }
+      await wait();
+      return !!s.querySelector('.qf-search input');
     })()`);
-    check(`${tag} quick: Marka opens a searchable list`, opened);
+    check(`${tag} quick: Marka (or İl) opens a searchable list`, opened);
     if (!opened) return;
   }
   const brandSel =
@@ -548,7 +554,7 @@ async function closeChecks(page: Page, d: Device, kind: string, tag: string, scr
 /** iOS model: layout viewport stays, visual viewport shrinks and pans (offsetTop) or zooms (scale/offsetLeft). */
 async function iosViewportModel(page: Page, d: Device, url: string, tag: string) {
   await page.goto(`${BASE}${url}`);
-  await page.waitFor("[...document.querySelectorAll('button')].some((b) => b.offsetParent && /^(Filtrele|Filtreler)\\b/.test((b.innerText || '').trim()))", 12000);
+  await page.waitFor(FILTER_BUTTON_READY, 12000);
   await page.eval(`(() => {
     const fake = new EventTarget();
     Object.assign(fake, { width: innerWidth, height: innerHeight, offsetTop: 0, offsetLeft: 0, pageTop: 0, pageLeft: 0, scale: 1 });
