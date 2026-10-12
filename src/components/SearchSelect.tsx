@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 export function SearchSelect({
@@ -28,6 +28,7 @@ export function SearchSelect({
 }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  const listId = useId();
   const list = useMemo(() => {
     const s = q.trim().toLocaleLowerCase("tr");
     return options.filter((o) => {
@@ -44,6 +45,14 @@ export function SearchSelect({
       <div className="relative">
         <input
           disabled={disabled}
+          role="combobox"
+          aria-expanded={open && !disabled}
+          aria-controls={open && !disabled ? listId : undefined}
+          aria-autocomplete="list"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="done"
           value={open ? q : value}
           placeholder={placeholder ?? "Seçiniz veya yazın..."}
           onFocus={() => {
@@ -56,12 +65,23 @@ export function SearchSelect({
             setQ(e.target.value);
             setOpen(true);
           }}
+          onKeyDown={(e) => {
+            // First Escape closes the list; FilterSheet ignores handled keys, so only the next one closes the sheet.
+            if (e.key === "Escape" && open) {
+              e.preventDefault();
+              e.stopPropagation();
+              setOpen(false);
+            }
+          }}
           onBlur={() => window.setTimeout(() => setOpen(false), 160)}
           className="flt-input pe-9 disabled:cursor-not-allowed disabled:opacity-50"
         />
         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink" />
         {open && !disabled && (
-          <ul className="absolute z-30 mt-1 max-h-52 w-full overflow-auto rounded-xl border border-line bg-card py-1 shadow-md">
+          <ul
+            id={listId}
+            className="flt-ss-list absolute z-30 mt-1 max-h-52 w-full overflow-auto overscroll-contain rounded-xl border border-line bg-card py-1 shadow-md"
+          >
             {anyLabel ? (
               <li>
                 <button
