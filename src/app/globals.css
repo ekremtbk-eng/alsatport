@@ -5154,6 +5154,7 @@ html[data-device="desktop"] .browse-filter-btn {
   background: var(--color-elev);
 }
 .filter-sheet {
+  top: 0;
   left: 0;
   right: 0;
   width: 100%;
@@ -5161,6 +5162,45 @@ html[data-device="desktop"] .browse-filter-btn {
   max-height: 100svh;
   overscroll-behavior: none;
   touch-action: none;
+}
+.filter-sheet:focus {
+  outline: none;
+}
+/* iOS Safari zooms the whole page when a focused field is under 16px; that zoom shifted and cropped the sheet. */
+@media (hover: none) and (pointer: coarse) {
+  .filter-sheet :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
+    font-size: 16px;
+  }
+}
+/* Keyboard up (FilterSheet sets .is-kb): every pixel goes to the scrolling fields; the actions return when it closes. */
+.filter-sheet.is-kb .filter-sheet-foot,
+.filter-sheet.is-kb .adv-foot,
+.filter-sheet.is-kb .filter-sheet-card::before {
+  display: none;
+}
+.filter-sheet.is-kb .filter-sheet-card {
+  padding-top: 0;
+  border-radius: 0;
+}
+.filter-sheet.is-kb .flt-ss-list {
+  max-height: min(13rem, calc(var(--sheet-h, 100svh) - 7rem));
+}
+@media (max-height: 480px) {
+  .filter-sheet .filter-sheet-card::before {
+    display: none;
+  }
+  .filter-sheet .filter-sheet-card .filter-head {
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+  }
+  .filter-sheet .filter-sheet-foot {
+    padding-top: 0.45rem;
+    padding-bottom: calc(0.45rem + env(safe-area-inset-bottom, 0px));
+  }
+  .filter-sheet .filter-sheet-foot .acil-search-btn,
+  .filter-sheet .filter-sheet-foot .flt-clear-btn {
+    min-height: 2.6rem;
+  }
 }
 .filter-sheet-backdrop {
   border: 0;
