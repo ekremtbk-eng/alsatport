@@ -58,6 +58,7 @@ export function ListingCard({
           }}
           className="hp-card-fav"
           aria-label={t("common.favorite")}
+          aria-pressed={liked}
         >
           <Heart className={`h-4 w-4 ${liked ? "fill-lime text-lime" : ""}`} />
         </button>
@@ -94,6 +95,7 @@ export function ListingCard({
         }}
         className="lux-listing-fav"
         aria-label={t("common.favorite")}
+        aria-pressed={liked}
       >
         <Heart className={`h-4 w-4 ${liked ? "fill-lime text-lime" : ""}`} />
       </button>

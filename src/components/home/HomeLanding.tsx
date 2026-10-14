@@ -12,7 +12,7 @@ import { findCategory, listingMatchesCategory } from "@/data/categories";
 import { isPublicListing } from "@/lib/categoryCounts";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { HomeDesktopLayout } from "@/components/home/HomeDesktopLayout";
-import { MobileCategoryHome } from "@/components/home/MobileCategoryHome";
+import { MobileHome } from "@/components/home/MobileHome";
 
 function listingInHomeTab(listing: { categoryId: string }, tabId: string) {
   if (!tabId) return true;
@@ -167,7 +167,7 @@ export function HomeLanding() {
   return (
     <div className="hp">
       <div className="home-phone-only">
-        <MobileCategoryHome />
+        <MobileHome />
       </div>
       <div className="home-desk-only">{deskHome}</div>
     </div>
