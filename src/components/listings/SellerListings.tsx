@@ -6,7 +6,8 @@ import type { Listing } from "@/data/store";
 import { useApp } from "@/context/AppContext";
 import { useI18n } from "@/context/I18nContext";
 import { remainingState } from "@/lib/listingQuota";
-import { posterSupported } from "@/lib/poster";
+import { posterAvailable } from "@/lib/poster";
+import { postListingHref } from "@/lib/profile";
 
 type Tab = "active" | "pending" | "expired" | "passive" | "sold";
 const TABS: { id: Tab; key: string }[] = [
@@ -59,7 +60,7 @@ export function SellerListings({ rounded = "rounded-xl" }: { rounded?: string })
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap gap-2" role="tablist">
+      <div className="my-tabs mb-4 flex flex-wrap gap-2" role="tablist">
         {TABS.map((x) => {
           const n = mine.filter((l) => inTab(l, x.id)).length;
           return (
@@ -68,7 +69,10 @@ export function SellerListings({ rounded = "rounded-xl" }: { rounded?: string })
               type="button"
               role="tab"
               aria-selected={tab === x.id}
-              onClick={() => setTab(x.id)}
+              onClick={(e) => {
+                setTab(x.id);
+                e.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+              }}
               className={`chip ${tab === x.id ? "chip-on" : ""}`}
             >
               {t(x.key)}
@@ -87,7 +91,7 @@ export function SellerListings({ rounded = "rounded-xl" }: { rounded?: string })
           const rem = l.status === "active" ? remainingState(l.expiresAt) : null;
           const pending = busy === l.id;
           return (
-            <div key={l.id} className={`flex flex-col gap-3 ${rounded} border border-line bg-card p-2 sm:flex-row`}>
+            <div key={l.id} className={`my-card flex flex-col gap-3 ${rounded} border border-line bg-card p-2 sm:flex-row`} data-status={l.status}>
               <div className="flex min-w-0 flex-1 gap-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={l.images[0]} alt="" className="h-20 w-24 shrink-0 rounded-xl object-cover" />
@@ -121,7 +125,7 @@ export function SellerListings({ rounded = "rounded-xl" }: { rounded?: string })
                   ) : null}
                 </div>
               </div>
-              <div className="flex flex-wrap items-start gap-1.5 sm:max-w-[13rem] sm:justify-end">
+              <div className="my-actions flex flex-wrap items-start gap-1.5 sm:max-w-[13rem] sm:justify-end">
                 {l.status === "expired" ? (
                   <button type="button" disabled={pending} onClick={() => void republish(l.id)} className={`${chip} bg-lime text-white`}>
                     {t("my.republish")}
@@ -175,7 +179,7 @@ export function SellerListings({ rounded = "rounded-xl" }: { rounded?: string })
                     {t("common.edit")}
                   </Link>
                 ) : null}
-                {l.status === "active" && posterSupported(l) ? (
+                {l.status === "active" && posterAvailable(l) ? (
                   <Link href={`/ilan/${l.id}?afis=1`} className={`${chip} bg-lime/10 text-lime`}>
                     {t("poster.short")}
                   </Link>
@@ -194,7 +198,16 @@ export function SellerListings({ rounded = "rounded-xl" }: { rounded?: string })
             </div>
           );
         })}
-        {rows.length === 0 ? <p className="dash-empty">{t(EMPTY[tab])}</p> : null}
+        {rows.length === 0 ? (
+          <div className="my-empty">
+            <p className="dash-empty">{t(EMPTY[tab])}</p>
+            {tab === "active" ? (
+              <Link href={postListingHref(user)} className="btn-primary my-empty-cta">
+                {t("nav.post")}
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );

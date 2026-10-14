@@ -8,6 +8,7 @@ import { useApp } from "@/context/AppContext";
 import { useAuthModal } from "@/context/AuthModalContext";
 import { useI18n } from "@/context/I18nContext";
 import { postListingHref } from "@/lib/profile";
+import { SellerAvatar } from "./SellerAvatar";
 
 export function UserMenu({ utility = false }: { utility?: boolean }) {
   const { user, logout, hydrated } = useApp();
@@ -52,8 +53,7 @@ export function UserMenu({ utility = false }: { utility?: boolean }) {
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={user.avatar} alt="" className="h-7 w-7 rounded-full object-cover" />
+        <SellerAvatar src={user.avatar} name={user.displayName || user.username} className="user-menu-avatar h-7 w-7 rounded-full object-cover" />
         <span className="user-menu-name max-w-[9rem] truncate text-sm font-medium">
           {user.displayName}
         </span>
