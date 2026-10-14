@@ -7,6 +7,7 @@ import { applyListingWatermark } from "@/lib/storage/listingWatermark";
 import {
   MAX_UPLOAD_BYTES,
   deleteStoredObject,
+  isHeifBytes,
   isManagedStorageKey,
   putListingImage,
   sniffImage,
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
   const buf = Buffer.from(await file.arrayBuffer());
   const sniff = sniffImage(buf);
   if (!sniff) {
-    return NextResponse.json({ ok: false, error: "photo.only" }, { status: 400 });
+    return NextResponse.json({ ok: false, error: isHeifBytes(buf) ? "photo.err.heic" : "photo.only" }, { status: 400 });
   }
 
   let processed: Awaited<ReturnType<typeof applyListingWatermark>>;

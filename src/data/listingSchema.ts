@@ -434,11 +434,7 @@ function vehicleFields(segment: VehicleSegment = "auto", profile: VehicleProfile
       f("charge", "Hızlı şarj süresi", "select", { options: FAST_CHARGE, specLabel: "Şarj" }),
     );
   }
-  fields.push(f("year", "Yıl", "select", {
-    options: years,
-    required: true,
-    dependsOn: skipBody ? "engine" : "body",
-  }));
+  fields.push(f("year", "Yıl", "select", { options: years, required: true }));
   if (!skipKm) fields.push(f("km", "Kilometre", "number", { required: true, specLabel: "Km" }));
   if (!skipGear) {
     fields.push(

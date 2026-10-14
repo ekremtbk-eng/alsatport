@@ -9,7 +9,16 @@ import { canPublishListing, expiresAtForUser, listingIsPromoted, remainingListin
 import { entitlementsChanged, reconcileEntitlements } from "@/lib/entitlements";
 import { saveUser } from "@/lib/security/userStore";
 import { lookupCategory } from "@/data/categories";
-import { createListing, fillMissingListingCoords, hideSellerPhone, parseListingInput, queryListings } from "@/lib/listings/store";
+import {
+  createListing,
+  fillMissingListingCoords,
+  findOwnDraftListing,
+  hideSellerPhone,
+  parseListingInput,
+  queryListings,
+} from "@/lib/listings/store";
+import type { Listing } from "@/data/store";
+import type { StoredUser } from "@/lib/security/userStore";
 import { notifyListingEvent } from "@/lib/listings/lifecycle";
 import { parseSearch, readJson } from "@/lib/security/parseBody";
 import { listingCreateBodySchema, listingQuerySchema } from "@/lib/security/schemas";
@@ -76,6 +85,14 @@ export async function POST(req: Request) {
   if (!isProfileComplete(auth.user.profile)) {
     return NextResponse.json({ ok: false, error: "auth.err.forbidden" }, { status: 403 });
   }
+  const parsedBody = await readJson(req, listingCreateBodySchema);
+  if (!parsedBody.ok) return parsedBody.response;
+  const body = parsedBody.data as Record<string, unknown>;
+
+  // A repeated publish of the same draft must not cost another slot or hit the quota wall.
+  const already = await findOwnDraftListing(auth.user, parsedBody.data.id);
+  if (already) return publishedResponse(auth.user.profile, already, 0);
+
   const limited = await throttle([{ key: `listing:${auth.user.id}`, limit: LIMITS.listing.limit, windowMs: LIMITS.listing.windowMs }], req);
   if (!limited.ok) {
     return NextResponse.json(
@@ -88,9 +105,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "quota.exhausted" }, { status: 402 });
   }
 
-  const parsedBody = await readJson(req, listingCreateBodySchema);
-  if (!parsedBody.ok) return parsedBody.response;
-  const body = parsedBody.data as Record<string, unknown>;
   const parsed = parseListingInput(body, undefined, await approvedVehicles());
   if ("error" in parsed) {
     return NextResponse.json({ ok: false, error: parsed.error }, { status: 400 });
@@ -105,24 +119,29 @@ export async function POST(req: Request) {
   if ("error" in created) {
     return NextResponse.json({ ok: false, error: created.error }, { status: "status" in created ? created.status : 400 });
   }
+  if (created.duplicate) return publishedResponse(auth.user.profile, created.listing, 0);
   if (created.listing.lat == null) {
     const listingId = created.listing.id;
     after(() => fillMissingListingCoords(listingId).catch(() => undefined));
   }
   const ref = created.ref;
   after(() => notifyListingEvent(ref, "listing.published"));
+  return publishedResponse(auth.user.profile, created.listing, 1);
+}
 
-  const posted = (auth.user.profile.listingsPosted ?? 0) + 1;
+function publishedResponse(profile: StoredUser["profile"], listing: Listing, added: 0 | 1) {
+  const posted = (profile.listingsPosted ?? 0) + added;
   return NextResponse.json({
     ok: true,
-    listing: created.listing,
-    id: created.listing.id,
-    title: created.listing.title,
-    description: created.listing.description,
-    expiresAt: created.listing.expiresAt,
-    featured: created.listing.featured,
-    vip: created.listing.vip,
+    listing,
+    id: listing.id,
+    title: listing.title,
+    description: listing.description,
+    expiresAt: listing.expiresAt,
+    featured: listing.featured,
+    vip: listing.vip,
     listingsPosted: posted,
-    remaining: remainingListingSlots({ ...auth.user.profile, listingsPosted: posted }),
+    remaining: remainingListingSlots({ ...profile, listingsPosted: posted }),
+    ...(added ? {} : { duplicate: true }),
   });
 }

@@ -171,6 +171,8 @@ export const listingQuerySchema = z.object({
 /** Identity, numbering, lifetime and promotion flags are always assigned on the server. */
 export const listingCreateBodySchema = z
   .object({
+    /** Client-made per-draft id: a repeated publish (double tap, lost response, retry) returns the same listing. */
+    id: z.string().uuid().optional(),
     title: z.string().min(1, "auth.err.required").max(200),
     subtitle: z.string().max(200).optional(),
     description: z.string().max(12000).optional().default(""),

@@ -17,7 +17,11 @@ export function FeatureGrid({
   return (
     <div className="feat-stack">
       {groups.map((group) => (
-        <section key={group.id} className="feat-box">
+        <section
+          key={group.id}
+          className="feat-box"
+          data-selected={readOnly ? group.items.filter((item) => set.has(item)).length : undefined}
+        >
           <h3 className="feat-box-h">{group.title}</h3>
           <ul className="feat-grid">
             {group.items.map((item) => {
