@@ -5,6 +5,7 @@ import { Minus, Send, X } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import type { Listing } from "@/data/store";
 import { VerifiedBadge } from "./VerifiedBadge";
+import { SellerAvatar } from "./SellerAvatar";
 import { useI18n } from "@/context/I18nContext";
 import { useAuthModal } from "@/context/AuthModalContext";
 import { isUuid } from "@/lib/ids";
@@ -95,8 +96,7 @@ export function SellerChatPopup({
           onClick={() => setMinimized(false)}
           className="chat-dock flex w-full items-center gap-3 rounded-2xl bg-panel px-3 py-2.5 text-start"
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={listing.sellerAvatar} alt="" className="h-9 w-9 rounded-full object-cover" />
+          <SellerAvatar src={listing.sellerAvatar} name={listingSellerLabel(listing)} className="h-9 w-9 rounded-full object-cover" />
           <span className="min-w-0 flex-1 truncate text-sm font-semibold">
             {listingSellerLabel(listing)}
           </span>
@@ -106,8 +106,7 @@ export function SellerChatPopup({
       ) : (
         <div className="chat-dock overflow-hidden rounded-3xl bg-panel">
           <div className="flex items-center gap-2 border-b border-line bg-elev/80 px-3 py-2.5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={listing.sellerAvatar} alt="" className="h-9 w-9 rounded-full object-cover" />
+            <SellerAvatar src={listing.sellerAvatar} name={listingSellerLabel(listing)} className="h-9 w-9 rounded-full object-cover" />
             <div className="min-w-0 flex-1">
               <p className="flex items-center gap-1.5 text-sm font-bold">
                 {listingSellerLabel(listing)}

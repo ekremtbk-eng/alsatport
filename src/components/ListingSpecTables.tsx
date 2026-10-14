@@ -151,7 +151,10 @@ export function ListingSpecTables({
       ) : null}
 
       {schema.groups.length > 0 ? (
-        <section>
+        <section
+          className="feat-section"
+          data-selected={schema.groups.flatMap((g) => g.items).filter((item) => listing.features?.includes(item)).length}
+        >
           <h2 className="spec-card-h mb-3">
             {schema.family === "vasita" ? "Donanım listesi" : schema.family === "hizmet" ? "Hizmet özellikleri" : "Özellikler"}
           </h2>

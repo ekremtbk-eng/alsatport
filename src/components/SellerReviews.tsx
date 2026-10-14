@@ -97,7 +97,7 @@ export function SellerReviews({
               onChange={(e) => setText(e.target.value)}
               rows={4}
               placeholder={mine ? t("rev.phUp") : t("rev.ph")}
-              className="w-full rounded-xl border border-line bg-panel px-3 py-3 text-sm"
+              className="seller-review-text w-full rounded-xl border border-line bg-panel px-3 py-3 text-sm"
             />
             {hint && (
               <p className={`text-xs ${hint === "rev.ok" || hint === "rev.ok2" ? "text-lime" : "text-orange"}`}>

@@ -8,12 +8,15 @@ import {
   EyeOff,
   Flag,
   Heart,
+  MapPin,
   MessageCircle,
   Phone,
   PhoneCall,
 } from "lucide-react";
 import { getSellerPhone, maskPhone, phoneToTel, type Listing } from "@/data/store";
-import { schemaForCategoryId } from "@/data/listingSchema";
+import { highlightSpecs, schemaForCategoryId } from "@/data/listingSchema";
+import { withDeclaredDistance } from "@/data/kktcVehicle";
+import { SellerAvatar } from "@/components/SellerAvatar";
 import { ListingSpecTables } from "@/components/ListingSpecTables";
 import { placeLabel } from "@/data/locations";
 import { isRightHandDrive } from "@/data/kktcVehicle";
@@ -40,7 +43,7 @@ import { ReportListingDialog } from "@/components/listing/ReportListingDialog";
 import { prefetchRegion } from "@/lib/regionClient";
 import { ListingPrintButton, ListingPrintSheet } from "@/components/listing/ListingPrint";
 import { ListingPosterButton, ListingPosterDialog } from "@/components/listing/ListingPoster";
-import { posterSupported } from "@/lib/poster";
+import { posterAvailable } from "@/lib/poster";
 import { listingSellerLabel } from "@/lib/publicName";
 import { ListingDescriptionPanel } from "@/components/listing/ListingDescriptionPanel";
 import { apiGet } from "@/lib/security/client";
@@ -50,10 +53,11 @@ import { isClassifiedPartsListing, listingCategoryChain } from "@/lib/listingFac
 import { BreadcrumbNav } from "@/components/BreadcrumbNav";
 import { PublishNotifCard } from "@/components/listing/PublishNotifCard";
 import { hrefForCategory } from "@/data/categories";
+import { isUuid } from "@/lib/ids";
 
 export function ListingDetailClient({ initialListing }: { initialListing?: Listing }) {
   const { id } = useParams<{ id: string }>();
-  const { listings, favorites, toggleFavorite, user } = useApp();
+  const { listings, favorites, toggleFavorite, user, startConversation } = useApp();
   const { formatMoney, t } = useI18n();
   const { requireAuth } = useAuthModal();
   const rawId = typeof id === "string" ? id : "";
@@ -72,6 +76,8 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
   const [detailTab, setDetailTab] = useState<"info" | "desc" | "region">("info");
   const [reportHint, setReportHint] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
+  const [chatHint, setChatHint] = useState("");
+  const [chatBusy, setChatBusy] = useState(false);
   const closeReport = useCallback(() => setReportOpen(false), []);
   const router = useRouter();
 
@@ -97,6 +103,12 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
   useEffect(() => {
     setShowPhone(false);
   }, [rawId]);
+
+  useEffect(() => {
+    if (!chatHint) return;
+    const timer = window.setTimeout(() => setChatHint(""), 3200);
+    return () => window.clearTimeout(timer);
+  }, [chatHint]);
 
   useEffect(() => {
     if (listing && isServiceListing(listing)) {
@@ -155,11 +167,27 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
     return call();
   }
 
-  function openChat() {
+  async function openChat() {
     if (!requireAuth("member")) return;
     const gate = gatePath(user);
     if (gate && gate !== "/giris") {
       router.push(gate);
+      return;
+    }
+    if (!listing) return;
+    if (user?.id === listing.sellerId) {
+      setChatHint(t("chat.own"));
+      return;
+    }
+    setChatHint("");
+    // Phones and tablets get the full-screen conversation, which stays above the on-screen keyboard.
+    if (isUuid(listing.id) && window.matchMedia("(max-width: 1023px)").matches) {
+      if (chatBusy) return;
+      setChatBusy(true);
+      const id = await startConversation(listing);
+      setChatBusy(false);
+      if (id) router.push(`/mesajlar/${id}`);
+      else setChatHint(t("chat.startFailed"));
       return;
     }
     setChatOpen(true);
@@ -177,7 +205,14 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
     setReportOpen(true);
   }
 
-  const canPoster = posterSupported(listing) && !isClassifiedPartsListing(listing.categoryId);
+  const canPoster = posterAvailable(listing);
+  const place = placeLabel(listing.city, listing.district, " / ");
+  const keyFacts = highlightSpecs(withDeclaredDistance(listing.specs ?? []), schema.family).slice(0, 3);
+  const chatToast = chatHint ? (
+    <p className="share-toast is-warn" role="status">
+      {chatHint}
+    </p>
+  ) : null;
 
   const contact = (
     <>
@@ -191,8 +226,11 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
       />
       <div className="mt-2 flex gap-2">
         <button
+          type="button"
           onClick={fav}
           className="hidden h-12 w-12 place-items-center rounded-xl border border-line md:grid"
+          aria-pressed={liked}
+          aria-label={liked ? t("fav.remove") : t("fav.add")}
         >
           <Heart className={liked ? "h-5 w-5 fill-lime text-lime" : "h-5 w-5"} />
         </button>
@@ -205,7 +243,7 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
           imageUrl={listing.images[0]}
           description={listing.description}
         />
-        <button onClick={openChat} className="btn-primary h-12 flex-1">
+        <button type="button" onClick={() => void openChat()} className="btn-primary h-12 flex-1">
           <MessageCircle className="relative z-10 h-4 w-4" />
           <span className="relative z-10">{t("list.msg")}</span>
         </button>
@@ -272,17 +310,18 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
           detailTab={detailTab}
           reportHint={reportHint}
           onFav={fav}
-          onChat={openChat}
+          onChat={() => void openChat()}
           onTogglePhone={togglePhone}
           onReport={user?.id === listing.sellerId ? undefined : reportListing}
           onTab={setDetailTab}
           formatMoney={formatMoney}
         />
+        {chatToast}
         <ListingContactBar
           phone={phone}
           maskedPhone={maskPhone(phone)}
           telHref={revealed ? phoneToTel(revealed) : "#"}
-          onMessage={openChat}
+          onMessage={() => void openChat()}
           onRevealPhone={() => {
             if (!requireAuth("member")) return false;
             void revealPhone();
@@ -306,7 +345,7 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
 
   return (
     <div className="detail-page mx-auto max-w-6xl pb-8">
-      <div className="px-4 pt-3">
+      <div className="detail-crumbs px-4 pt-3">
         <BreadcrumbNav
           items={[
             { href: "/", label: t("nav.home") },
@@ -319,7 +358,9 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
           ]}
         />
       </div>
-      <CompareToolbar listing={listing} />
+      <div className="detail-compare is-top">
+        <CompareToolbar listing={listing} />
+      </div>
       <div className="detail-hero relative">
         <ListingGallery images={listing.images} alt={listing.title} />
         <button
@@ -338,8 +379,12 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
             description={listing.description}
           />
           <button
+            type="button"
             onClick={fav}
             className="grid h-9 w-9 place-items-center rounded-full bg-black/50"
+            aria-pressed={liked}
+            aria-label={liked ? t("fav.remove") : t("fav.add")}
+            data-fav-toggle
           >
             <Heart className={`h-5 w-5 ${liked ? "fill-lime text-lime" : "text-white"}`} />
           </button>
@@ -361,21 +406,31 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
           <h1 className="text-xl font-extrabold text-ink md:text-2xl">{listing.title}</h1>
           <p className="text-sm text-muted">{listing.subtitle}</p>
           <p className="price-text mt-2 text-2xl font-extrabold">{formatMoney(listing.price, listing.currency)}</p>
-          <div className="mt-3 lg:hidden">
-            <ListingShareTrigger
-              variant="banner"
-              listingId={listing.id}
-              title={listing.title}
-              priceLabel={formatMoney(listing.price, listing.currency)}
-              imageUrl={listing.images[0]}
-              description={listing.description}
-            />
-            {canPoster ? <ListingPosterButton variant="block" onClick={() => setPosterOpen(true)} /> : null}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted">
+          {place ? (
+            <p className="detail-m-place">
+              <MapPin className="h-4 w-4 shrink-0" aria-hidden />
+              {place}
+            </p>
+          ) : null}
+          {keyFacts.length ? (
+            <ul className="detail-keyfacts" aria-label={t("loc.tab.details")}>
+              {keyFacts.map((s) => (
+                <li key={s.label}>
+                  <strong>{s.value}</strong>
+                  <span>{s.label}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {canPoster ? (
+            <div className="mt-3 lg:hidden">
+              <ListingPosterButton variant="block" onClick={() => setPosterOpen(true)} />
+            </div>
+          ) : null}
+          <div className="detail-meta mt-2 flex flex-wrap gap-3 text-xs text-muted">
             <span>No: {listing.listingNo}</span>
             <span>{listing.createdAt}</span>
-            <span>{placeLabel(listing.city, listing.district, " / ")}</span>
+            <span className="detail-meta-place">{place}</span>
             {isRightHandDrive(listing.specs) ? <span className="rhd-badge is-inline">{t("kktc.rhd")}</span> : null}
             {user?.id !== listing.sellerId ? (
               <button type="button" className="inline-flex items-center gap-1 font-semibold text-orange" onClick={reportListing}>
@@ -385,7 +440,6 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
             ) : null}
           </div>
           {reportHint ? <p className="mt-1 text-xs font-semibold text-lime">{reportHint}</p> : null}
-
           <div className="detail-tabs">
             <button
               type="button"
@@ -422,13 +476,15 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
           <div hidden={detailTab !== "info"}>
             <ListingSpecTables listing={listing} schema={schema} />
           </div>
+          <div className="detail-compare is-low">
+            <CompareToolbar listing={listing} />
+          </div>
         </div>
 
         <aside className="detail-aside">
           <section className="rounded-xl border border-line bg-card p-3 shadow-sm">
             <div className="flex items-start gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={listing.sellerAvatar} alt="" className="h-12 w-12 rounded-full object-cover" />
+              <SellerAvatar src={listing.sellerAvatar} name={listingSellerLabel(listing)} className="h-12 w-12 rounded-full object-cover" />
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5 font-semibold text-ink">
                   {listingSellerLabel(listing)}
@@ -464,7 +520,7 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
         phone={phone}
         maskedPhone={maskPhone(phone)}
         telHref={revealed ? phoneToTel(revealed) : "#"}
-        onMessage={openChat}
+        onMessage={() => void openChat()}
         onRevealPhone={() => {
           if (!requireAuth("member")) return false;
           void revealPhone();
@@ -480,6 +536,7 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
         }}
       />
 
+      {chatToast}
       <SellerChatPopup listing={listing} open={chatOpen} onClose={() => setChatOpen(false)} />
       <ListingPrintSheet listing={listing} mode="standard" formatMoney={formatMoney} />
       {canPoster ? (
