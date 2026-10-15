@@ -54,7 +54,7 @@ export async function POST(req: Request, ctx: Ctx) {
         select: {
           bannedAt: true,
           profile: { select: { phone: true, phoneVerifiedAt: true } },
-          business: { select: { status: true, showPhone: true } },
+          business: { select: { showPhone: true } },
         },
       },
     },

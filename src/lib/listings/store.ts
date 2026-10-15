@@ -71,9 +71,12 @@ export async function sellerCanUseUrgent(userId: string) {
   return sellerUrgentEligible(seller);
 }
 
-/** An approved store that turned its phone off hides the owner's number on every listing and reveal path. */
-export function storeHidesPhone(business: { status: string; showPhone: boolean } | null | undefined) {
-  return business?.status === "approved" && !business.showPhone;
+/**
+ * A store that turned its phone off hides the owner's number on every listing and reveal path, whatever its
+ * status: the choice outlives a revocation, re-application or rejection. Sellers without a store row are unaffected.
+ */
+export function storeHidesPhone(business: { showPhone: boolean } | null | undefined) {
+  return !!business && !business.showPhone;
 }
 
 function storeRef(business: StoreRow | null | undefined): Listing["store"] {

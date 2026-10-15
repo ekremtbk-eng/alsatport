@@ -6,7 +6,9 @@
  * For each store category (= business type) with the four company types rotated: apply → admin approve → listing →
  * store page, listing detail card, listing API ref, owner panel + display preferences, phone privacy (listing hint,
  * reveal API, detail/store HTML) with the store phone on, off and on again → /magazalar; then unauthorized phone
- * reveal / preference attempts and an individual seller whose phone flow must stay unchanged.
+ * reveal / preference attempts and an individual seller whose phone flow must stay unchanged. Finally two hidden-phone
+ * stores are revoked (and one re-applies and is rejected): the number must stay hidden, while a seller whose rejected
+ * application kept the default preferences still reveals as before.
  * Creates throw-away users (`*@typetest.invalid`) and removes them, their stores, listings and uploads at the end.
  */
 import { randomBytes } from "node:crypto";
@@ -136,6 +138,7 @@ async function uploadImage(s: Sess, kind: "logo" | "cover") {
   form.append("file", new Blob([new Uint8Array(bytes)], { type: "image/png" }), `${kind}.png`);
   form.append("kind", kind);
   const r = await send("POST", "/api/account/business/media", s, form);
+  if (!r.json.url) console.log(`      ${kind} upload failed — status ${r.status} ${String(r.json.error ?? r.text.slice(0, 120))}`);
   return String(r.json.url ?? "");
 }
 
@@ -356,6 +359,94 @@ async function main() {
     const r = await call("GET", "/magazalar", null);
     const absent = names.filter((n) => !r.text.includes(n));
     check("M1", `All ${names.length} type stores listed on /magazalar`, r.status === 200 && absent.length === 0, absent.join(", "));
+
+    // ---------- Phone preference survives revocation / rejection ----------
+    for (const [cat, how] of [[types[1], "revoked"], [types[2], "rejected"]] as const) {
+      const l = await prisma.listing.findFirst({ where: { title: `Typetest ilan ${cat.id} ${TAG}` }, select: { id: true, sellerId: true } });
+      const b = l && (await prisma.businessAccount.findUnique({ where: { userId: l.sellerId }, select: { id: true, slug: true } }));
+      const p = l && (await prisma.profile.findUnique({ where: { userId: l.sellerId }, select: { phone: true } }));
+      if (!l || !b || !p?.phone) {
+        check(`L.${how}`, `Fixture for the ${how} store`, false, "missing listing / store / phone");
+        continue;
+      }
+      let lr = await call("POST", `/api/admin/business/${b.id}`, sAdmin, { action: "revoke", reason: "Yerel test iptali" });
+      let ok = lr.status === 200;
+      if (how === "rejected") {
+        // Rejection only applies to pending applications: a revoked store re-applies and keeps its saved preferences.
+        await prisma.businessAccount.update({ where: { id: b.id }, data: { status: "pending" } });
+        lr = await call("POST", `/api/admin/business/${b.id}`, sAdmin, { action: "reject", reason: "Yerel test reddi" });
+        ok = ok && lr.status === 200;
+      }
+      const row = await prisma.businessAccount.findUnique({ where: { id: b.id }, select: { status: true, showPhone: true } });
+      check(`L.${how}`, `Admin moves the hidden-phone store to ${how}; preference kept`, ok && row?.status === how && row.showPhone === false, `status ${lr.status} ${row?.status}`);
+
+      const masked = `${p.phone.slice(0, 4)} *** ** ${p.phone.slice(-2)}`;
+      const page = cat.id === "services" ? `/ustalar-hizmetler/firma/${l.id}` : `/ilan/${l.id}`;
+      const [one, list, detail] = await Promise.all([
+        call("GET", `/api/listings/${l.id}`, null),
+        call("GET", `/api/listings?sellerId=${l.sellerId}`, null),
+        call("GET", page, null),
+      ]);
+      const mine = ((list.json.listings as Record<string, unknown>[] | undefined) ?? []).find((x) => x.id === l.id);
+      check(
+        `L.${how}.hint`,
+        `${how} store: listing APIs + detail HTML carry neither number nor hint`,
+        one.status === 200 && !(one.json.listing as Record<string, unknown> | undefined)?.sellerPhone && !!mine && !mine.sellerPhone &&
+          detail.status === 200 && ![one.text, list.text, detail.text].some((t) => t.includes(p.phone!) || t.includes(masked)),
+        `listing ${one.status} detail ${detail.status}`,
+      );
+      lr = await call("POST", `/api/listings/${l.id}/phone`, sOther, {});
+      check(`L.${how}.reveal`, `${how} store: member reveal refused`, lr.status === 404 && lr.json.error === "seller.nophone" && !lr.text.includes(p.phone), `status ${lr.status}`);
+      lr = await call("GET", `/magaza/${b.slug}`, null);
+      check(`L.${how}.store`, `${how} store page is no longer public`, lr.status === 404 && !lr.text.includes(p.phone), `status ${lr.status}`);
+    }
+
+    const appPhone = `55${String(Date.now()).slice(-8)}`;
+    const applicant = await makeUser("appl", "seller", appPhone);
+    await prisma.profile.update({ where: { userId: applicant.id }, data: { phoneVerifiedAt: new Date() } });
+    await prisma.businessAccount.create({
+      data: {
+        userId: applicant.id,
+        slug: `typetest-appl-${TAG}`,
+        status: "rejected",
+        rejectReason: "Yerel test reddi",
+        name: `Typetest başvuru ${TAG}`,
+        contactName: "Deneme Yetkili",
+        companyType: COMPANY_TYPES[0],
+        taxOffice: "Çankaya VD",
+        taxNumber: "1234567890",
+        categoryId: types[0].id,
+        city: "Ankara",
+        district: "Çankaya",
+        description: "Geçici yerel test başvurusu açıklaması.",
+        email: `appl-${TAG}@${DOMAIN}`,
+        phone: "0312 555 00 00",
+      },
+    });
+    const appListing = await prisma.listing.create({
+      data: {
+        listingNo: `TTA${Date.now()}`,
+        sellerId: applicant.id,
+        categoryId: indListing.categoryId,
+        title: `Typetest başvuru ilanı ${TAG}`,
+        description: "Geçici yerel test ilanı.",
+        price: 600,
+        city: "Ankara",
+        district: "Çankaya",
+        status: "active",
+        postedAt: new Date(),
+        expiresAt: new Date(Date.now() + 30 * 864e5),
+      },
+    });
+    ir = await call("GET", `/api/listings/${appListing.id}`, null);
+    const appHint = String((ir.json.listing as Record<string, unknown> | undefined)?.sellerPhone ?? "");
+    const appReveal = await call("POST", `/api/listings/${appListing.id}/phone`, sOther, {});
+    check(
+      "I4",
+      "Seller with a rejected application and default preferences: hint + reveal unchanged",
+      appHint.endsWith(appPhone.slice(-2)) && appReveal.status === 200 && appReveal.json.phone === appPhone,
+      `hint=${appHint} status ${appReveal.status}`,
+    );
   } finally {
     const tagged = await prisma.user.findMany({ where: { email: { endsWith: `-${TAG}@${DOMAIN}` } }, select: { id: true } });
     const ids = tagged.map((u) => u.id);

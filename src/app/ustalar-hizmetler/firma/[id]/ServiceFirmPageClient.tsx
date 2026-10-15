@@ -17,25 +17,38 @@ export function ServiceFirmPageClient() {
   const router = useRouter();
   const rawId = typeof id === "string" ? decodeURIComponent(id) : "";
   const cached = listings.find((l) => l.id === rawId);
-  const [fetched, setFetched] = useState<Listing | null>(null);
-  const listing = cached ?? fetched;
+  const skipFetch = !rawId || rawId.startsWith("d-") || rawId.startsWith("demo-");
+  const [result, setResult] = useState<{ id: string; listing: Listing | null } | null>(null);
+  const settled = skipFetch || result?.id === rawId;
+  const listing = cached ?? (result?.id === rawId ? result.listing : null);
 
   useEffect(() => {
-    if (!rawId || rawId.startsWith("d-") || rawId.startsWith("demo-")) return;
+    if (skipFetch) return;
     let cancelled = false;
-    void apiGet<{ listing?: Listing }>(`/api/listings/${encodeURIComponent(rawId)}`).then((res) => {
-      if (!cancelled && res.listing) setFetched(res.listing);
-    });
+    apiGet<{ listing?: Listing }>(`/api/listings/${encodeURIComponent(rawId)}`)
+      .then((res) => res.listing ?? null)
+      .catch(() => null)
+      .then((found) => {
+        if (!cancelled) setResult({ id: rawId, listing: found });
+      });
     return () => {
       cancelled = true;
     };
-  }, [rawId]);
+  }, [rawId, skipFetch]);
 
   useEffect(() => {
     if (listing && !isServiceListing(listing)) {
       router.replace(`/ilan/${listing.id}`);
     }
   }, [listing, router]);
+
+  if (!listing && !settled) {
+    return (
+      <p className="p-8 text-center text-sm text-muted" role="status" aria-live="polite" data-firm-loading>
+        {t("common.loading")}
+      </p>
+    );
+  }
 
   if (!listing) {
     return (
