@@ -32,7 +32,16 @@ import {
 import { type AuthResult } from "@/lib/auth";
 import { buildLiveCategoryCounts, shortcutCounts } from "@/lib/categoryCounts";
 import { isUuid } from "@/lib/ids";
-import { apiDelete, apiGet, apiPatch, apiPost, apiPut, getCsrfToken, resetCsrfToken } from "@/lib/security/client";
+import {
+  apiDelete,
+  apiGet,
+  apiPatch,
+  apiPost,
+  apiPut,
+  checkSession,
+  getCsrfToken,
+  resetCsrfToken,
+} from "@/lib/security/client";
 import { listingPatchForProfile, type ListingEntitlementPatch } from "@/lib/entitlements";
 import { usePathname } from "next/navigation";
 import { applyExpiryToListing } from "@/lib/listingQuota";
@@ -42,6 +51,8 @@ type AppState = {
   user: UserProfile | null;
   listings: Listing[];
   favorites: string[];
+  /** The signed-in user's favorites and inbox have been fetched at least once (or there is no user). */
+  inboxReady: boolean;
   conversations: Conversation[];
   reviews: SellerReview[];
   savedSearches: SavedSearch[];
@@ -89,6 +100,8 @@ type AppState = {
   setPlan: (plan: UserProfile["plan"]) => void;
   purchaseProduct: (product: "profesyonel" | "vip" | "doping") => Promise<{ ok: boolean; error?: string }>;
   refreshSession: () => Promise<UserProfile | null>;
+  /** Set while the session could not be confirmed for a temporary reason; the signed-in user is kept. */
+  sessionIssue: SessionIssue;
   startPaytrCheckout: (input: {
     product: "profesyonel" | "vip" | "doping";
     legalAccepted: boolean;
@@ -151,6 +164,10 @@ function capNotifs(list: AppNotification[]) {
 
 const SERVER_NOTIF_PREFIX = "srv:";
 
+export type SessionIssue = null | "rateLimit" | "unavailable";
+/** Short in-place retries (1 s, then 2 s) before falling back to one delayed re-check. */
+const SESSION_QUICK_RETRIES = 2;
+
 /** Server inbox replaces its previous copy; device-local alerts (price, search, nearby) stay as they are. */
 function mergeServerNotifs(prev: AppNotification[], server: AppNotification[]) {
   const local = prev.filter((n) => !n.id.startsWith(SERVER_NOTIF_PREFIX));
@@ -164,6 +181,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     process.env.NODE_ENV === "production" ? [] : seedListings,
   );
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [inboxUser, setInboxUser] = useState<string | null | undefined>(undefined);
   const [conversations, setConversations] = useState<Conversation[]>(() =>
     process.env.NODE_ENV === "production" ? [] : seedConversations,
   );
@@ -192,6 +210,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   searchesRef.current = savedSearches;
   favoritesRef.current = favorites;
   pricesRef.current = watchedPrices;
+  /** Favorite toggles not yet confirmed by the server; the periodic pull must not undo them. */
+  const favPending = useRef(new Map<string, boolean>());
+  const favQueue = useRef(new Map<string, Promise<unknown>>());
 
   const applyListingPatch = useCallback((sellerId: string, patch: ListingEntitlementPatch) => {
     setListings((prev) =>
@@ -207,26 +228,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
+  const [sessionIssue, setSessionIssue] = useState<SessionIssue>(null);
   const sessionInflight = useRef<Promise<UserProfile | null> | null>(null);
+  const sessionRetry = useRef<number | undefined>(undefined);
   const refreshSession = useCallback(async () => {
     if (sessionInflight.current) return sessionInflight.current;
     const job = (async () => {
       try {
-        const session = await apiGet<{
-          ok: boolean;
-          user: UserProfile | null;
-          listingPatch?: ListingEntitlementPatch;
-        }>("/api/auth/session");
-        const next = session.user ?? null;
-        setUser(next);
-        if (next) {
-          const patch = session.listingPatch ?? listingPatchForProfile(next);
-          applyListingPatch(next.id, patch);
+        for (let attempt = 0; ; attempt++) {
+          const check = await checkSession<{ user: UserProfile | null; listingPatch?: ListingEntitlementPatch }>();
+          if (check.kind === "ok" || check.kind === "signedOut") {
+            window.clearTimeout(sessionRetry.current);
+            setSessionIssue(null);
+            const next = check.kind === "ok" ? check.data.user : null;
+            setUser(next);
+            if (next && check.kind === "ok") {
+              applyListingPatch(next.id, check.data.listingPatch ?? listingPatchForProfile(next));
+            }
+            return next;
+          }
+          if (attempt < SESSION_QUICK_RETRIES) {
+            await new Promise((r) => window.setTimeout(r, Math.min(check.retryAfter || 1, 2 ** attempt) * 1000));
+            continue;
+          }
+          // Keep whoever is signed in; ask again once the server is reachable or the limit window has passed.
+          setSessionIssue(check.kind);
+          window.clearTimeout(sessionRetry.current);
+          const wait = Math.min(Math.max(check.retryAfter || 5, 2), 60) * 1000;
+          sessionRetry.current = window.setTimeout(() => void refreshSessionRef.current(), wait);
+          return userRef.current;
         }
-        return next;
-      } catch {
-        setUser(null);
-        return null;
       } finally {
         sessionInflight.current = null;
       }
@@ -234,6 +265,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     sessionInflight.current = job;
     return job;
   }, [applyListingPatch]);
+  useEffect(() => () => window.clearTimeout(sessionRetry.current), []);
   const refreshSessionRef = useRef(refreshSession);
   refreshSessionRef.current = refreshSession;
 
@@ -289,7 +321,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch {
-        if (!cancelled) setUser(null);
+        /* catalogue unavailable: the session was already settled above, keep it */
       }
       if (!cancelled) {
         setListings((prev) => prev.map((l) => applyExpiryToListing(l)));
@@ -401,25 +433,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!hydrated) return;
     if (!user) {
+      favPending.current.clear();
       setFavorites([]);
       setConversations(process.env.NODE_ENV === "production" ? [] : seedConversations);
+      setInboxUser(null);
       return;
     }
+    const uid = user.id;
     let cancelled = false;
     const pull = async () => {
       if (document.visibilityState === "hidden") return;
+      const failed = { ok: false as const };
       const [fav, inbox] = await Promise.all([
-        apiGet<{ ok?: boolean; listingIds?: string[] }>("/api/favorites"),
-        apiGet<{ ok?: boolean; conversations?: Conversation[] }>("/api/conversations"),
+        apiGet<{ ok?: boolean; listingIds?: string[] }>("/api/favorites").catch(() => failed),
+        apiGet<{ ok?: boolean; conversations?: Conversation[] }>("/api/conversations").catch(() => failed),
       ]);
       if (cancelled) return;
-      setFavorites(fav.listingIds ?? []);
-      setConversations((prev) => {
-        const api = inbox.conversations ?? [];
-        if (process.env.NODE_ENV === "production") return api;
-        const demo = prev.filter((c) => c.listingId && !isUuid(c.listingId));
-        return [...api, ...demo.filter((d) => !api.some((a) => a.id === d.id))];
-      });
+      if (fav.ok && Array.isArray(fav.listingIds)) {
+        const ids = new Set(fav.listingIds);
+        for (const [id, want] of favPending.current) {
+          if (want) ids.add(id);
+          else ids.delete(id);
+        }
+        setFavorites([...ids]);
+      }
+      if (inbox.ok && Array.isArray(inbox.conversations)) {
+        const api = inbox.conversations;
+        setConversations((prev) => {
+          if (process.env.NODE_ENV === "production") return api;
+          const demo = prev.filter((c) => c.listingId && !isUuid(c.listingId));
+          return [...api, ...demo.filter((d) => !api.some((a) => a.id === d.id))];
+        });
+      }
+      if (fav.ok || inbox.ok) setInboxUser(uid);
     };
     void pull();
     const timer = window.setInterval(() => void pull(), 10_000);
@@ -442,7 +488,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const res = await apiGet<{
         ok?: boolean;
         notifications?: (Omit<AppNotification, "kind"> & { kind: string })[];
-      }>("/api/notifications");
+      }>("/api/notifications").catch(() => ({ ok: false as const, notifications: undefined }));
       if (cancelled || !res.ok || !res.notifications) return;
       const server: AppNotification[] = res.notifications.map((n) => ({ ...n, kind: "system" }));
       setNotifications((prev) => mergeServerNotifs(prev, server));
@@ -746,29 +792,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       resetCsrfToken();
       void getCsrfToken();
     });
+    window.clearTimeout(sessionRetry.current);
+    setSessionIssue(null);
     setUser(null);
   }, []);
 
   const toggleFavorite = useCallback((id: string) => {
-    setFavorites((prev) => {
-      const liked = prev.includes(id);
-      const next = liked ? prev.filter((x) => x !== id) : [...prev, id];
-      if (userRef.current && isUuid(id)) {
-        const req = liked
-          ? apiDelete<{ ok?: boolean }>(`/api/favorites/${id}`)
-          : apiPost<{ ok?: boolean }>("/api/favorites", { listingId: id });
-        void req.then((res) => {
-          if (!res.ok) {
-            setFavorites((cur) => (liked ? [...new Set([...cur, id])] : cur.filter((x) => x !== id)));
-          }
-        });
-      }
-      return next;
+    const want = !(favPending.current.get(id) ?? favoritesRef.current.includes(id));
+    setFavorites((prev) => (want ? [...new Set([...prev, id])] : prev.filter((x) => x !== id)));
+    if (!userRef.current || !isUuid(id)) return;
+    favPending.current.set(id, want);
+    // Requests for one listing run in order, so a quick like → unlike cannot reach the server reversed.
+    const prev = favQueue.current.get(id) ?? Promise.resolve();
+    const run = prev
+      .then(() =>
+        want
+          ? apiPost<{ ok?: boolean }>("/api/favorites", { listingId: id })
+          : apiDelete<{ ok?: boolean }>(`/api/favorites/${id}`),
+      )
+      .catch(() => ({ ok: false }));
+    favQueue.current.set(id, run);
+    void run.then((res) => {
+      if (favQueue.current.get(id) === run) favQueue.current.delete(id);
+      if (favPending.current.get(id) !== want) return;
+      favPending.current.delete(id);
+      if (!res.ok) setFavorites((cur) => (want ? cur.filter((x) => x !== id) : [...new Set([...cur, id])]));
     });
   }, []);
 
   const updateListing = useCallback(async (id: string, patch: Partial<Listing>) => {
-    const res = await apiPut<{ ok: boolean; error?: string; listing?: Listing }>(`/api/listings/${id}`, patch);
+    const res = await apiPut<{ ok: boolean; error?: string; listing?: Listing }>(`/api/listings/${id}`, patch).catch(
+      () => ({ ok: false, error: "post.err.network", status: 0, listing: undefined }),
+    );
     if (!res.ok || !res.listing) return { ok: false, error: res.error ?? "auth.err.server", status: res.status };
     setListings((prev) => prev.map((l) => (l.id === id ? res.listing! : l)));
     return { ok: true };
@@ -802,7 +857,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       error?: string;
       listing?: Listing;
       listingsPosted?: number;
-    }>("/api/listings", payload);
+      duplicate?: boolean;
+    }>("/api/listings", payload).catch(() => ({ ok: false as const, error: "post.err.network", status: 0 }));
     if (!res.ok) return { ok: false, error: res.error ?? "auth.err.server", status: res.status };
     const nextListing = res.listing ?? { ...listing, status: "active" as const };
     setListings((prev) => [nextListing, ...prev.filter((l) => l.id !== nextListing.id)]);
@@ -810,7 +866,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       u
         ? {
             ...u,
-            listings: u.listings + 1,
+            listings: u.listings + (res.duplicate ? 0 : 1),
             listingsPosted: res.listingsPosted ?? (u.listingsPosted ?? 0) + 1,
           }
         : u,
@@ -920,8 +976,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         error?: string;
         text?: string;
         conversation?: Conversation;
-      }>("/api/messages", { conversationId, text });
-      if (!res.ok) return false;
+      }>("/api/messages", { conversationId, text }).catch(() => null);
+      if (!res?.ok) return false;
       if (res.conversation) {
         setConversations((prev) => prev.map((c) => (c.id === conversationId ? res.conversation! : c)));
       }
@@ -949,8 +1005,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (isUuid(listing.id) && isUuid(listing.sellerId) && userRef.current) {
       const res = await apiPost<{ ok: boolean; conversation?: Conversation }>("/api/conversations", {
         listingId: listing.id,
-      });
-      if (!res.ok || !res.conversation) return "";
+      }).catch(() => null);
+      if (!res?.ok || !res.conversation) return "";
       setConversations((prev) => [res.conversation!, ...prev.filter((c) => c.id !== res.conversation!.id)]);
       return res.conversation.id;
     }
@@ -1221,11 +1277,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [serverCategoryCounts, listings],
   );
 
+  const inboxReady = hydrated && inboxUser !== undefined && inboxUser === (user?.id ?? null);
+
   const value = useMemo(
     () => ({
       user,
       listings,
       favorites,
+      inboxReady,
       conversations,
       reviews,
       savedSearches,
@@ -1260,6 +1319,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setPlan,
       purchaseProduct,
       refreshSession,
+      sessionIssue,
       reviewsFor,
       addReview,
       saveSearch,
@@ -1280,6 +1340,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       user,
       listings,
       favorites,
+      inboxReady,
       conversations,
       reviews,
       savedSearches,
@@ -1314,6 +1375,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setPlan,
       purchaseProduct,
       refreshSession,
+      sessionIssue,
       reviewsFor,
       addReview,
       saveSearch,

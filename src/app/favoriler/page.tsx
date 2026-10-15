@@ -8,15 +8,16 @@ import { isPublicListing } from "@/lib/categoryCounts";
 import { useI18n } from "@/context/I18nContext";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Bell, Search, Trash2 } from "lucide-react";
+import { Bell, Heart, Search, Trash2 } from "lucide-react";
 import { Suspense } from "react";
 
 function FavoritesInner() {
   const params = useSearchParams();
   const tab = params.get("tab") === "aramalar" ? "aramalar" : "ilanlar";
-  const { listings, favorites, savedSearches, removeSavedSearch } = useApp();
+  const { listings, favorites, savedSearches, removeSavedSearch, hydrated, inboxReady, user } = useApp();
   const { t } = useI18n();
   const items = listings.filter((l) => favorites.includes(l.id) && isPublicListing(l));
+  const loading = !hydrated || (!!user && !inboxReady);
 
   return (
     <div className="mx-auto max-w-6xl px-3 py-4">
@@ -31,13 +32,19 @@ function FavoritesInner() {
       </div>
 
       {tab === "ilanlar" ? (
-        items.length === 0 ? (
-          <p className="rounded-2xl border border-line bg-card p-8 text-center text-muted">
-            {t("fav.empty")}{" "}
-            <Link href="/" className="text-lime">
+        loading ? (
+          <p className="rounded-2xl border border-line bg-card p-8 text-center text-muted" aria-busy="true">
+            {t("common.loading")}
+          </p>
+        ) : items.length === 0 ? (
+          <div className="fav-empty rounded-2xl border border-line bg-card p-8 text-center text-muted">
+            <Heart className="mx-auto mb-2 h-7 w-7 text-lime" aria-hidden />
+            <p>{t("fav.empty")}</p>
+            <p className="mt-1 text-xs">{t("fav.emptyHint")}</p>
+            <Link href="/" className="mt-3 inline-flex text-sm font-bold text-lime">
               {t("go.home")}
             </Link>
-          </p>
+          </div>
         ) : (
           <ListingGrid>
             {items.map((l) => (

@@ -2,6 +2,7 @@ import type { Listing } from "@/data/store";
 import { estateDealFromCategoryId, schemaForCategoryId, type ListingSchema } from "@/data/listingSchema";
 import { formatMoney } from "@/i18n/config";
 import { listingCurrencyOf } from "@/lib/listings/currency";
+import { isClassifiedPartsListing } from "@/lib/listingFacts";
 
 export type PosterDeal = "sale" | "rent";
 export type PosterTemplate = "sale" | "rent" | "plain";
@@ -46,6 +47,11 @@ const AFFIRMATIVE: Record<string, string> = {
 
 export function posterSupported(listing: Pick<Listing, "categoryId">) {
   return !!POSTER_FEATURES[schemaForCategoryId(listing.categoryId).family];
+}
+
+/** Same rule the listing page uses to render the poster dialog, so a ?afis=1 link never opens nothing. */
+export function posterAvailable(listing: Pick<Listing, "categoryId">) {
+  return posterSupported(listing) && !isClassifiedPartsListing(listing.categoryId);
 }
 
 function specValue(listing: Listing, label: string) {

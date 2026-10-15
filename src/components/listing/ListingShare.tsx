@@ -55,6 +55,11 @@ export function ListingShareTrigger({
   async function startShare() {
     const url = listingPublicUrl(listingId, kind);
     const data = listingWebShareData({ title, priceLabel, url });
+    // Phones and tablets get the AlsatPort sheet (WhatsApp, copy link, device menu) first.
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      setOpen(true);
+      return;
+    }
     if (canUseWebShare(data)) {
       try {
         await navigator.share(data);
@@ -194,11 +199,22 @@ function ShareModal({
   const waStatus = listingWhatsAppStatusText({ title, priceLabel, url });
   const telegramText = listingTelegramText({ title, priceLabel, description });
   const tweet = listingTweetText({ title, priceLabel });
+  const nativeData = listingWebShareData({ title, priceLabel, url });
+  const canNative = canUseWebShare(nativeData);
 
   async function copyLink() {
     const ok = await copyText(url);
     onToast(ok ? "copied" : "failed");
     if (ok) onClose();
+  }
+
+  async function shareNative() {
+    try {
+      await navigator.share(nativeData);
+      onClose();
+    } catch (err) {
+      if (!(err instanceof DOMException && err.name === "AbortError")) onToast("failed");
+    }
   }
 
   async function shareWhatsAppStatus() {
@@ -247,18 +263,32 @@ function ShareModal({
         </div>
 
         <div className="share-modal-grid">
-          <button type="button" className="share-modal-btn" onClick={() => void copyLink()}>
-            <span className="share-modal-ico is-copy">
-              <Copy className="h-4 w-4" />
-            </span>
-            {t("share.copy")}
-          </button>
-          <a className="share-modal-btn" href={whatsappShareHref(waText)} target="_blank" rel="noopener noreferrer">
+          <a
+            className="share-modal-btn"
+            href={whatsappShareHref(waText)}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-share="whatsapp"
+          >
             <span className="share-modal-ico is-wa">
               <WhatsAppMark />
             </span>
             {t("share.wa")}
           </a>
+          <button type="button" className="share-modal-btn" onClick={() => void copyLink()} data-share="copy">
+            <span className="share-modal-ico is-copy">
+              <Copy className="h-4 w-4" />
+            </span>
+            {t("share.copy")}
+          </button>
+          {canNative ? (
+            <button type="button" className="share-modal-btn" onClick={() => void shareNative()} data-share="native">
+              <span className="share-modal-ico is-native">
+                <Share2 className="h-4 w-4" />
+              </span>
+              {t("share.device")}
+            </button>
+          ) : null}
           <a
             className="share-modal-btn"
             href={whatsappShareHref(waStatus)}

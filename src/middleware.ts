@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { COOKIE_ACCESS, COOKIE_DEVICE, COOKIE_REFRESH, deviceCookieOptions } from "@/lib/security/cookies";
 import { verifyAuthToken } from "@/lib/security/jwt";
-import { LIMITS, clientRateKey, rateLimit } from "@/lib/security/rateLimit";
+import { apiRateLimit } from "@/lib/security/rateLimit";
 import { hasRole } from "@/lib/security/rbac";
 
 const PROTECTED_PREFIXES = [
@@ -91,8 +91,7 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   if (path.startsWith("/api/") && !path.startsWith("/api/payments/webhook/") && !path.startsWith("/api/auth/oauth/")) {
     const write = !["GET", "HEAD", "OPTIONS"].includes(request.method);
-    const spec = write ? LIMITS.apiWrite : LIMITS.apiRead;
-    const limited = rateLimit(clientRateKey(request, write ? "api-write" : "api-get"), spec.limit, spec.windowMs, request);
+    const limited = apiRateLimit(request, write);
     if (!limited.ok) {
       return NextResponse.json(
         { ok: false, error: "auth.err.rateLimit" },

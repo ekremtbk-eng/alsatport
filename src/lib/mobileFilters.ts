@@ -35,9 +35,9 @@ const LISTING_KEYS = ["kimden", "seller", "swap", "warranty", "shopOpts", "poste
 const SEARCH_KEYS = ["keyword", "category"];
 
 const VEHICLE_LAYOUT: MobileFilterLayout = {
-  quick: ["brand", "model", "priceMin", "yearMin", "kmMin", "location"],
+  quick: ["brand", "model", "trim", "priceMin", "yearMin", "kmMin", "location"],
   groups: [
-    { id: "vehicle", labelKey: "mf.g.vehicle", keys: ["trim", "engine", "body", "fuel", "gear", "bodyType", "engineSize", "power", "drive", "color"] },
+    { id: "vehicle", labelKey: "mf.g.vehicle", keys: ["engine", "body", "fuel", "gear", "bodyType", "engineSize", "power", "drive", "color"] },
     { id: "condition", labelKey: "mf.g.condition", keys: ["damage", "paint", "equip"] },
     { id: "listing", labelKey: "mf.g.listing", keys: ["kimden", "seller", "posted", "urgent", "mappedOnly"] },
     { id: "kktc", labelKey: "mf.g.kktc", keys: ["steering", "origin", "importStatus", "customs", "kktcReg", "plateType", "firstReg"] },
@@ -170,6 +170,18 @@ export function rowStateKeys(row: MobileFilterRow): string[] {
   if (!f) return [row.key];
   if (row.key === "priceMin") return ["priceMin", "priceMax", "currency"];
   return f.pairKey ? [f.key, f.pairKey] : [f.key];
+}
+
+/**
+ * Short single-choice fields shown as a sideways chip strip on the quick tab (vehicles: fuel and gearbox).
+ * They keep their row under "Tüm Filtreler"; both edit the same state.
+ */
+const QUICK_CHIPS: Record<string, string[]> = { vasita: ["fuel", "gear"] };
+
+export function quickChipFields(cat: Category, fields: FilterField[], state: FilterState) {
+  return (QUICK_CHIPS[rootOf(cat).id] ?? [])
+    .map((k) => fields.find((f) => f.key === k))
+    .filter((f): f is FilterField => Boolean(f && f.kind === "select" && f.options?.length && f.options.length <= 8 && fieldOffered(f, state)));
 }
 
 export function rowActive(row: MobileFilterRow, state: FilterState) {

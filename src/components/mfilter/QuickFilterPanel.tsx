@@ -69,8 +69,9 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { CategoryDrill } from "@/components/CategoryDrill";
+import { CategoryIcon } from "@/components/CategoryIcon";
 import { CountrySwitch } from "@/components/CountrySwitch";
 import { approvedLevel, fieldTitle } from "@/components/FilterPanel";
 import { STD_DATE_PRESETS } from "@/components/StdFilterSidebar";
@@ -94,6 +95,7 @@ import {
 } from "@/lib/categoryFilters";
 import {
   popularOptions,
+  quickChipFields,
   rangeBuckets,
   resolveMobileLayout,
   rowActive,
@@ -243,6 +245,16 @@ export function QuickFilterPanel({
   const resolved = useMemo(() => resolveMobileLayout(layout, fields, state), [layout, fields, state]);
   const screen = stack[stack.length - 1];
   const counting = listings.length > 0 && listings.length <= 800;
+  /** Body scroll of each depth, so a new screen starts at the top and going back returns to the same spot. */
+  const scrollMem = useRef<number[]>([]);
+  const shownDepth = useRef(0);
+
+  useLayoutEffect(() => {
+    const body = rootRef.current?.querySelector<HTMLElement>("[data-filter-scroll]");
+    const depth = stack.length;
+    if (body) body.scrollTop = depth < shownDepth.current ? (scrollMem.current[depth] ?? 0) : 0;
+    shownDepth.current = depth;
+  }, [stack, tab]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -255,7 +267,10 @@ export function QuickFilterPanel({
     if (stack.length) root.querySelector<HTMLElement>(".qf-title")?.focus();
   }, [stack]);
 
-  const push = (s: Screen) => setStack((prev) => [...prev, s]);
+  const push = (s: Screen) => {
+    scrollMem.current[stack.length] = rootRef.current?.querySelector<HTMLElement>("[data-filter-scroll]")?.scrollTop ?? 0;
+    setStack((prev) => [...prev, s]);
+  };
   const pop = () =>
     setStack((prev) => {
       const top = prev[prev.length - 1];
@@ -359,7 +374,76 @@ export function QuickFilterPanel({
     );
   };
 
-  const quickActive = resolved.quick.filter((r) => rowActive(r, state)).length;
+  const chipFields = quickChipFields(category, fields, state);
+  const chipStrip = (f: FilterField) => {
+    const multi = Boolean(f.multiPick);
+    const chosen = (state[f.key] ?? "").split(",").filter(Boolean);
+    const options = f.options ?? [];
+    const counts = counting
+      ? Object.fromEntries(options.map((o) => [o, countFilterOption(listings, fields, multi ? { ...state, [f.key]: "" } : state, f.key, o) ?? 0]))
+      : undefined;
+    const labelId = `qf-chips-${f.key}`;
+    return (
+      <div key={f.key} className="qf-block qf-chip-block">
+        <p className="qf-block-title" id={labelId}>
+          {fieldTitle(t, f.labelKey)}
+        </p>
+        <div className="qf-chips" role="group" aria-labelledby={labelId} data-chips={f.key}>
+          <button type="button" aria-pressed={!chosen.length} className={`qf-chip ${chosen.length ? "" : "is-on"}`} onClick={() => set(f.key, "")}>
+            {t("flt.any")}
+          </button>
+          {options.map((o) => {
+            const on = chosen.includes(o);
+            const n = counts?.[o];
+            return (
+              <button
+                key={o}
+                type="button"
+                aria-pressed={on}
+                className={`qf-chip ${on ? "is-on" : ""}`}
+                onClick={() => set(f.key, multi ? (on ? chosen.filter((x) => x !== o) : [...chosen, o]).join(",") : on ? "" : o)}
+              >
+                {o}
+                {n ? <span className="qf-chip-n">{n.toLocaleString("tr-TR")}</span> : null}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  /** Vasıta sub-categories as a sideways strip (Otomobil, Arazi/SUV, Motosiklet…); switching keeps the filters. */
+  const navRoot = rootOf(category);
+  const typeRail =
+    navRoot.id === "vasita" ? (
+      <div className="qf-block qf-type-block">
+        <p className="qf-block-title" id="qf-type-title">
+          {t("mf.vehicleType")}
+        </p>
+        <div className="qf-types" role="group" aria-labelledby="qf-type-title">
+          {[navRoot, ...visibleChildren(navRoot)].map((c) => {
+            const on = c.id === category.id || (c.id !== navRoot.id && categoryPath(category).some((p) => p.id === c.id));
+            return (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={on}
+                className={`qf-type ${on ? "is-on" : ""}`}
+                onClick={() => (on ? undefined : onPickCategory(c))}
+              >
+                <span className="qf-type-ico" aria-hidden>
+                  <CategoryIcon name={c.id === navRoot.id ? "grid" : c.icon} className="h-5 w-5" />
+                </span>
+                <span className="qf-type-name">{c.id === navRoot.id ? t("flt.any") : catName(t, c.id, c.name)}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    ) : null;
+
+  const quickActive = resolved.quick.filter((r) => rowActive(r, state)).length + chipFields.filter((f) => state[f.key]).length;
   const allActive = resolved.groups.reduce((n, g) => n + g.rows.filter((r) => rowActive(r, state)).length, 0);
 
   const onTabKey = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -413,16 +497,17 @@ export function QuickFilterPanel({
     </div>
   );
 
-  const showLabel = (
+  const countLabel = (label: string) => (
     <span className="qf-apply-label">
-      <span>{t("mf.show")}</span>
+      <span>{label}</span>
       <span className="qf-apply-n">{resultCount ? t("browse.count", { n: resultCount.toLocaleString("tr-TR") }) : t("mf.noResults")}</span>
     </span>
   );
+  const showLabel = countLabel(t("mf.show"));
 
   const clearRow = (keys: string[]) => onSet(keys.map((k) => [k, ""] as [string, string]));
   const backFoot = (keys: string[]) =>
-    foot(t("flt.clearShort"), () => clearRow(keys), pop, t("mf.apply"), !keys.some((k) => state[k]));
+    foot(t("flt.clearShort"), () => clearRow(keys), pop, countLabel(t("mf.apply")), !keys.some((k) => state[k]));
 
   let content: ReactNode;
   if (!screen) {
@@ -455,7 +540,9 @@ export function QuickFilterPanel({
           <div id="qf-tabpanel" role="tabpanel" aria-labelledby={`qf-tab-${tab}`}>
             {rows ? (
               <>
+                {typeRail}
                 <div className="qf-rows">{rows.map(renderRow)}</div>
+                {chipFields.map(chipStrip)}
                 <button type="button" className="qf-more" onClick={() => setTab("all")}>
                   <SlidersHorizontal className="h-4 w-4" aria-hidden />
                   {t("flt.adv.more")}
@@ -489,8 +576,10 @@ export function QuickFilterPanel({
             options.map((o) => [o, countFilterOption(listings, fields, multi ? { ...state, [f.key]: "" } : state, f.key, o) ?? 0]),
           )
         : undefined;
-    const modelField = f.key === "brand" ? fieldOf("model") : undefined;
+    const nextField = f.key === "brand" ? fieldOf("model") : f.key === "model" ? fieldOf("trim") : undefined;
     const parent = f.dependsOn && state[f.dependsOn] ? fieldOf(f.dependsOn) : undefined;
+    const chain: FilterField[] = [];
+    for (let p = parent; p; p = p.dependsOn && state[p.dependsOn] ? fieldOf(p.dependsOn) : undefined) chain.unshift(p);
     content = (
       <>
         {head(fieldTitle(t, f.labelKey), true)}
@@ -499,7 +588,13 @@ export function QuickFilterPanel({
             {parent ? (
               <div className="qf-pick-ctx">
                 <p className="qf-pick-ctx-label">
-                  {fieldTitle(t, parent.labelKey)}: <span>{state[parent.key]}</span>
+                  {chain.length > 1 ? (
+                    <span>{chain.map((c) => state[c.key]).join(" › ")}</span>
+                  ) : (
+                    <>
+                      {fieldTitle(t, parent.labelKey)}: <span>{state[parent.key]}</span>
+                    </>
+                  )}
                 </p>
                 <button type="button" onClick={() => setStack((prev) => [...prev.slice(0, -1), { kind: "pick", key: parent.key }])}>
                   {t("mf.change")}
@@ -523,8 +618,8 @@ export function QuickFilterPanel({
               onPick={(v) => {
                 set(f.key, v);
                 if (multi) return;
-                if (v && modelField && stack.length === 1) {
-                  setStack([{ kind: "pick", key: modelField.key }]);
+                if (v && nextField && stack.length === 1 && resolvedOptions(nextField, { ...state, [f.key]: v }).length > 0) {
+                  setStack([{ kind: "pick", key: nextField.key }]);
                   return;
                 }
                 pop();
@@ -700,7 +795,6 @@ export function QuickFilterPanel({
       </>
     );
   } else {
-    const navRoot = rootOf(category);
     const roots = visibleChildren(navRoot).length ? visibleChildren(navRoot) : [navRoot];
     content = (
       <>

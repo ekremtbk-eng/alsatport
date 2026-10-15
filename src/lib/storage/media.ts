@@ -23,6 +23,14 @@ export function sniffImage(bytes: Uint8Array): { mime: string; ext: string } | n
   return null;
 }
 
+/** ISO-BMFF `ftyp` box with a HEIC/HEIF brand (iPhone photos); not accepted, only recognised for a clearer error. */
+export function isHeifBytes(bytes: Uint8Array) {
+  if (bytes.length < 12) return false;
+  if (String.fromCharCode(bytes[4], bytes[5], bytes[6], bytes[7]) !== "ftyp") return false;
+  const brand = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]);
+  return ["heic", "heix", "heim", "heis", "hevc", "hevx", "mif1", "msf1"].includes(brand);
+}
+
 export function isManagedStorageKey(key: string) {
   return /^(listings|avatars|business)\//.test(key) && !key.includes("..") && !key.includes("\\");
 }
@@ -59,7 +67,9 @@ function ownBlobHost() {
   return storeId ? `${storeId}.public.blob.vercel-storage.com` : "";
 }
 
+/** MEDIA_STORAGE=local pins uploads to .data/uploads for local test servers; it has no effect on Vercel. */
 function blobEnabled() {
+  if (process.env.MEDIA_STORAGE === "local" && !process.env.VERCEL) return false;
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 }
 

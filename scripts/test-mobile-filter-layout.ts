@@ -78,7 +78,7 @@ const otoFields = filterFieldsForCategory(oto);
 const otoLayout = mobileFilterLayout(oto)!;
 for (const [label, state] of Object.entries(STATES)) {
   const q = resolveMobileLayout(otoLayout, otoFields, state).quick.map((r) => r.key);
-  check(`otomobil/${label}: quick tab starts with Marka, Seri, Fiyat, Yıl, Km`, ["brand", "model", "priceMin", "yearMin", "kmMin"].every((k, i) => q[i] === k), q.join(","));
+  check(`otomobil/${label}: quick tab starts with Marka, Seri, Model/Paket, Fiyat, Yıl, Km`, ["brand", "model", "trim", "priceMin", "yearMin", "kmMin"].every((k, i) => q[i] === k), q.join(","));
 }
 const kktcFields = otoFields.filter((f) => !fieldOffered(f, STATES.tr) && fieldOffered(f, STATES.kktc)).map((f) => f.key);
 check("otomobil: KKTC fields exist", kktcFields.length > 0);

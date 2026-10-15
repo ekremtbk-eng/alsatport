@@ -39,18 +39,22 @@ function niceStep(raw: number) {
 }
 
 /**
- * Two-thumb slider over 0…top (the highest preset bound). A thumb at either end means "no limit", so dragging
- * never invents a bound the user did not ask for. Values are committed shortly after the thumb stops.
+ * Two-thumb slider over floor…top. A thumb at either end means "no limit", so dragging never invents a bound the
+ * user did not ask for. Values are committed shortly after the thumb stops.
  */
 function RangeSlider({
+  floor = 0,
   top,
+  step: fixedStep,
   min,
   max,
   label,
   format,
   onCommit,
 }: {
+  floor?: number;
   top: number;
+  step?: number;
   min: string;
   max: string;
   label: string;
@@ -58,46 +62,48 @@ function RangeSlider({
   onCommit: (min: string, max: string) => void;
 }) {
   const { t } = useI18n();
-  const step = niceStep(top / 60);
-  const clamp = (v: string, fallback: number) => (v ? Math.min(Math.max(Number(v), 0), top) : fallback);
-  const [lo, setLo] = useState(() => clamp(min, 0));
+  const step = fixedStep ?? niceStep((top - floor) / 60);
+  const clamp = (v: string, fallback: number) => (v ? Math.min(Math.max(Number(v), floor), top) : fallback);
+  const [lo, setLo] = useState(() => clamp(min, floor));
   const [hi, setHi] = useState(() => clamp(max, top));
   const timer = useRef(0);
   useEffect(() => {
     window.clearTimeout(timer.current);
-    setLo(min ? Math.min(Math.max(Number(min), 0), top) : 0);
-    setHi(max ? Math.min(Math.max(Number(max), 0), top) : top);
-  }, [min, max, top]);
+    setLo(min ? Math.min(Math.max(Number(min), floor), top) : floor);
+    setHi(max ? Math.min(Math.max(Number(max), floor), top) : top);
+  }, [min, max, floor, top]);
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
   const schedule = (nextLo: number, nextHi: number) => {
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => onCommit(nextLo > 0 ? String(nextLo) : "", nextHi < top ? String(nextHi) : ""), 250);
+    timer.current = window.setTimeout(() => onCommit(nextLo > floor ? String(nextLo) : "", nextHi < top ? String(nextHi) : ""), 250);
   };
-  const text = (v: number, end: boolean) => (end && v >= top ? `${format(top)}+` : format(v));
+  const text = (v: number, end: boolean) =>
+    end && v >= top && floor === 0 ? `${format(top)}+` : !end && floor > 0 && v <= floor ? `≤ ${format(floor)}` : format(v);
+  const pct = (v: number) => ((v - floor) / (top - floor)) * 100;
 
   return (
     <div className="qf-block">
       <div className="qf-slider" role="group" aria-label={t("mf.slider", { label })}>
         <span className="qf-slider-track" aria-hidden />
-        <span className="qf-slider-fill" aria-hidden style={{ left: `${(lo / top) * 100}%`, right: `${100 - (hi / top) * 100}%` }} />
+        <span className="qf-slider-fill" aria-hidden style={{ left: `${pct(lo)}%`, right: `${100 - pct(hi)}%` }} />
         <input
           type="range"
-          min={0}
+          min={floor}
           max={top}
           step={step}
           value={lo}
           aria-label={t("flt.min")}
           aria-valuetext={text(lo, false)}
           onChange={(e) => {
-            const v = Math.max(Math.min(Number(e.target.value), hi - step), 0);
+            const v = Math.max(Math.min(Number(e.target.value), hi - step), floor);
             setLo(v);
             schedule(v, hi);
           }}
         />
         <input
           type="range"
-          min={0}
+          min={floor}
           max={top}
           step={step}
           value={hi}
@@ -145,6 +151,12 @@ export function RangePicker({
   const minId = `qf-${minField.key}`;
   const maxId = `qf-${maxField.key}`;
   const top = Math.max(0, ...buckets.flat().filter(Boolean).map(Number));
+  const slider =
+    minField.key === "yearMin"
+      ? { floor: 1990, top: new Date().getFullYear(), step: 1, format: (n: number) => String(n) }
+      : (isPrice || minField.key === "kmMin") && top > 0
+        ? { floor: 0, top, step: undefined, format: (n: number) => compactAmount(n, locale) }
+        : null;
 
   return (
     <div className="qf-range">
@@ -154,13 +166,15 @@ export function RangePicker({
           <CurrencyChips value={state.currency ?? ""} onChange={(v) => onSet([["currency", v]])} order={PHONE_CURRENCIES} />
         </div>
       ) : null}
-      {isPrice && top > 0 ? (
+      {slider ? (
         <RangeSlider
-          top={top}
+          floor={slider.floor}
+          top={slider.top}
+          step={slider.step}
           min={min}
           max={max}
-          label={t("flt.price")}
-          format={(n) => compactAmount(n, locale)}
+          label={isPrice ? t("flt.price") : t(minField.labelKey)}
+          format={slider.format}
           onCommit={(a, b) =>
             onSet([
               [minField.key, a],

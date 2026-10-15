@@ -75,9 +75,80 @@ export async function apiUpload<T>(
   return { ...data, status: res.status };
 }
 
+/**
+ * apiUpload with upload progress (fetch cannot report it). Same CSRF header, device fingerprint and one
+ * retry with a fresh token; a dropped connection comes back as status 0 with `photo.err.network`.
+ */
+export async function apiUploadWithProgress<T>(
+  url: string,
+  file: File,
+  extra: Record<string, string> | undefined,
+  onProgress: (fraction: number) => void,
+): Promise<T & { status: number }> {
+  const fp = await deviceFingerprint();
+  const send = (token: string) =>
+    new Promise<{ status: number; body: string }>((resolve) => {
+      const body = new FormData();
+      body.append("file", file);
+      for (const [key, value] of Object.entries(extra ?? {})) if (value) body.append(key, value);
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", url);
+      xhr.withCredentials = true;
+      xhr.timeout = 120_000;
+      xhr.setRequestHeader("X-CSRF-Token", token);
+      if (fp) xhr.setRequestHeader("X-Device-Fp", fp);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && e.total > 0) onProgress(Math.min(1, e.loaded / e.total));
+      };
+      xhr.onload = () => resolve({ status: xhr.status, body: xhr.responseText });
+      xhr.onerror = xhr.ontimeout = xhr.onabort = () => resolve({ status: 0, body: "" });
+      xhr.send(body);
+    });
+  const parse = (raw: string) => {
+    try {
+      return JSON.parse(raw) as T & { error?: string };
+    } catch {
+      return null;
+    }
+  };
+  const used = await getCsrfToken();
+  let res = await send(used);
+  if (res.status === 403 && parse(res.body)?.error === "auth.err.csrf") {
+    if ((await getCsrfToken()) === used) resetCsrfToken();
+    onProgress(0);
+    res = await send(await getCsrfToken());
+  }
+  const data = parse(res.body) ?? ({ ok: false, error: res.status === 0 ? "photo.err.network" : "auth.err.server" } as T);
+  return { ...data, status: res.status };
+}
+
 export async function apiGet<T>(url: string): Promise<T> {
   const res = await fetch(url, { credentials: "include", cache: "no-store" });
   return (await res.json()) as T;
+}
+
+export type SessionCheck<T> =
+  | { kind: "ok"; data: T }
+  | { kind: "signedOut" }
+  | { kind: "rateLimit" | "unavailable"; retryAfter: number };
+
+/**
+ * Only a real answer may sign the user out: 200 with `user: null` (the server also drops its cookies)
+ * or 401/403. Rate limiting, server errors and dropped connections say nothing about the session.
+ */
+export async function checkSession<T extends { user?: unknown }>(url = "/api/auth/session"): Promise<SessionCheck<T>> {
+  let res: Response;
+  try {
+    res = await fetch(url, { credentials: "include", cache: "no-store" });
+  } catch {
+    return { kind: "unavailable", retryAfter: 0 };
+  }
+  if (res.status === 401 || res.status === 403) return { kind: "signedOut" };
+  const retryAfter = Number(res.headers.get("Retry-After")) || 0;
+  if (res.status === 429) return { kind: "rateLimit", retryAfter };
+  const data = res.ok ? ((await res.json().catch(() => null)) as T | null) : null;
+  if (!data || !("user" in data)) return { kind: "unavailable", retryAfter };
+  return data.user ? { kind: "ok", data } : { kind: "signedOut" };
 }
 
 export async function apiPost<T>(url: string, body: unknown): Promise<T & { status: number }> {

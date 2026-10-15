@@ -13,6 +13,36 @@ import type { AttrField, ListingSchema } from "@/data/listingSchema";
 import { withApprovedOptions, type ApprovedVehicle } from "@/data/vehicleRequests";
 import { fieldUnit } from "@/lib/listings/currency";
 
+/**
+ * Catalog picks (brand → model → package → engine …) whose value is no longer offered for the parents above
+ * them, e.g. from an old draft. Fields without catalog options are never flagged.
+ */
+export function staleCatalogAttrs(schema: ListingSchema, attrs: Record<string, string>, approved?: ApprovedVehicle[]) {
+  const segment = schema.catalogKind ?? "auto";
+  return schema.fields.filter((field) => {
+    const value = attrs[field.key];
+    if (!value || !(field.optionSource || (field.key === "brand" && field.catalogKind))) return false;
+    const options = optionsOf(field, attrs, segment, approved);
+    return options.length > 0 && !options.includes(value);
+  });
+}
+
+/** Values of `prev` that are still valid choices in `next`, so switching category keeps what still fits. */
+export function carryAttrs(prev: Record<string, string>, next: ListingSchema, approved?: ApprovedVehicle[]) {
+  const segment = next.catalogKind ?? "auto";
+  const out: Record<string, string> = {};
+  for (const field of next.fields) {
+    const value = prev[field.key];
+    if (!value) continue;
+    if (field.kind === "number" || field.kind === "text") {
+      out[field.key] = value;
+      continue;
+    }
+    if (optionsOf(field, out, segment, approved).includes(value)) out[field.key] = value;
+  }
+  return out;
+}
+
 function optionsOf(field: AttrField, attrs: Record<string, string>, segment: VehicleSegment, approved?: ApprovedVehicle[]) {
   const kind = field.catalogKind ?? segment;
   const merge = (level: "brand" | "model" | "trim" | "engine", options: string[]) =>
@@ -57,6 +87,7 @@ export function DynamicAttributeForm({
   onChange,
   approved,
   currency,
+  invalid,
 }: {
   schema: ListingSchema;
   attrs: Record<string, string>;
@@ -65,6 +96,8 @@ export function DynamicAttributeForm({
   approved?: ApprovedVehicle[];
   /** Currency chosen for the listing; amount fields are labelled with it. */
   currency?: string;
+  /** Required keys the last validation found empty; they are outlined until filled. */
+  invalid?: string[];
 }) {
   const segment = schema.catalogKind ?? "auto";
   const lockedMemo = new Map<string, boolean>();
@@ -93,10 +126,11 @@ export function DynamicAttributeForm({
           const options = optionsOf(field, attrs, segment, approved);
           const locked = isLocked(field);
           const placeholder = locked ? lockHint(field.dependsOn) : "Seçiniz";
+          const bad = Boolean(invalid?.includes(field.key));
           if (field.kind === "number" || field.kind === "text") {
             const unit = fieldUnit(field, currency);
             return (
-              <label key={field.key} className="block">
+              <label key={field.key} className={`block ${bad ? "dyn-invalid" : ""}`} data-attr-key={field.key}>
                 <span className="mb-1.5 block text-sm font-semibold text-ink">
                   {field.label}
                   {unit ? ` (${unit})` : ""}
@@ -104,6 +138,7 @@ export function DynamicAttributeForm({
                 </span>
                 <input
                   value={attrs[field.key] ?? ""}
+                  aria-invalid={bad || undefined}
                   inputMode={field.kind === "number" ? (field.decimal ? "decimal" : "numeric") : undefined}
                   disabled={locked}
                   maxLength={field.kind === "number" ? 12 : 120}
@@ -134,7 +169,7 @@ export function DynamicAttributeForm({
             );
           }
           return (
-            <div key={field.key}>
+            <div key={field.key} className={bad ? "dyn-invalid" : undefined} data-attr-key={field.key}>
               <SearchSelect
                 label={`${field.label}${field.required ? " *" : ""}`}
                 value={attrs[field.key] ?? ""}

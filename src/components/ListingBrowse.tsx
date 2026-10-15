@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LayoutGrid, List, SlidersHorizontal, X } from "lucide-react";
 import { FilterPanel } from "@/components/FilterPanel";
@@ -46,6 +47,22 @@ import { currencyOrder } from "@/lib/listings/currency";
 import { ClassifiedSearchTable } from "@/components/ClassifiedSearchTable";
 import { isSeaEquipCategoryId } from "@/data/seaEquip";
 import { isPublicListing } from "@/lib/categoryCounts";
+
+/** Filters every category shares, carried over when the sheet switches category. */
+const CARRY_KEYS = new Set([
+  "country",
+  "city",
+  "district",
+  "neighborhood",
+  "posted",
+  "keyword",
+  "includeDesc",
+  "currency",
+  "mappedOnly",
+  "priceMin",
+  "priceMax",
+  "urgent",
+]);
 
 /** Desktop filter sidebar open/closed preference; kept apart from the filter values themselves. */
 const SIDEBAR_KEY = "alsatport-browse-sidebar";
@@ -191,6 +208,8 @@ export function ListingBrowse({
     "district",
     "priceMin",
     "priceMax",
+    "currency",
+    "country",
     "subject",
     "level",
     "place",
@@ -254,6 +273,17 @@ export function ListingBrowse({
     setFilters(emptyFilterState());
     setWordDraft("");
     commit(emptyFilterState());
+  }
+
+  /** Listing page of a category picked inside the sheet, keeping every filter that still applies there. */
+  function hrefKeepingFilters(cat: Category) {
+    const base = hrefForCategoryListings(cat);
+    if (!base.startsWith("/ara?")) return base;
+    const keep: FilterState = {};
+    for (const [key, value] of Object.entries(filters)) {
+      if (value && (CARRY_KEYS.has(key) || fields.some((f) => f.key === key || f.pairKey === key))) keep[key] = value;
+    }
+    return `/ara?${mergeFilterQuery(new URLSearchParams(base.slice("/ara?".length)), keep, { sira: sort, gorunum: view })}`;
   }
 
   const sheetLayout = compact ? mobileFilterLayout(filterCat) : null;
@@ -329,7 +359,7 @@ export function ListingBrowse({
       onSearch={() => {
         setFilter("keyword", sanitizeSearchQuery(wordDraft));
         if (variant === "sheet" && sheetCat && sheetCat.id !== category?.id) {
-          router.push(hrefForCategoryListings(sheetCat));
+          router.push(hrefKeepingFilters(sheetCat));
         }
       }}
     />
@@ -543,7 +573,11 @@ export function ListingBrowse({
                 >
                   {t("search.clearSome")}
                 </button>
-              ) : null}
+              ) : (
+                <Link href="/kategoriler" className="btn-ghost acil-empty-cta">
+                  {t("search.browseCats")}
+                </Link>
+              )}
             </div>
           ) : compact && phoneView.view === "rows" ? (
             <CompactListingList>
@@ -619,7 +653,7 @@ export function ListingBrowse({
             onPickCategory={(cat) => setSheetCat(cat)}
             onApply={() => {
               setSheetOpen(false);
-              if (sheetCat && sheetCat.id !== category?.id) router.push(hrefForCategoryListings(sheetCat));
+              if (sheetCat && sheetCat.id !== category?.id) router.push(hrefKeepingFilters(sheetCat));
             }}
           />
         ) : (

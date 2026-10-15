@@ -90,11 +90,11 @@ export function DashboardPanel({ panel }: { panel: DashPanelId }) {
     case "teklifler":
       return <EmptyPanel titleKey="dash.offers" bodyKey="dash.offers.empty" />;
     case "sparam":
-      return <SParamPanel />;
+      return <EmptyPanel titleKey="dash.sparam" bodyKey="dash.soon" />;
     case "eticaret":
-      return <EmptyPanel titleKey="dash.ecom" bodyKey="dash.ecom.empty" />;
+      return <EmptyPanel titleKey="dash.ecom" bodyKey="dash.soon" />;
     case "guvenli":
-      return <EmptyPanel titleKey="dash.safe" bodyKey="dash.safe.empty" />;
+      return <EmptyPanel titleKey="dash.safe" bodyKey="dash.soon" />;
     case "bildirimler":
       return <NotifsPanel />;
     case "kisisel":
@@ -349,19 +349,6 @@ function MessagesPanel() {
           ))}
         </ul>
       )}
-    </Pane>
-  );
-}
-
-function SParamPanel() {
-  const { t, formatMoney } = useI18n();
-  return (
-    <Pane title={t("dash.sparam")}>
-      <div className="dash-summary-card">
-        <p className="dash-row-label">{t("dash.sparam.bal")}</p>
-        <p className="text-2xl font-extrabold">{formatMoney(0)}</p>
-        <p className="mt-2 text-sm text-muted">{t("dash.sparam.p")}</p>
-      </div>
     </Pane>
   );
 }

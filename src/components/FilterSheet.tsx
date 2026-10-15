@@ -21,10 +21,24 @@ function scrollsY(el: Element) {
   return (oy === "auto" || oy === "scroll") && el.scrollHeight > el.clientHeight + 1;
 }
 
+function scrollsX(el: Element) {
+  const ox = getComputedStyle(el).overflowX;
+  return (ox === "auto" || ox === "scroll") && el.scrollWidth > el.clientWidth + 1;
+}
+
 /** Nearest box inside the sheet that can actually scroll; the page itself never counts. */
 function scrollBoxFrom(el: Element | null, root: HTMLElement) {
   for (let node = el; node && node !== root; node = node.parentElement) {
     if (node instanceof HTMLElement && scrollsY(node)) return node;
+  }
+  return null;
+}
+
+/** What a finger may move inside the sheet: a vertical or sideways scroll box, or a slider thumb. */
+function touchTargetFrom(el: Element | null, root: HTMLElement) {
+  if (el instanceof HTMLInputElement && el.type === "range") return el;
+  for (let node = el; node && node !== root; node = node.parentElement) {
+    if (node instanceof HTMLElement && (scrollsY(node) || scrollsX(node))) return node;
   }
   return null;
 }
@@ -166,7 +180,7 @@ export function FilterSheet({
 
     let scroller: HTMLElement | null = null;
     const onTouchStart = (event: TouchEvent) => {
-      scroller = event.touches.length === 1 && event.target instanceof Element ? scrollBoxFrom(event.target, root) : null;
+      scroller = event.touches.length === 1 && event.target instanceof Element ? touchTargetFrom(event.target, root) : null;
     };
     /** Only boxes that really overflow may move; anything else would drag the whole sheet or the page behind it. */
     const onTouchMove = (event: TouchEvent) => {

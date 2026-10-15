@@ -1,12 +1,13 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Bell, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import { ChevronRight, Search, X } from "lucide-react";
 import {
   categories,
+  categoryShortcuts,
   formatListingCount,
-  hrefForCategoryListings,
+  hrefForCategory,
   parentOf,
   visibleChildren,
   walkCategories,
@@ -15,23 +16,18 @@ import {
 import { CategoryIcon, iconTone } from "@/components/CategoryIcon";
 import { catName, useI18n } from "@/context/I18nContext";
 import { useApp } from "@/context/AppContext";
-import { NotificationPanel } from "@/components/NotificationPanel";
-import { Logo } from "@/components/Logo";
-import { SmartSearch } from "@/components/home/SmartSearch";
 import { liveCount } from "@/lib/categoryCounts";
 
 function labelOf(t: (key: string, vars?: Record<string, string | number>) => string, cat: Category) {
   return catName(t, cat.id, cat.name).trim() || cat.name;
 }
 
+/** Phone version of /kategoriler: special-filter chips, an in-page search over the whole tree and one row per root. */
 export function MobileCategoryHome() {
   const { t } = useI18n();
-  const router = useRouter();
-  const { unreadNotifications, categoryCounts } = useApp();
+  const { categoryCounts } = useApp();
   const roots = useMemo(() => categories.filter((c) => !c.filter && !c.navHidden), []);
-  const [cursor, setCursor] = useState<Category | null>(null);
   const [q, setQ] = useState("");
-  const [notifOpen, setNotifOpen] = useState(false);
 
   const query = q.trim().toLocaleLowerCase("tr");
   const hits = useMemo(() => {
@@ -48,116 +44,67 @@ export function MobileCategoryHome() {
     return out.slice(0, 40);
   }, [query, roots, t]);
 
-  const rows = query ? hits : cursor ? visibleChildren(cursor) : roots;
-  const backLabel = cursor ? (parentOf(cursor) ? t("common.back") : t("nav.catHome")) : "";
-
-  function go(cat: Category) {
-    router.push(hrefForCategoryListings(cat));
-  }
-
-  function choose(cat: Category) {
-    if (query) {
-      go(cat);
-      return;
-    }
-    if (visibleChildren(cat).length) {
-      setCursor(cat);
-      setQ("");
-      return;
-    }
-    go(cat);
-  }
-
-  function onSearch(e: FormEvent) {
-    e.preventDefault();
-    const text = q.trim();
-    if (!text) return;
-    router.push(`/ara?q=${encodeURIComponent(text)}`);
-  }
+  const rows = query ? hits : roots;
 
   return (
-    <div className="m-cat-home">
-      <header className="m-cat-top">
-        <Logo compact />
-        <h1>{t("nav.catHome")}</h1>
-        <div className="relative">
-          <button
-            type="button"
-            className="m-cat-bell"
-            aria-label={t("nav.notifications")}
-            data-notif-toggle
-            onClick={() => setNotifOpen((v) => !v)}
-          >
-            <Bell className="h-5 w-5" />
-            {unreadNotifications > 0 ? <span className="m-cat-bell-dot" /> : null}
-          </button>
-          <NotificationPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
-        </div>
-      </header>
-
-      <form className="m-cat-search" onSubmit={onSearch}>
-        <Search className="m-cat-search-ico" aria-hidden />
+    <div className="mc">
+      <h1 className="mc-title">{t("nav.catHome")}</h1>
+      <form className="mc-search" role="search" onSubmit={(e) => e.preventDefault()}>
+        <Search className="mc-search-ico" aria-hidden />
         <input
+          type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder={t("nav.catHome.search")}
+          placeholder={t("cat.find")}
+          aria-label={t("cat.find")}
           enterKeyHint="search"
           autoComplete="off"
         />
+        {q ? (
+          <button type="button" className="mc-search-x" aria-label={t("common.close")} onClick={() => setQ("")}>
+            <X className="h-4 w-4" />
+          </button>
+        ) : null}
       </form>
 
-      {!cursor && !query ? <SmartSearch variant="phone" /> : null}
-
-      {cursor && !query ? (
-        <div className="m-cat-level">
-          <button type="button" className="m-cat-back" onClick={() => setCursor(parentOf(cursor) ?? null)}>
-            <ChevronLeft className="h-5 w-5" aria-hidden />
-            {backLabel}
-          </button>
-          <strong>{labelOf(t, cursor)}</strong>
-          <button type="button" className="m-cat-all" onClick={() => go(cursor)}>
-            {t("flt.cat.all", { name: labelOf(t, cursor) })}
-          </button>
-        </div>
-      ) : null}
-
-      {query && !hits.length ? <p className="m-cat-empty">{t("nav.cat.empty")}</p> : null}
-
       {query ? null : (
-        <ul className="m-cat-grid" aria-label={cursor ? labelOf(t, cursor) : t("nav.catHome")}>
-          {rows.map((cat) => {
-            const n = liveCount(categoryCounts, cat);
-            return (
-              <li key={cat.id}>
-                <button type="button" className="m-cat-card" onClick={() => choose(cat)}>
-                  <span className={`m-cat-card-ico cat-ico ${iconTone(cat.icon)}`} aria-hidden>
-                    <CategoryIcon name={cat.icon} className="h-6 w-6" />
-                  </span>
-                  <span className="m-cat-card-name">{labelOf(t, cat)}</span>
-                  {n > 0 ? <span className="m-cat-card-n">{t("browse.count", { n: formatListingCount(n) })}</span> : null}
-                </button>
-              </li>
-            );
-          })}
+        <ul className="mc-chips" aria-label={t("cat.filters")}>
+          {categoryShortcuts.map((c) => (
+            <li key={c.id}>
+              <Link href={hrefForCategory(c)} className={`mc-chip ${c.filter === "urgent" ? "is-urgent" : c.filter === "h48" ? "is-fresh" : ""}`}>
+                <CategoryIcon name={c.icon} className="h-4 w-4" />
+                {labelOf(t, c)}
+                <span className="mc-chip-n">{formatListingCount(liveCount(categoryCounts, c))}</span>
+              </Link>
+            </li>
+          ))}
         </ul>
       )}
 
-      {query ? (
-        <ul className="m-cat-list">
-          {hits.map((cat) => {
-            const up = parentOf(cat);
+      {query && !hits.length ? <p className="mc-empty">{t("nav.cat.empty")}</p> : null}
+
+      {rows.length ? (
+        <ul className="mc-list" aria-label={t("nav.catHome")}>
+          {rows.map((cat) => {
+            const n = liveCount(categoryCounts, cat);
+            const up = query ? parentOf(cat) : undefined;
+            const kids = query ? 0 : visibleChildren(cat).length;
             return (
               <li key={cat.id}>
-                <button type="button" className="m-cat-row" onClick={() => choose(cat)}>
-                  <span className={`cat-ico ${iconTone(cat.icon)}`}>
+                <Link href={hrefForCategory(cat)} className="mc-row">
+                  <span className={`mc-row-ico cat-ico ${iconTone(cat.icon)}`} aria-hidden>
                     <CategoryIcon name={cat.icon} className="h-5 w-5" />
                   </span>
-                  <span className="m-cat-copy">
-                    <span className="m-cat-name">{labelOf(t, cat)}</span>
-                    {up ? <span className="m-cat-sub">{labelOf(t, up)}</span> : null}
+                  <span className="mc-row-copy">
+                    <span className="mc-row-name">{labelOf(t, cat)}</span>
+                    <span className="mc-row-sub">
+                      {up ? `${labelOf(t, up)} · ` : ""}
+                      {t("cat.count", { n: formatListingCount(n) })}
+                      {kids ? ` · ${t("cat.subn", { n: kids })}` : ""}
+                    </span>
                   </span>
-                  <ChevronRight className="m-cat-chev" aria-hidden />
-                </button>
+                  <ChevronRight className="mc-row-chev" aria-hidden />
+                </Link>
               </li>
             );
           })}

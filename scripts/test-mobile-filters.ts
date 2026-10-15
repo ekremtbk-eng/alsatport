@@ -203,7 +203,18 @@ const PROBE = String.raw`
     const hit = document.elementFromPoint(x, y);
     return !!hit && (hit === el || el.contains(hit) || hit.contains(el) || (el.tagName === 'INPUT' && hit.closest('label') === el.closest('label')));
   };
-  window.__mf = { sheet, scrollBox, vis, reachable, textEntry };
+  /** Sideways scroll strip (chips, vehicle types) holding el, if that strip itself sits inside the screen. */
+  const strip = (el) => {
+    for (let p = el.parentElement; p && p !== sheet(); p = p.parentElement) {
+      const ox = getComputedStyle(p).overflowX;
+      if ((ox === 'auto' || ox === 'scroll') && p.scrollWidth > p.clientWidth + 1) {
+        const b = p.getBoundingClientRect();
+        return b.left >= -1 && b.right <= innerWidth + 1 ? p : null;
+      }
+    }
+    return null;
+  };
+  window.__mf = { sheet, scrollBox, vis, reachable, textEntry, strip };
   return true;
 })()`;
 
@@ -229,7 +240,7 @@ const LAYOUT = String.raw`
   const s = __mf.sheet(); const r = s.getBoundingClientRect();
   const head = s.querySelector('.filter-head, .adv-head'); const foot = s.querySelector('.filter-sheet-foot, .adv-foot');
   const hr = head && head.getBoundingClientRect(); const fr = foot && getComputedStyle(foot).display !== 'none' ? foot.getBoundingClientRect() : null;
-  const wide = [...s.querySelectorAll('input, select, button, summary, a, label')].filter(__mf.vis).filter((el) => { const b = el.getBoundingClientRect(); return b.right > innerWidth + 1 || b.left < -1; }).map((el) => (el.className || el.tagName).toString().slice(0, 40));
+  const wide = [...s.querySelectorAll('input, select, button, summary, a, label')].filter(__mf.vis).filter((el) => { const b = el.getBoundingClientRect(); return (b.right > innerWidth + 1 || b.left < -1) && !__mf.strip(el); }).map((el) => (el.className || el.tagName).toString().slice(0, 40));
   const small = [...s.querySelectorAll(__mf.textEntry)].filter((el) => parseFloat(getComputedStyle(el).fontSize) < 16).map((el) => el.className.toString().slice(0, 30));
   return {
     rect: [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)],
@@ -256,6 +267,12 @@ const REACH_ALL = String.raw`
     let box = el.parentElement;
     while (box && box !== s && !(box.matches('[data-filter-scroll]'))) box = box.parentElement;
     if (!box || box === s) continue;
+    const side = __mf.strip(el);
+    if (side) {
+      const a = el.getBoundingClientRect(); const sv = side.getBoundingClientRect();
+      if (a.left < sv.left + 4) side.scrollLeft -= sv.left + 4 - a.left;
+      else if (a.right > sv.right - 4) side.scrollLeft += a.right - (sv.right - 4);
+    }
     const r = el.getBoundingClientRect(); const v = box.getBoundingClientRect();
     if (r.top < v.top + 4) box.scrollTop -= v.top + 4 - r.top;
     else if (r.bottom > Math.min(v.bottom, limit) - 4) box.scrollTop += r.bottom - (Math.min(v.bottom, limit) - 4);
@@ -263,6 +280,7 @@ const REACH_ALL = String.raw`
     if (!__mf.reachable(el, limit)) missed.push((el.getAttribute('aria-label') || el.innerText || el.placeholder || el.className || el.tagName).toString().trim().slice(0, 30));
   }
   s.querySelectorAll('[data-filter-scroll]').forEach((b) => { b.scrollTop = 0; });
+  controls.forEach((el) => { const side = __mf.strip(el); if (side) side.scrollLeft = 0; });
   return { total: controls.length, missed };
 })()`;
 

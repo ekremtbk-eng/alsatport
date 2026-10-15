@@ -34,6 +34,7 @@ export function StoresDirectory({ stores, filters }: { stores: PublicStore[]; fi
   }
 
   const districts = filters.city ? districtsOf(filters.city) : [];
+  const filtered = !!(filters.categoryId || filters.country || filters.city || filters.district || filters.verified);
 
   return (
     <div className="biz-dir">
@@ -122,8 +123,15 @@ export function StoresDirectory({ stores, filters }: { stores: PublicStore[]; fi
             </li>
           ))}
         </ul>
+      ) : filtered ? (
+        <div className="biz-empty-wrap">
+          <p className="biz-empty">{t("biz.stores.empty")}</p>
+          <Link href="/magazalar" className="btn-ghost biz-empty-cta" scroll={false}>
+            {t("biz.stores.clear")}
+          </Link>
+        </div>
       ) : (
-        <p className="biz-empty">{t("biz.stores.empty")}</p>
+        <p className="biz-empty">{t("biz.stores.none")}</p>
       )}
     </div>
   );

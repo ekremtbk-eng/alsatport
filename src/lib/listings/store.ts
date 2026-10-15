@@ -444,6 +444,13 @@ async function ensureCategoryRow(categoryId: string) {
   }
 }
 
+/** The seller's own listing created earlier from the same draft id, so a repeated publish returns it instead of a copy. */
+export async function findOwnDraftListing(user: StoredUser, id: string | undefined) {
+  if (!id || !isUuid(id)) return null;
+  const row = await prisma.listing.findFirst({ where: { id, sellerId: user.id, deletedAt: null }, include: listingInclude });
+  return row ? toClientListing(row) : null;
+}
+
 export async function createListing(user: StoredUser, input: ListingInput) {
   if (input.urgent && !(await sellerCanUseUrgent(user.id))) {
     return { error: "urgent.err.businessOnly" as const, status: 403 as const };
@@ -452,11 +459,19 @@ export async function createListing(user: StoredUser, input: ListingInput) {
   if (!input.images.length) return { error: "photo.minN" as const };
   const category = await ensureCategoryRow(input.categoryId);
   if (!category) return { error: "auth.err.required" as const };
-  const id = input.id && /^[0-9a-f-]{36}$/i.test(input.id) ? input.id : crypto.randomUUID();
+  const clientId = input.id && isUuid(input.id) ? input.id : undefined;
+  // An id already used by someone else is never reused; that request simply gets a fresh one.
+  const taken = clientId ? await prisma.listing.findUnique({ where: { id: clientId }, select: { sellerId: true } }) : null;
+  if (taken && taken.sellerId === user.id) {
+    const existing = await findOwnDraftListing(user, clientId);
+    if (existing) return { listing: existing, ref: null, duplicate: true as const };
+  }
+  const id = clientId && !taken ? clientId : crypto.randomUUID();
   const listingNo =
     input.listingNo || `AP-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 8)}`;
   const period = newPeriod();
-  const row = await prisma.$transaction(async (tx) => {
+  const outcome = await prisma
+    .$transaction(async (tx) => {
     const created = await tx.listing.create({
       data: {
         id,
@@ -490,10 +505,19 @@ export async function createListing(user: StoredUser, input: ListingInput) {
       where: { userId: user.id },
       data: { listingsPosted: { increment: 1 } },
     });
-    return created;
-  });
+    return { kind: "created" as const, row: created };
+  })
+    .catch(async (err: unknown) => {
+      // Two publishes of one draft raced past the lookup: the loser returns the winner's listing.
+      if (id === clientId && (err as { code?: string })?.code === "P2002") {
+        const existing = await findOwnDraftListing(user, id);
+        if (existing) return { kind: "existing" as const, listing: existing };
+      }
+      throw err;
+    });
+  if (outcome.kind === "existing") return { listing: outcome.listing, ref: null, duplicate: true as const };
   invalidateCategoryCounts();
-  return { listing: toClientListing(row), ref: listingRef(row) };
+  return { listing: toClientListing(outcome.row), ref: listingRef(outcome.row), duplicate: false as const };
 }
 
 function listingRef(row: { id: string; title: string; sellerId: string; expiresAt: Date | null }): ListingRef {

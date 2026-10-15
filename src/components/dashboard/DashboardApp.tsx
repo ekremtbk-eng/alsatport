@@ -53,6 +53,7 @@ import {
 } from "@/lib/dashboardNav";
 import { DashboardPanel } from "./DashboardPanels";
 import { ListingNavGroup } from "./ListingNavGroup";
+import { SellerAvatar } from "@/components/SellerAvatar";
 
 const DASH_ICONS: Record<string, LucideIcon> = {
   ozet: LayoutDashboard,
@@ -138,12 +139,25 @@ export function DashboardApp({ initialPanel }: { initialPanel?: DashPanelId }) {
     );
   }
 
+  const current = labelKeyOf(DASH_NAV, panel);
   return (
     <div className="dash-page">
       <div className="dash-layout">
-        <button type="button" className="dash-menu-toggle" onClick={() => setOpen((v) => !v)}>
+        <div className="dash-m-head">
+          <SellerAvatar src={user.avatar} name={user.displayName || user.username} className="dash-m-avatar" />
+          <div className="min-w-0 flex-1">
+            <p className="dash-m-name">{user.displayName}</p>
+            <p className="dash-m-sub">{user.email || `@${user.username}`}</p>
+          </div>
+          <button type="button" className="dash-m-edit" onClick={() => go("kisisel")}>
+            {t("common.edit")}
+          </button>
+        </div>
+        <button type="button" className="dash-menu-toggle" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
           <Menu className="h-4 w-4" />
-          {t("dash.menu")}
+          <span>{t("dash.menu")}</span>
+          {current ? <span className="dash-menu-current">{t(current)}</span> : null}
+          <ChevronDown className={`dash-menu-chev h-4 w-4 ${open ? "rotate-180" : ""}`} />
         </button>
         <aside className={`dash-nav ${open ? "is-open" : ""}`}>
           <DashTree
@@ -161,6 +175,17 @@ export function DashboardApp({ initialPanel }: { initialPanel?: DashPanelId }) {
       </div>
     </div>
   );
+}
+
+function labelKeyOf(nodes: DashNode[], id: DashPanelId): string {
+  for (const node of nodes) {
+    if (node.kind === "item" && node.id === id) return node.labelKey;
+    if (node.kind === "group") {
+      const hit = labelKeyOf(node.children, id);
+      if (hit) return hit;
+    }
+  }
+  return "";
 }
 
 function DashTree({

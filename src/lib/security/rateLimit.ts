@@ -48,11 +48,41 @@ export function clientRateKey(req: Request, kind: string) {
   return `${kind}:${who}`;
 }
 
+const DEVICE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function deviceId(req: Request) {
+  const raw = req.headers.get("cookie") ?? "";
+  const did = raw.match(new RegExp(`(?:^|;\\s*)${COOKIE_DEVICE}=([^;]+)`))?.[1]?.trim() ?? "";
+  return DEVICE_ID.test(did) ? did.toLowerCase() : "";
+}
+
+/**
+ * General API budget. Each browser (device cookie) gets its own bucket so people behind one shared IP
+ * (office, mobile carrier NAT) do not exhaust each other's quota; a wider per-IP ceiling still caps a
+ * client that rotates or drops the cookie. Requests without a valid device cookie share one bucket per IP.
+ */
+export function apiRateLimit(req: Request, write: boolean) {
+  const spec = write ? LIMITS.apiWrite : LIMITS.apiRead;
+  const kind = write ? "api-write" : "api-get";
+  const ip = clientIp(req);
+  const did = deviceId(req);
+  if (isLoopback(ip)) return rateLimit(`${kind}:${did || "local"}`, spec.limit, spec.windowMs, req);
+  const own = rateLimit(`${kind}:${ip}:${did || "-"}`, spec.limit, spec.windowMs, req);
+  if (!own.ok) return own;
+  const shared = write ? LIMITS.apiWriteIp : LIMITS.apiReadIp;
+  return rateLimit(`${kind}-ip:${ip}`, shared.limit, shared.windowMs, req);
+}
+
+const PRUNE_AT = 20_000;
+
 export function rateLimit(key: string, limit: number, windowMs: number, req?: Request) {
   if (isLocalDevRequest(req)) {
     return { ok: true as const, remaining: limit, retryAfter: 0 };
   }
   const now = Date.now();
+  if (store.size > PRUNE_AT) {
+    for (const [k, b] of store) if (b.resetAt < now) store.delete(k);
+  }
   const bucket = store.get(key);
   if (!bucket || bucket.resetAt < now) {
     store.set(key, { count: 1, resetAt: now + windowMs });
@@ -80,4 +110,6 @@ export const LIMITS = {
   avatar: { limit: 8, windowMs: 60 * 60 * 1000 },
   apiRead: { limit: 120, windowMs: 60 * 1000 },
   apiWrite: { limit: 40, windowMs: 60 * 1000 },
+  apiReadIp: { limit: 480, windowMs: 60 * 1000 },
+  apiWriteIp: { limit: 160, windowMs: 60 * 1000 },
 } as const;

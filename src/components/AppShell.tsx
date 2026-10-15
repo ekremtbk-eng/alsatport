@@ -10,6 +10,7 @@ import { CompletionGuard } from "./CompletionGuard";
 import { LocationPrompt } from "./LocationPrompt";
 import { CelebrationHost } from "./CelebrationHost";
 import { NotificationToasts } from "./NotificationToasts";
+import { SessionNotice } from "./SessionNotice";
 import { useI18n } from "@/context/I18nContext";
 import { isServicesPortalPath, ServicesPortalNav } from "@/components/ServicesPortalNav";
 import { MobileSplash } from "@/components/home/MobileSplash";
@@ -38,6 +39,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <MobileSplash />
         <CompletionGuard />
         {isServicesPortalPath(path) ? <ServicesPortalNav /> : <Header />}
+        <SessionNotice />
         <LocationPrompt />
         <CelebrationHost />
         <main id="main-content">{children}</main>
