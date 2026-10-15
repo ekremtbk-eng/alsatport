@@ -34,6 +34,7 @@ const storeSelect = {
     district: true,
     showContactName: true,
     contactName: true,
+    showPhone: true,
   },
 } as const;
 
@@ -70,6 +71,14 @@ export async function sellerCanUseUrgent(userId: string) {
   return sellerUrgentEligible(seller);
 }
 
+/**
+ * A store that turned its phone off hides the owner's number on every listing and reveal path, whatever its
+ * status: the choice outlives a revocation, re-application or rejection. Sellers without a store row are unaffected.
+ */
+export function storeHidesPhone(business: { showPhone: boolean } | null | undefined) {
+  return !!business && !business.showPhone;
+}
+
 function storeRef(business: StoreRow | null | undefined): Listing["store"] {
   if (!business || business.status !== "approved") return undefined;
   return {
@@ -103,7 +112,9 @@ export function toClientListing(row: ListingWithRelations): Listing {
                 : "passive";
   const postedAt = (row.postedAt ?? row.createdAt).getTime();
   const phone =
-    row.seller.profile?.phoneVerifiedAt && row.seller.profile.phone ? row.seller.profile.phone : "";
+    row.seller.profile?.phoneVerifiedAt && row.seller.profile.phone && !storeHidesPhone(row.seller.business)
+      ? row.seller.profile.phone
+      : "";
   const sellerSince = row.seller.createdAt.toLocaleDateString("tr-TR", {
     month: "long",
     year: "numeric",

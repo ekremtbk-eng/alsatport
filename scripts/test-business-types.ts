@@ -4,7 +4,11 @@
  *   BUSINESS_TEST_BASE=http://localhost:3013 DATABASE_URL=<local> AUTH_SECRET=<same as server> npx tsx scripts/test-business-types.ts
  *
  * For each store category (= business type) with the four company types rotated: apply → admin approve → listing →
- * store page, listing detail card, listing API ref, owner panel + display preferences → /magazalar.
+ * store page, listing detail card, listing API ref, owner panel + display preferences, phone privacy (listing hint,
+ * reveal API, detail/store HTML) with the store phone on, off and on again → /magazalar; then unauthorized phone
+ * reveal / preference attempts and an individual seller whose phone flow must stay unchanged. Finally two hidden-phone
+ * stores are revoked (and one re-applies and is rejected): the number must stay hidden, while a seller whose rejected
+ * application kept the default preferences still reveals as before.
  * Creates throw-away users (`*@typetest.invalid`) and removes them, their stores, listings and uploads at the end.
  */
 import { randomBytes } from "node:crypto";
@@ -134,6 +138,7 @@ async function uploadImage(s: Sess, kind: "logo" | "cover") {
   form.append("file", new Blob([new Uint8Array(bytes)], { type: "image/png" }), `${kind}.png`);
   form.append("kind", kind);
   const r = await send("POST", "/api/account/business/media", s, form);
+  if (!r.json.url) console.log(`      ${kind} upload failed — status ${r.status} ${String(r.json.error ?? r.text.slice(0, 120))}`);
   return String(r.json.url ?? "");
 }
 
@@ -178,8 +183,11 @@ async function main() {
       const companyType = COMPANY_TYPES[i % COMPANY_TYPES.length];
       const id = cat.id;
       const typeLabel = tr[businessTypeKey(id)];
-      const owner = await makeUser(`o${i}`, "seller", `53${String(Date.now() + i).slice(-8)}`);
+      const ownerPhone = `53${String(Date.now() + i).slice(-8)}`;
+      const owner = await makeUser(`o${i}`, "seller", ownerPhone);
+      await prisma.profile.update({ where: { userId: owner.id }, data: { phoneVerifiedAt: new Date() } });
       const sOwner = await makeSession(owner);
+      const sViewer = await makeSession(await makeUser(`v${i}`, "member"));
       const name = `Typetest ${id} ${TAG}`;
       names.push(name);
 
@@ -248,6 +256,11 @@ async function main() {
         r = await call("GET", `/api/listings?sellerId=${owner.id}`, null);
         const ref = ((r.json.listings as Record<string, unknown>[] | undefined) ?? []).find((l) => l.id === listing.id)?.store as Record<string, unknown> | undefined;
         check(`${id}.ref`, "Listing API store ref carries the category", ref?.slug === slug && ref?.categoryId === id && !("contactName" in ref), JSON.stringify(ref ?? null));
+        r = await call("GET", `/api/listings/${listing.id}`, null);
+        const hint = String((r.json.listing as Record<string, unknown> | undefined)?.sellerPhone ?? "");
+        check(`${id}.phHint`, "Phone shown (default): listing API carries only a masked hint", hint.includes("*") && hint.endsWith(ownerPhone.slice(-2)) && !r.text.includes(ownerPhone), hint);
+        r = await call("POST", `/api/listings/${listing.id}/phone`, sViewer, {});
+        check(`${id}.phReveal`, "Phone shown (default): member reveal returns the number", r.status === 200 && r.json.phone === ownerPhone, `status ${r.status} ${String(r.json.error ?? "")}`);
       }
 
       r = await call("GET", "/isletme-paneli", sOwner);
@@ -257,13 +270,183 @@ async function main() {
       check(`${id}.prefs`, "Owner saves display preferences + team", r.status === 200 && saved?.showContactName === true && saved?.showPhone === false, `status ${r.status} ${String(r.json.error ?? "")}`);
       r = await call("GET", `/magaza/${slug}`, null);
       check(`${id}.shown`, "Opt-in contact person + team visible", r.text.includes("Deneme Yetkili") && r.text.includes('id="ekibimiz"') && r.text.includes("Deneme Üye"));
-      r = await call("GET", `/api/stores/${slug}/contact`, sOther);
+      r = await call("GET", `/api/stores/${slug}/contact`, sViewer);
       check(`${id}.contact`, "Contact API respects phone preference", r.status === 200 && r.json.phone === "" && !!r.json.email, JSON.stringify(r.json));
+
+      if (listing) {
+        const tail = ownerPhone.slice(-2);
+        const masked = `${ownerPhone.slice(0, 4)} *** ** ${tail}`;
+        r = await call("GET", `/api/listings/${listing.id}`, null);
+        const one = r.json.listing as Record<string, unknown> | undefined;
+        const list = await call("GET", `/api/listings?sellerId=${owner.id}`, null);
+        const mine = ((list.json.listings as Record<string, unknown>[] | undefined) ?? []).find((l) => l.id === listing.id);
+        check(
+          `${id}.phHidden`,
+          "Phone hidden: no hint in listing / seller APIs",
+          !!one && !one.sellerPhone && !!mine && !mine.sellerPhone && !r.text.includes(masked) && !list.text.includes(masked),
+          `one=${String(one?.sellerPhone ?? "")} list=${String(mine?.sellerPhone ?? "")}`,
+        );
+        const page = id === "services" ? `/ustalar-hizmetler/firma/${listing.id}` : `/ilan/${listing.id}`;
+        const [detail, store] = await Promise.all([call("GET", page, null), call("GET", `/magaza/${slug}`, null)]);
+        check(
+          `${id}.phPages`,
+          "Phone hidden: detail + store HTML carry neither number nor hint",
+          detail.status === 200 && ![detail.text, store.text].some((t) => t.includes(ownerPhone) || t.includes(masked)),
+          `status ${detail.status}`,
+        );
+        r = await call("POST", `/api/listings/${listing.id}/phone`, sViewer, {});
+        check(`${id}.phBlocked`, "Phone hidden: member reveal refused", r.status === 404 && r.json.error === "seller.nophone" && !r.text.includes(ownerPhone), `status ${r.status}`);
+
+        r = await call("PATCH", "/api/account/business", sOwner, { showPhone: true });
+        check(`${id}.phOn`, "Owner turns the phone back on", r.status === 200 && (r.json.business as Record<string, unknown> | undefined)?.showPhone === true, `status ${r.status}`);
+        r = await call("POST", `/api/listings/${listing.id}/phone`, sViewer, {});
+        const back = await call("GET", `/api/listings/${listing.id}`, null);
+        const hintBack = String((back.json.listing as Record<string, unknown> | undefined)?.sellerPhone ?? "");
+        check(`${id}.phRestored`, "Phone shown again: hint + reveal work", r.status === 200 && r.json.phone === ownerPhone && hintBack.endsWith(tail), `status ${r.status}`);
+        await call("PATCH", "/api/account/business", sOwner, { showPhone: false });
+      }
     }
+
+    // ---------- Unauthorized access + individual sellers (phone reveal) ----------
+    const hidden = await prisma.listing.findFirst({ where: { title: `Typetest ilan ${types[0].id} ${TAG}` }, select: { id: true, sellerId: true } });
+    if (hidden) {
+      const anonCsrf = randomBytes(32).toString("hex");
+      let r = await call("POST", `/api/listings/${hidden.id}/phone`, { cookie: `ap_csrf=${anonCsrf}`, csrf: anonCsrf }, {});
+      check("A1", "Reveal with a valid CSRF pair but no session is rejected", r.status === 401 && !r.text.includes('"phone"'), `status ${r.status}`);
+      const noCsrf = await fetch(`${BASE}/api/listings/${hidden.id}/phone`, {
+        method: "POST",
+        headers: { cookie: sOther.cookie, "content-type": "application/json" },
+        body: "{}",
+      });
+      check("A2", "Reveal without CSRF token is rejected", noCsrf.status === 403, `status ${noCsrf.status}`);
+      r = await call("POST", "/api/listings/not-a-uuid/phone", sOther, {});
+      check("A3", "Reveal with a malformed id is rejected", r.status === 400, `status ${r.status}`);
+      r = await call("PATCH", "/api/account/business", sOther, { showPhone: true });
+      const still = await prisma.businessAccount.findUnique({ where: { userId: hidden.sellerId }, select: { showPhone: true } });
+      check("A4", "Non-owner cannot switch a store's phone back on", r.status === 404 && still?.showPhone === false, `status ${r.status}`);
+      r = await call("GET", `/api/stores/${(await prisma.businessAccount.findUnique({ where: { userId: hidden.sellerId }, select: { slug: true } }))?.slug}/contact`, null);
+      check("A5", "Store contact API without session is rejected", r.status === 401 || r.status === 403, `status ${r.status}`);
+      r = await call("POST", `/api/listings/${hidden.id}/phone`, sAdmin, {});
+      check("A6", "Hidden phone is not revealed even to admin sessions", r.status === 404 && r.json.error === "seller.nophone", `status ${r.status}`);
+    }
+
+    const indPhone = `54${String(Date.now()).slice(-8)}`;
+    const ind = await makeUser("ind", "seller", indPhone);
+    await prisma.profile.update({ where: { userId: ind.id }, data: { phoneVerifiedAt: new Date() } });
+    const indListing = await prisma.listing.create({
+      data: {
+        listingNo: `TTI${Date.now()}`,
+        sellerId: ind.id,
+        categoryId: leavesOf(types.find((c) => c.id === "shopping") ?? types[0]).find((c) => known.has(c)) ?? "",
+        title: `Typetest bireysel ${TAG}`,
+        description: "Geçici yerel test ilanı.",
+        price: 500,
+        city: "Ankara",
+        district: "Çankaya",
+        status: "active",
+        postedAt: new Date(),
+        expiresAt: new Date(Date.now() + 30 * 864e5),
+      },
+    });
+    let ir = await call("GET", `/api/listings/${indListing.id}`, null);
+    const indHint = String((ir.json.listing as Record<string, unknown> | undefined)?.sellerPhone ?? "");
+    check("I1", "Individual seller: masked hint unchanged", indHint.includes("*") && indHint.endsWith(indPhone.slice(-2)) && !ir.text.includes(indPhone), indHint);
+    ir = await call("POST", `/api/listings/${indListing.id}/phone`, sOther, {});
+    check("I2", "Individual seller: member reveal unchanged", ir.status === 200 && ir.json.phone === indPhone, `status ${ir.status} ${String(ir.json.error ?? "")}`);
+    ir = await call("POST", `/api/listings/${indListing.id}/phone`, null, {});
+    check("I3", "Individual seller: anonymous reveal still rejected", ir.status === 401 || ir.status === 403, `status ${ir.status}`);
 
     const r = await call("GET", "/magazalar", null);
     const absent = names.filter((n) => !r.text.includes(n));
     check("M1", `All ${names.length} type stores listed on /magazalar`, r.status === 200 && absent.length === 0, absent.join(", "));
+
+    // ---------- Phone preference survives revocation / rejection ----------
+    for (const [cat, how] of [[types[1], "revoked"], [types[2], "rejected"]] as const) {
+      const l = await prisma.listing.findFirst({ where: { title: `Typetest ilan ${cat.id} ${TAG}` }, select: { id: true, sellerId: true } });
+      const b = l && (await prisma.businessAccount.findUnique({ where: { userId: l.sellerId }, select: { id: true, slug: true } }));
+      const p = l && (await prisma.profile.findUnique({ where: { userId: l.sellerId }, select: { phone: true } }));
+      if (!l || !b || !p?.phone) {
+        check(`L.${how}`, `Fixture for the ${how} store`, false, "missing listing / store / phone");
+        continue;
+      }
+      let lr = await call("POST", `/api/admin/business/${b.id}`, sAdmin, { action: "revoke", reason: "Yerel test iptali" });
+      let ok = lr.status === 200;
+      if (how === "rejected") {
+        // Rejection only applies to pending applications: a revoked store re-applies and keeps its saved preferences.
+        await prisma.businessAccount.update({ where: { id: b.id }, data: { status: "pending" } });
+        lr = await call("POST", `/api/admin/business/${b.id}`, sAdmin, { action: "reject", reason: "Yerel test reddi" });
+        ok = ok && lr.status === 200;
+      }
+      const row = await prisma.businessAccount.findUnique({ where: { id: b.id }, select: { status: true, showPhone: true } });
+      check(`L.${how}`, `Admin moves the hidden-phone store to ${how}; preference kept`, ok && row?.status === how && row.showPhone === false, `status ${lr.status} ${row?.status}`);
+
+      const masked = `${p.phone.slice(0, 4)} *** ** ${p.phone.slice(-2)}`;
+      const page = cat.id === "services" ? `/ustalar-hizmetler/firma/${l.id}` : `/ilan/${l.id}`;
+      const [one, list, detail] = await Promise.all([
+        call("GET", `/api/listings/${l.id}`, null),
+        call("GET", `/api/listings?sellerId=${l.sellerId}`, null),
+        call("GET", page, null),
+      ]);
+      const mine = ((list.json.listings as Record<string, unknown>[] | undefined) ?? []).find((x) => x.id === l.id);
+      check(
+        `L.${how}.hint`,
+        `${how} store: listing APIs + detail HTML carry neither number nor hint`,
+        one.status === 200 && !(one.json.listing as Record<string, unknown> | undefined)?.sellerPhone && !!mine && !mine.sellerPhone &&
+          detail.status === 200 && ![one.text, list.text, detail.text].some((t) => t.includes(p.phone!) || t.includes(masked)),
+        `listing ${one.status} detail ${detail.status}`,
+      );
+      lr = await call("POST", `/api/listings/${l.id}/phone`, sOther, {});
+      check(`L.${how}.reveal`, `${how} store: member reveal refused`, lr.status === 404 && lr.json.error === "seller.nophone" && !lr.text.includes(p.phone), `status ${lr.status}`);
+      lr = await call("GET", `/magaza/${b.slug}`, null);
+      check(`L.${how}.store`, `${how} store page is no longer public`, lr.status === 404 && !lr.text.includes(p.phone), `status ${lr.status}`);
+    }
+
+    const appPhone = `55${String(Date.now()).slice(-8)}`;
+    const applicant = await makeUser("appl", "seller", appPhone);
+    await prisma.profile.update({ where: { userId: applicant.id }, data: { phoneVerifiedAt: new Date() } });
+    await prisma.businessAccount.create({
+      data: {
+        userId: applicant.id,
+        slug: `typetest-appl-${TAG}`,
+        status: "rejected",
+        rejectReason: "Yerel test reddi",
+        name: `Typetest başvuru ${TAG}`,
+        contactName: "Deneme Yetkili",
+        companyType: COMPANY_TYPES[0],
+        taxOffice: "Çankaya VD",
+        taxNumber: "1234567890",
+        categoryId: types[0].id,
+        city: "Ankara",
+        district: "Çankaya",
+        description: "Geçici yerel test başvurusu açıklaması.",
+        email: `appl-${TAG}@${DOMAIN}`,
+        phone: "0312 555 00 00",
+      },
+    });
+    const appListing = await prisma.listing.create({
+      data: {
+        listingNo: `TTA${Date.now()}`,
+        sellerId: applicant.id,
+        categoryId: indListing.categoryId,
+        title: `Typetest başvuru ilanı ${TAG}`,
+        description: "Geçici yerel test ilanı.",
+        price: 600,
+        city: "Ankara",
+        district: "Çankaya",
+        status: "active",
+        postedAt: new Date(),
+        expiresAt: new Date(Date.now() + 30 * 864e5),
+      },
+    });
+    ir = await call("GET", `/api/listings/${appListing.id}`, null);
+    const appHint = String((ir.json.listing as Record<string, unknown> | undefined)?.sellerPhone ?? "");
+    const appReveal = await call("POST", `/api/listings/${appListing.id}/phone`, sOther, {});
+    check(
+      "I4",
+      "Seller with a rejected application and default preferences: hint + reveal unchanged",
+      appHint.endsWith(appPhone.slice(-2)) && appReveal.status === 200 && appReveal.json.phone === appPhone,
+      `hint=${appHint} status ${appReveal.status}`,
+    );
   } finally {
     const tagged = await prisma.user.findMany({ where: { email: { endsWith: `-${TAG}@${DOMAIN}` } }, select: { id: true } });
     const ids = tagged.map((u) => u.id);

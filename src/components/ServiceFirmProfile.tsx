@@ -490,15 +490,17 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
         <aside className="firm-side">
           {listing.store ? <StoreRefCard store={listing.store} /> : null}
           <div className="firm-actions">
-            <button type="button" className="firm-phone" onClick={revealPhone}>
-              {phoneOpen && phone ? t("list.hide") : t("firm.phone")}
-            </button>
+            {phoneHint ? (
+              <button type="button" className="firm-phone" onClick={revealPhone}>
+                {phoneOpen && phone ? t("list.hide") : t("firm.phone")}
+              </button>
+            ) : (
+              <p className="firm-hint">{t("seller.nophone")}</p>
+            )}
             {phoneOpen && phone ? (
               <a className="firm-phone-num" href={telHref}>
                 {phone}
               </a>
-            ) : phoneOpen && !phoneHint ? (
-              <p className="firm-hint">{t("seller.nophone")}</p>
             ) : null}
             <button type="button" className="firm-quote" onClick={openQuote}>
               {t("firm.quote")}

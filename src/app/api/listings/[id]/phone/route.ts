@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { writeAudit } from "@/lib/admin/audit";
 import { isUuid } from "@/lib/ids";
 import { isLiveRow } from "@/lib/listings/lifecycle";
+import { storeHidesPhone } from "@/lib/listings/store";
 import { clientIp } from "@/lib/security/rateLimit";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
 import { THROTTLE, throttle, tooMany } from "@/lib/security/throttle";
@@ -49,7 +50,13 @@ export async function POST(req: Request, ctx: Ctx) {
       status: true,
       expiresAt: true,
       sellerId: true,
-      seller: { select: { bannedAt: true, profile: { select: { phone: true, phoneVerifiedAt: true } } } },
+      seller: {
+        select: {
+          bannedAt: true,
+          profile: { select: { phone: true, phoneVerifiedAt: true } },
+          business: { select: { showPhone: true } },
+        },
+      },
     },
   });
   const owner = row?.sellerId === auth.user.id || auth.user.role === "admin";
@@ -57,7 +64,8 @@ export async function POST(req: Request, ctx: Ctx) {
     return NextResponse.json({ ok: false, error: "auth.err.session" }, { status: 404 });
   }
   const profile = row.seller.profile;
-  const phone = profile?.phoneVerifiedAt && profile.phone ? profile.phone : "";
+  const phone =
+    profile?.phoneVerifiedAt && profile.phone && !storeHidesPhone(row.seller.business) ? profile.phone : "";
   if (!phone) return NextResponse.json({ ok: false, error: "seller.nophone" }, { status: 404 });
   return NextResponse.json({ ok: true, phone }, { headers: { "Cache-Control": "no-store" } });
 }
