@@ -330,7 +330,7 @@ async function main() {
       `found=${!!pub} sellerName=${String(pub?.sellerName)} sellerBusiness=${String(pub?.sellerBusiness)}`,
     );
     r = await call("GET", `/ilan/${listingId}`, null);
-    check("L5", "Listing detail public; shows Mağazaya Git link", r.status === 200 && r.text.includes(`/magaza/${slug}`) && r.text.includes("Mağazaya Git"), `status ${r.status}`);
+    check("L5", "Listing detail public; shows Mağazayı Görüntüle link", r.status === 200 && r.text.includes(`/magaza/${slug}`) && r.text.includes("Mağazayı Görüntüle"), `status ${r.status}`);
     r = await call("GET", `/magaza/${slug}`, null);
     check("L6", "Store page lists the new listing", r.text.includes(`Biztest kulaklık ${TAG}`));
     r = await call("GET", "/api/account/business", sCorp);

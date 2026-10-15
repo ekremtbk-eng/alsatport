@@ -95,7 +95,25 @@ export function isValidTaxNumber(value: string, city?: string) {
   return /^\d{10,11}$/.test(value);
 }
 
-export type StoreRef = { slug: string; name: string; logo?: string };
+export type StoreRef = { slug: string; name: string; logo?: string; categoryId?: string; city?: string; district?: string };
+
+const BUSINESS_TYPE_KEYS: Record<string, string> = {
+  emlak: "biz.type.emlak",
+  vasita: "biz.type.vasita",
+  parts: "biz.type.parts",
+  shopping: "biz.type.shopping",
+  machines: "biz.type.machines",
+  services: "biz.type.services",
+  tutors: "biz.type.tutors",
+  jobs: "biz.type.jobs",
+  pets: "biz.type.pets",
+  helpers: "biz.type.helpers",
+};
+
+/** i18n key of the business type implied by the store's own main category (e.g. Vasıta → "Oto Galeri"). */
+export function businessTypeKey(categoryId: string | undefined) {
+  return (categoryId && BUSINESS_TYPE_KEYS[categoryId]) || "biz.type.store";
+}
 
 /** Public store data only: never tax data, contact person or private contact details. */
 export type PublicStore = {
@@ -112,6 +130,9 @@ export type PublicStore = {
   memberSince: number;
   activeCount: number;
   soldCount: number;
+  /** Store page only (owner-entered, empty when not provided). */
+  hours?: FirmExtras["hours"];
+  serviceDistricts?: string[];
 };
 
 export type OwnerStats = {

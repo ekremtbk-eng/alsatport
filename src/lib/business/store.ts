@@ -420,8 +420,9 @@ export async function findPublicStore(slug: string): Promise<{
       take: 60,
     }),
   ]);
+  const { hours, serviceDistricts } = readFirmExtras(row);
   return {
-    store: toPublicStore(row, counts),
+    store: { ...toPublicStore(row, counts), hours, serviceDistricts },
     sellerId: row.userId,
     active: activeRows.map((r) => hideSellerPhone(toClientListing(r))),
     sold: soldRows.map((r) => hideSellerPhone(toClientListing(r))),

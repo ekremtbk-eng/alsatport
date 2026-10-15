@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { MapPin, Store } from "lucide-react";
 import { useI18n } from "@/context/I18nContext";
-import type { StoreRef } from "@/lib/business/shared";
+import { businessTypeKey, type StoreRef } from "@/lib/business/shared";
 
 export function VerifiedBusinessBadge({ compact = false }: { compact?: boolean }) {
   const { t } = useI18n();
@@ -32,25 +33,41 @@ export function StoreLogo({ name, src, size = 48 }: { name: string; src?: string
   );
 }
 
-/** Seller block addition on listing detail pages for admin-approved stores. */
-export function StoreRefCard({ store }: { store: StoreRef }) {
+/**
+ * Corporate seller card on listing detail pages. `store` is only set for admin-approved stores,
+ * which is what the verified badge means; nothing here is shown for individual sellers.
+ */
+export function StoreRefCard({ store, main = false }: { store: StoreRef; main?: boolean }) {
   const { t } = useI18n();
   const href = `/magaza/${store.slug}`;
+  const where = [store.district, store.city].filter(Boolean).join(", ");
   return (
-    <div className="biz-ref">
-      <Link href={href} className="biz-ref-head">
-        <StoreLogo name={store.name} src={store.logo} size={44} />
+    <div className={`biz-ref${main ? " is-main" : ""}`}>
+      <div className="biz-ref-head">
+        <Link href={href} className="biz-ref-logo" aria-label={store.name}>
+          <StoreLogo name={store.name} src={store.logo} size={main ? 64 : 44} />
+        </Link>
         <span className="min-w-0">
-          <span className="biz-ref-name">{store.name}</span>
+          <Link href={href} className="biz-ref-name">
+            {store.name}
+          </Link>
+          <span className="biz-ref-type">{t(businessTypeKey(store.categoryId))}</span>
           <VerifiedBusinessBadge />
         </span>
-      </Link>
+      </div>
+      {where ? (
+        <p className="biz-ref-place">
+          <MapPin aria-hidden="true" />
+          {where}
+        </p>
+      ) : null}
       <div className="biz-ref-actions">
         <Link href={href} className="biz-btn is-primary">
+          <Store aria-hidden="true" className="h-4 w-4" />
           {t("biz.goStore")}
         </Link>
         <Link href={`${href}#ilanlar`} className="biz-btn">
-          {t("biz.otherListings")}
+          {t("biz.allListings")}
         </Link>
       </div>
     </div>

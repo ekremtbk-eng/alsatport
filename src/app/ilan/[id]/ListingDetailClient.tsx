@@ -290,6 +290,8 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
     </>
   );
 
+  const contactAside = <div className="detail-contact-aside hidden rounded-xl border border-line bg-card p-3 lg:block">{contact}</div>;
+
   if (isClassifiedPartsListing(listing.categoryId)) {
     return (
       <div className="detail-page mx-auto max-w-6xl pb-8">
@@ -483,22 +485,29 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
 
         <aside className="detail-aside">
           <section className="rounded-xl border border-line bg-card p-3 shadow-sm">
-            <div className="flex items-start gap-3">
-              <SellerAvatar src={listing.sellerAvatar} name={listingSellerLabel(listing)} className="h-12 w-12 rounded-full object-cover" />
-              <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-1.5 font-semibold text-ink">
-                  {listingSellerLabel(listing)}
-                  {listing.sellerVerified && <VerifiedBadge size={18} />}
-                </p>
-                <p className="text-xs text-muted">
-                  {listing.sellerVerified ? t("list.seller.v") : t("prof.member")}
-                </p>
+            {listing.store ? (
+              <>
+                <StoreRefCard store={listing.store} main />
                 <SellerRatingBlock reviews={reviews} verified={listing.sellerVerified} />
+              </>
+            ) : (
+              <div className="flex items-start gap-3">
+                <SellerAvatar src={listing.sellerAvatar} name={listingSellerLabel(listing)} className="h-12 w-12 rounded-full object-cover" />
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-1.5 font-semibold text-ink">
+                    {listingSellerLabel(listing)}
+                    {listing.sellerVerified && <VerifiedBadge size={18} />}
+                  </p>
+                  <p className="text-xs text-muted">
+                    {listing.sellerVerified ? t("list.seller.v") : t("prof.member")}
+                  </p>
+                  <SellerRatingBlock reviews={reviews} verified={listing.sellerVerified} />
+                </div>
+                <Link href={`/satici/${listing.sellerId}`} className="text-sm font-semibold text-lime">
+                  {t("nav.profile")}
+                </Link>
               </div>
-              <Link href={`/satici/${listing.sellerId}`} className="text-sm font-semibold text-lime">
-                {t("nav.profile")}
-              </Link>
-            </div>
+            )}
             <dl className="seller-meta">
               <div>
                 <dt>{t("seller.since")}</dt>
@@ -509,10 +518,10 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
               {memberYears > 0 ? <span className="seller-pill">{t("seller.years", { n: memberYears })}</span> : null}
               {listing.sellerVerified ? <span className="seller-pill is-ok">{t("badge.verified")}</span> : null}
             </div>
-            {listing.store ? <StoreRefCard store={listing.store} /> : null}
           </section>
+          {listing.store ? contactAside : null}
           <SellerReviews sellerId={listing.sellerId} listingId={listing.id} />
-          <div className="detail-contact-aside hidden rounded-xl border border-line bg-card p-3 lg:block">{contact}</div>
+          {listing.store ? null : contactAside}
         </aside>
       </div>
 

@@ -115,17 +115,22 @@ export function ClassifiedListingView({
         </div>
 
         <aside className="classified-seller">
-          <p className="classified-seller-kicker">{shop ? t("seller.store") : t("list.seller.v")}</p>
-          <p className="classified-seller-name">
-            {listingSellerLabel(listing)}
-            {listing.sellerVerified ? <VerifiedBadge size={16} /> : null}
-          </p>
-          <div className="classified-seller-links">
-            <Link href={`/satici/${listing.sellerId}`}>{t("list.allAds")}</Link>
-            <span>·</span>
-            <Link href={`/satici/${listing.sellerId}`}>{t("nav.profile")}</Link>
-          </div>
-          {listing.store ? <StoreRefCard store={listing.store} /> : null}
+          {listing.store ? (
+            <StoreRefCard store={listing.store} main />
+          ) : (
+            <>
+              <p className="classified-seller-kicker">{shop ? t("seller.store") : t("list.seller.v")}</p>
+              <p className="classified-seller-name">
+                {listingSellerLabel(listing)}
+                {listing.sellerVerified ? <VerifiedBadge size={16} /> : null}
+              </p>
+              <div className="classified-seller-links">
+                <Link href={`/satici/${listing.sellerId}`}>{t("list.allAds")}</Link>
+                <span>·</span>
+                <Link href={`/satici/${listing.sellerId}`}>{t("nav.profile")}</Link>
+              </div>
+            </>
+          )}
           {phone ? (
             <ul className="classified-phones">
               {shop ? (

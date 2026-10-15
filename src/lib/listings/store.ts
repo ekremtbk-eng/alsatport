@@ -23,7 +23,9 @@ import { type ListingCurrency, listingCurrencyOf, parseListingCurrency } from "@
 import { type Country, cityWhereForCountry, isKktcCity, kktcNeighborhoodsOf } from "@/data/locations";
 import { districtsOf } from "@/data/turkey";
 
-const storeSelect = { select: { status: true, slug: true, name: true, logoUrl: true } } as const;
+const storeSelect = {
+  select: { status: true, slug: true, name: true, logoUrl: true, categoryId: true, city: true, district: true },
+} as const;
 
 type StoreRow = Prisma.BusinessAccountGetPayload<typeof storeSelect>;
 
@@ -60,7 +62,14 @@ export async function sellerCanUseUrgent(userId: string) {
 
 function storeRef(business: StoreRow | null | undefined): Listing["store"] {
   if (!business || business.status !== "approved") return undefined;
-  return { slug: business.slug, name: business.name, ...(business.logoUrl ? { logo: business.logoUrl } : {}) };
+  return {
+    slug: business.slug,
+    name: business.name,
+    ...(business.logoUrl ? { logo: business.logoUrl } : {}),
+    categoryId: business.categoryId,
+    city: business.city,
+    ...(business.district ? { district: business.district } : {}),
+  };
 }
 
 export function toClientListing(row: ListingWithRelations): Listing {
