@@ -34,6 +34,7 @@ const storeSelect = {
     district: true,
     showContactName: true,
     contactName: true,
+    showPhone: true,
   },
 } as const;
 
@@ -70,6 +71,11 @@ export async function sellerCanUseUrgent(userId: string) {
   return sellerUrgentEligible(seller);
 }
 
+/** An approved store that turned its phone off hides the owner's number on every listing and reveal path. */
+export function storeHidesPhone(business: { status: string; showPhone: boolean } | null | undefined) {
+  return business?.status === "approved" && !business.showPhone;
+}
+
 function storeRef(business: StoreRow | null | undefined): Listing["store"] {
   if (!business || business.status !== "approved") return undefined;
   return {
@@ -103,7 +109,9 @@ export function toClientListing(row: ListingWithRelations): Listing {
                 : "passive";
   const postedAt = (row.postedAt ?? row.createdAt).getTime();
   const phone =
-    row.seller.profile?.phoneVerifiedAt && row.seller.profile.phone ? row.seller.profile.phone : "";
+    row.seller.profile?.phoneVerifiedAt && row.seller.profile.phone && !storeHidesPhone(row.seller.business)
+      ? row.seller.profile.phone
+      : "";
   const sellerSince = row.seller.createdAt.toLocaleDateString("tr-TR", {
     month: "long",
     year: "numeric",
