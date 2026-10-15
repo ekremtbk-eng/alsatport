@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { writeAudit } from "@/lib/admin/audit";
+import { readTeam } from "@/lib/business/shared";
 import { hashPassword, verifyPasswordHash } from "@/lib/security/password";
 import { LIMITS, clientIp } from "@/lib/security/rateLimit";
 import { throttle } from "@/lib/security/throttle";
@@ -53,7 +54,7 @@ export async function POST(req: Request) {
   const avatarUrl = user.profile.avatar;
   const business = await prisma.businessAccount.findUnique({
     where: { userId: user.id },
-    select: { logoUrl: true, coverUrl: true },
+    select: { logoUrl: true, coverUrl: true, team: true },
   });
   const now = new Date();
   const unusableHash = await hashPassword(randomBytes(32).toString("base64url"));
@@ -131,6 +132,9 @@ export async function POST(req: Request) {
   if (avatarUrl) await deleteStoredObject(storageKeyFromUrl(avatarUrl), avatarUrl);
   for (const url of [business?.logoUrl, business?.coverUrl]) {
     if (isOwnBusinessImage(user.id, url)) await deleteStoredObject(storageKeyFromUrl(url!), url!);
+  }
+  for (const { photo } of readTeam(business?.team)) {
+    if (isOwnBusinessImage(user.id, photo, ["team"])) await deleteStoredObject(storageKeyFromUrl(photo!), photo!);
   }
 
   await writeAudit({

@@ -22,6 +22,7 @@ import { buildFirmProfile, type FirmPriceRow } from "@/lib/serviceFirm";
 import type { PublicFirm } from "@/lib/business/firmProfile";
 import { loadRegionCoords, regionVersion, type RegionCoords } from "@/lib/regionClient";
 import { reviewAuthorLabel } from "@/lib/publicName";
+import { StoreRefCard } from "@/components/business/StoreBits";
 
 type FirmTab = "services" | "hours" | "districts" | "prices" | "news" | "qa";
 
@@ -487,6 +488,7 @@ export function ServiceFirmProfile({ listing }: { listing: Listing }) {
         </div>
 
         <aside className="firm-side">
+          {listing.store ? <StoreRefCard store={listing.store} /> : null}
           <div className="firm-actions">
             <button type="button" className="firm-phone" onClick={revealPhone}>
               {phoneOpen && phone ? t("list.hide") : t("firm.phone")}

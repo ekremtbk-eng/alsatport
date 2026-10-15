@@ -41,7 +41,7 @@ export type Listing = {
   sellerPhone?: string;
   sellerSince?: string;
   /** Present only while the seller's corporate store is admin-approved. */
-  store?: { slug: string; name: string; logo?: string };
+  store?: { slug: string; name: string; logo?: string; categoryId?: string; city?: string; district?: string; contactName?: string };
 };
 
 export type UserProfile = {

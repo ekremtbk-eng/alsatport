@@ -35,6 +35,10 @@ function biz(status: OwnerBusiness["status"], slug = "ornek-magaza"): OwnerBusin
     rejectReason: "",
     submittedAt: 0,
     extras: EMPTY_FIRM_EXTRAS,
+    showContactName: false,
+    showPhone: true,
+    showEmail: true,
+    team: [],
   };
 }
 

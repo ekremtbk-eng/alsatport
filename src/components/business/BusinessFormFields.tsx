@@ -9,7 +9,12 @@ import { BUSINESS_DESC_MAX, businessCategories } from "@/lib/business/shared";
 import { apiUpload } from "@/lib/security/client";
 
 const ACCEPT = "image/jpeg,image/png,image/webp,image/jpg";
-const MAX_MB = { logo: 2, cover: 6 } as const;
+const MAX_MB = { logo: 2, cover: 6, team: 2 } as const;
+const PICK_TEXT = {
+  logo: { label: "biz.f.logo", hint: "biz.f.logoHint" },
+  cover: { label: "biz.f.cover", hint: "biz.f.coverHint" },
+  team: { label: "biz.f.teamPhoto", hint: "biz.f.teamPhotoHint" },
+} as const;
 
 export type ProfileValues = {
   categoryId: string;
@@ -28,7 +33,7 @@ export function ImagePicker({
   value,
   onChange,
 }: {
-  kind: "logo" | "cover";
+  kind: "logo" | "cover" | "team";
   value: string;
   onChange: (url: string) => void;
 }) {
@@ -42,7 +47,7 @@ export function ImagePicker({
     setError("");
     const okType = /image\/(jpeg|jpg|png|webp)/i.test(file.type) || /\.(jpe?g|png|webp)$/i.test(file.name);
     if (!okType) return setError(t("photo.only"));
-    if (file.size > MAX_MB[kind] * 1024 * 1024) return setError(t(kind === "logo" ? "biz.err.logoSize" : "biz.err.coverSize"));
+    if (file.size > MAX_MB[kind] * 1024 * 1024) return setError(t(kind === "cover" ? "biz.err.coverSize" : "biz.err.logoSize"));
     setBusy(true);
     const res = await apiUpload<{ ok?: boolean; url?: string; error?: string }>("/api/account/business/media", file, { kind });
     setBusy(false);
@@ -59,11 +64,11 @@ export function ImagePicker({
         ) : (
           <span className="biz-pick-empty">
             <ImagePlus aria-hidden="true" />
-            {busy ? t("common.loading") : t(kind === "logo" ? "biz.f.logo" : "biz.f.cover")}
+            {busy ? t("common.loading") : t(PICK_TEXT[kind].label)}
           </span>
         )}
       </button>
-      <p className="biz-hint">{t(kind === "logo" ? "biz.f.logoHint" : "biz.f.coverHint")}</p>
+      <p className="biz-hint">{t(PICK_TEXT[kind].hint)}</p>
       {value ? (
         <button type="button" className="biz-link" disabled={busy} onClick={() => ref.current?.click()}>
           {busy ? t("common.loading") : t("biz.f.change")}

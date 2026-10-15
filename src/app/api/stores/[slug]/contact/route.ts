@@ -17,5 +17,6 @@ export async function GET(req: Request, ctx: Ctx) {
   const { slug } = await ctx.params;
   const contact = await findStoreContact(slug);
   if (!contact) return NextResponse.json({ ok: false, error: "biz.err.none" }, { status: 404 });
-  return NextResponse.json({ ok: true, phone: formatBusinessPhone(contact.phone), email: contact.email });
+  if (!contact.phone && !contact.email) return NextResponse.json({ ok: false, error: "biz.err.noContact" }, { status: 404 });
+  return NextResponse.json({ ok: true, phone: contact.phone ? formatBusinessPhone(contact.phone) : "", email: contact.email });
 }

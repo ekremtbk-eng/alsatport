@@ -330,7 +330,7 @@ async function main() {
       `found=${!!pub} sellerName=${String(pub?.sellerName)} sellerBusiness=${String(pub?.sellerBusiness)}`,
     );
     r = await call("GET", `/ilan/${listingId}`, null);
-    check("L5", "Listing detail public; shows Mağazaya Git link", r.status === 200 && r.text.includes(`/magaza/${slug}`) && r.text.includes("Mağazaya Git"), `status ${r.status}`);
+    check("L5", "Listing detail public; shows Mağazayı Görüntüle link", r.status === 200 && r.text.includes(`/magaza/${slug}`) && r.text.includes("Mağazayı Görüntüle"), `status ${r.status}`);
     r = await call("GET", `/magaza/${slug}`, null);
     check("L6", "Store page lists the new listing", r.text.includes(`Biztest kulaklık ${TAG}`));
     r = await call("GET", "/api/account/business", sCorp);
@@ -349,6 +349,90 @@ async function main() {
     check("E4", "Another user cannot edit this store", r.status === 404 && after?.description?.startsWith("Güncel açıklama") === true, `status ${r.status}`);
     r = await call("POST", "/api/account/business", sCorp, application);
     check("E5", "Approved user cannot overwrite via re-apply", r.status === 409, `status ${r.status}`);
+
+    // ---------- Display preferences + team ----------
+    const listingRef = async () => {
+      const res = await call("GET", `/api/listings?sellerId=${corp.id}`, null);
+      const row = ((res.json.listings as Record<string, unknown>[] | undefined) ?? []).find((l) => l.id === listingId);
+      return (row?.store as Record<string, unknown> | undefined) ?? null;
+    };
+    r = await call("GET", "/api/account/business", sCorp);
+    const ownerView = r.json.business as Record<string, unknown> | undefined;
+    check("P1", "Defaults: contact name hidden, phone/e-mail shown, empty team", ownerView?.showContactName === false && ownerView?.showPhone === true && ownerView?.showEmail === true && Array.isArray(ownerView?.team) && (ownerView?.team as unknown[]).length === 0);
+    r = await call("GET", `/magaza/${slug}`, null);
+    const refBefore = await listingRef();
+    check("P2", "Contact person stays private by default (store + listing)", !r.text.includes(application.contactName) && !!refBefore && !("contactName" in refBefore) && !r.text.includes('id="ekibimiz"'));
+    r = await call("PATCH", "/api/account/business", sOther, { showContactName: true });
+    check("P3", "Another user cannot change display preferences", r.status === 404, `status ${r.status}`);
+    r = await call("PATCH", "/api/account/business", sCorp, { showContactName: true });
+    const refShown = await listingRef();
+    const pageShown = await call("GET", `/magaza/${slug}`, null);
+    check("P4", "Opt-in shows contact person on store + listing", r.status === 200 && refShown?.contactName === application.contactName && pageShown.text.includes(application.contactName), `status ${r.status}`);
+
+    r = await call("PATCH", "/api/account/business", sCorp, { showPhone: false });
+    const contactNoPhone = await call("GET", `/api/stores/${slug}/contact`, sOther);
+    check("P5", "Phone hidden → contact API returns e-mail only", r.status === 200 && contactNoPhone.status === 200 && contactNoPhone.json.phone === "" && contactNoPhone.json.email === application.email, JSON.stringify(contactNoPhone.json));
+    r = await call("PATCH", "/api/account/business", sCorp, { showEmail: false });
+    const contactNone = await call("GET", `/api/stores/${slug}/contact`, sOther);
+    check("P6", "Phone + e-mail hidden → contact API reveals nothing", contactNone.status === 404 && contactNone.json.error === "biz.err.noContact" && !JSON.stringify(contactNone.json).includes("555"), `status ${contactNone.status}`);
+    r = await call("PATCH", "/api/account/business", sCorp, { showContactName: false, showPhone: true, showEmail: true });
+    const refHidden = await listingRef();
+    r = await call("GET", `/magaza/${slug}`, null);
+    check("P7", "Opt-out hides the contact person again", !!refHidden && !("contactName" in refHidden) && !r.text.includes(application.contactName));
+
+    // The first store has spent its 20/h profile-edit budget; team checks use a second approved store.
+    const teamOwner = await makeUser("team", "seller");
+    const sTeam = await makeSession(teamOwner);
+    const teamSlug = `biztest-ekip-${TAG}`;
+    await prisma.businessAccount.create({
+      data: {
+        userId: teamOwner.id,
+        slug: teamSlug,
+        status: "approved",
+        approvedAt: new Date(),
+        name: `Biztest Ekip ${TAG}`,
+        contactName: "Ekip Yetkilisi",
+        companyType: "sahis",
+        taxOffice: TAX_OFFICE,
+        taxNumber: "1234567890",
+        categoryId: "real-estate",
+        city: "İzmir",
+        district: "Konak",
+        description: "Ekip bölümü testi için oluşturulan geçici yerel test mağazası.",
+        email: `ekip-${TAG}@biztest.invalid`,
+        phone: "02320000000",
+      },
+    });
+    r = await call("PATCH", "/api/account/business", sTeam, { showPhone: "yes" });
+    check("P8", "Non-boolean preference rejected", r.status === 400, `status ${r.status}`);
+    r = await upload("/api/account/business/media", sTeam, await png(400, 400, "#065f46"), "team.png", "image/png", { kind: "team" });
+    const teamPhoto = String(r.json.url ?? "");
+    check("T1", "Team photo upload (own business folder)", r.status === 200 && /\/business\/[^/]+\/team-[0-9a-f-]{36}\.webp$/i.test(teamPhoto), `status ${r.status}`);
+    r = await call("GET", `/magaza/${teamSlug}`, null);
+    check("T2", "Store without team has no Ekibimiz section", r.status === 200 && !r.text.includes('id="ekibimiz"'), `status ${r.status}`);
+    r = await call("PATCH", "/api/account/business", sTeam, { team: [{ name: "A", role: "Müdür" }] });
+    check("T3", "Too-short team member name rejected", r.status === 400 && r.json.error === "biz.err.team", `status ${r.status} ${String(r.json.error)}`);
+    r = await call("PATCH", "/api/account/business", sTeam, { team: [{ name: "Can Demir", role: "Satış", photo: "https://evil.example.com/x.webp" }] });
+    check("T4", "External team photo rejected", r.status === 400 && r.json.error === "biz.err.image", `status ${r.status} ${String(r.json.error)}`);
+    r = await call("PATCH", "/api/account/business", sTeam, { team: [{ name: "Can Demir", role: "Satış", photo: logoUrl }] });
+    check("T5", "Another store's logo cannot be used as team photo", r.status === 400 && r.json.error === "biz.err.image", `status ${r.status} ${String(r.json.error)}`);
+    r = await call("PATCH", "/api/account/business", sTeam, { team: [{ name: "Can Demir", role: "Satış", email: "x@y.z" }] });
+    check("T6", "Unknown team member fields rejected", r.status === 400, `status ${r.status}`);
+    r = await call("PATCH", "/api/account/business", sTeam, { team: Array.from({ length: 21 }, (_, i) => ({ name: `Üye ${i + 10}`, role: "" })) });
+    check("T7", "More than 20 team members rejected", r.status === 400, `status ${r.status}`);
+    r = await call("PATCH", "/api/account/business", sOther, { team: [{ name: "Yabancı Kişi", role: "" }] });
+    check("T8", "Another user cannot edit a team", r.status === 404, `status ${r.status}`);
+    r = await call("PATCH", "/api/account/business", sTeam, { team: [{ name: "  Can   Demir ", role: "Satış Danışmanı", photo: teamPhoto }, { name: "Elif Kaya", role: "" }] });
+    const savedTeam = (r.json.business as Record<string, unknown> | undefined)?.team as Record<string, unknown>[] | undefined;
+    check("T9", "Owner saves team (names normalised)", r.status === 200 && savedTeam?.length === 2 && savedTeam[0].name === "Can Demir" && savedTeam[0].photo === teamPhoto, JSON.stringify(savedTeam ?? null));
+    r = await call("GET", `/magaza/${teamSlug}`, null);
+    check("T10", "Store page shows Ekibimiz with members", r.text.includes('id="ekibimiz"') && r.text.includes("Can Demir") && r.text.includes("Satış Danışmanı") && r.text.includes("Elif Kaya"));
+    r = await call("PATCH", "/api/account/business", sTeam, { team: [{ name: "Elif Kaya", role: "" }] });
+    const oldPhoto = await call("GET", teamPhoto.replace(/^https?:\/\/[^/]+/, ""), null);
+    check("T11", "Removed member's photo is deleted from storage", r.status === 200 && oldPhoto.status === 404, `patch ${r.status} photo ${oldPhoto.status}`);
+    r = await call("PATCH", "/api/account/business", sTeam, { team: [] });
+    const emptied = await call("GET", `/magaza/${teamSlug}`, null);
+    check("T12", "Emptied team hides Ekibimiz again", r.status === 200 && !emptied.text.includes('id="ekibimiz"'));
 
     // ---------- Revoke ----------
     r = await call("POST", `/api/admin/business/${bizId}`, sAdminNoStep, { action: "revoke" });

@@ -73,7 +73,7 @@ export default async function StorePage({ params }: Ctx) {
   return (
     <>
       <JsonLd data={schema} />
-      <StorePageClient store={store} active={data.active} sold={data.sold} />
+      <StorePageClient store={store} sellerId={data.sellerId} active={data.active} sold={data.sold} />
     </>
   );
 }
