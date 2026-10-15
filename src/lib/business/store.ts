@@ -18,13 +18,16 @@ import {
   isValidTaxNumber,
   normalizeBusinessPhone,
   normalizeWebsite,
+  readTeam,
   slugifyBusinessName,
+  TEAM_LIMITS,
   type AdminBusiness,
   type BusinessStatusId,
   type CompanyType,
   type OwnerBusiness,
   type OwnerStats,
   type PublicStore,
+  type TeamMember,
 } from "@/lib/business/shared";
 
 type Fail = { error: string; status: number };
@@ -58,6 +61,10 @@ export function toOwnerView(row: BusinessAccount, stats?: OwnerStats): OwnerBusi
     approvedAt: row.approvedAt?.getTime(),
     ...(stats ? { stats } : {}),
     extras: readFirmExtras(row),
+    showContactName: row.showContactName,
+    showPhone: row.showPhone,
+    showEmail: row.showEmail,
+    team: readTeam(row.team),
   };
 }
 
@@ -169,6 +176,29 @@ async function dropReplacedImages(userId: string, before: BusinessAccount | null
       await deleteStoredObject(storageKeyFromUrl(old), old);
     }
   }
+  const kept = new Set(readTeam(after.team).map((m) => m.photo));
+  for (const { photo } of readTeam(before?.team)) {
+    if (photo && !kept.has(photo) && isOwnBusinessImage(userId, photo, ["team"])) {
+      await deleteStoredObject(storageKeyFromUrl(photo), photo);
+    }
+  }
+}
+
+type TeamInput = { name: string; role?: string; photo?: string }[];
+
+/** Names and roles are the owner's own entries; photos must be the owner's uploads of kind "team". */
+function cleanTeam(userId: string, input: TeamInput): TeamMember[] | Fail {
+  if (input.length > TEAM_LIMITS.members) return fail("biz.err.team");
+  const out: TeamMember[] = [];
+  for (const m of input) {
+    const name = sanitizeText(m.name, TEAM_LIMITS.name);
+    const role = sanitizeText(m.role ?? "", TEAM_LIMITS.role);
+    if (name.length < 2) return fail("biz.err.team");
+    const photo = m.photo?.trim() || "";
+    if (photo && !isOwnBusinessImage(userId, photo, ["team"])) return fail("biz.err.image");
+    out.push({ name, role, ...(photo ? { photo } : {}) });
+  }
+  return out;
 }
 
 /** New application, or a resubmission while pending / after rejection or revocation. Never auto-approves. */
@@ -221,14 +251,17 @@ export async function submitApplication(userId: string, input: ApplyInput): Prom
 /** Approved owners only; the account is always the caller's own (no id is accepted from the client). */
 export async function updateStoreProfile(
   userId: string,
-  patch: Partial<ApplyInput> & FirmExtrasInput,
+  patch: Partial<ApplyInput> &
+    FirmExtrasInput & { showContactName?: boolean; showPhone?: boolean; showEmail?: boolean; team?: TeamInput },
 ): Promise<{ row: BusinessAccount } | Fail> {
   const existing = await findOwnBusiness(userId);
   if (!existing) return fail("biz.err.none", 404);
   if (existing.status !== "approved") return fail("biz.err.notApproved", 409);
-  const { hours, serviceDistricts, priceList, announcements, faq, ...profile } = patch;
+  const { hours, serviceDistricts, priceList, announcements, faq, showContactName, showPhone, showEmail, team, ...profile } = patch;
   const fields = cleanProfileFields(userId, profile, existing);
   if ("error" in fields) return fields;
+  const cleanedTeam = team === undefined ? undefined : cleanTeam(userId, team);
+  if (cleanedTeam && "error" in cleanedTeam) return cleanedTeam;
   const city = fields.city ?? existing.city;
   const current = readFirmExtras(existing);
   const extras = cleanFirmExtras(
@@ -251,6 +284,10 @@ export async function updateStoreProfile(
   if (extras.priceList) data.priceList = extras.priceList;
   if (extras.announcements) data.announcements = extras.announcements;
   if (extras.faq) data.faq = extras.faq;
+  if (showContactName !== undefined) data.showContactName = showContactName;
+  if (showPhone !== undefined) data.showPhone = showPhone;
+  if (showEmail !== undefined) data.showEmail = showEmail;
+  if (cleanedTeam) data.team = cleanedTeam;
   if (!Object.keys(data).length) return { row: existing };
   const row = await prisma.businessAccount.update({ where: { id: existing.id }, data });
   await dropReplacedImages(userId, existing, row);
@@ -422,7 +459,14 @@ export async function findPublicStore(slug: string): Promise<{
   ]);
   const { hours, serviceDistricts } = readFirmExtras(row);
   return {
-    store: { ...toPublicStore(row, counts), hours, serviceDistricts },
+    store: {
+      ...toPublicStore(row, counts),
+      hours,
+      serviceDistricts,
+      team: readTeam(row.team),
+      ...(row.showContactName ? { contactName: row.contactName } : {}),
+      reveal: { phone: row.showPhone, email: row.showEmail },
+    },
     sellerId: row.userId,
     active: activeRows.map((r) => hideSellerPhone(toClientListing(r))),
     sold: soldRows.map((r) => hideSellerPhone(toClientListing(r))),
@@ -430,10 +474,18 @@ export async function findPublicStore(slug: string): Promise<{
   };
 }
 
-/** Private contact details of a public store; callers must already require a signed-in member. */
+/**
+ * Private contact details of a public store, limited to what the owner allows; callers must already require
+ * a signed-in member. Fields the owner hid are never selected into the response.
+ */
 export async function findStoreContact(slug: string) {
   if (!/^[a-z0-9-]{1,80}$/.test(slug)) return null;
-  return prisma.businessAccount.findFirst({ where: publicStoreWhere(slug), select: { email: true, phone: true } });
+  const row = await prisma.businessAccount.findFirst({
+    where: publicStoreWhere(slug),
+    select: { email: true, phone: true, showPhone: true, showEmail: true },
+  });
+  if (!row) return null;
+  return { phone: row.showPhone ? row.phone : "", email: row.showEmail ? row.email : "" };
 }
 
 /** Owner-entered service profile shown on the seller's service pages; null unless the store is public. */

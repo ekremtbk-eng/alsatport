@@ -92,7 +92,9 @@ export async function putAvatarImage(userId: string, bytes: Buffer) {
   return { storageKey, url: `/api/media/${publicPath}`, mime, byteSize: bytes.length };
 }
 
-export async function putBusinessImage(userId: string, kind: "logo" | "cover", bytes: Buffer) {
+export type BusinessImageKind = "logo" | "cover" | "team";
+
+export async function putBusinessImage(userId: string, kind: BusinessImageKind, bytes: Buffer) {
   const storageKey = `business/${userId}/${kind}-${crypto.randomUUID()}.webp`;
   const mime = "image/webp";
   if (blobEnabled()) {
@@ -111,11 +113,15 @@ export async function putBusinessImage(userId: string, kind: "logo" | "cover", b
   return { storageKey, url: `/api/media/${publicPath}` };
 }
 
-/** True only for images this user uploaded through the business media endpoint. */
-export function isOwnBusinessImage(userId: string, url: string | null | undefined) {
+/** True only for images this user uploaded through the business media endpoint (as one of `kinds`). */
+export function isOwnBusinessImage(
+  userId: string,
+  url: string | null | undefined,
+  kinds: readonly BusinessImageKind[] = ["logo", "cover"],
+) {
   if (!url || !/^[0-9a-f-]{36}$/i.test(userId)) return false;
   const key = storageKeyFromUrl(url);
-  return new RegExp(`^business/${userId}/(logo|cover)-[0-9a-f-]{36}\\.webp$`, "i").test(key);
+  return new RegExp(`^business/${userId}/(${kinds.join("|")})-[0-9a-f-]{36}\\.webp$`, "i").test(key);
 }
 
 export async function putListingImage(userId: string, bytes: Buffer, mime: string, ext: string) {

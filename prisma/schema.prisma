@@ -266,6 +266,12 @@ model BusinessAccount {
   priceList        Json     @default("[]") @map("price_list")
   announcements    Json     @default("[]")
   faq              Json     @default("[]")
+  /// Owner's public-display choices; defaults keep the contact person private and contact reveal as before.
+  showContactName  Boolean  @default(false) @map("show_contact_name")
+  showPhone        Boolean  @default(true) @map("show_phone")
+  showEmail        Boolean  @default(true) @map("show_email")
+  /// Owner-entered "Ekibimiz" entries; an empty list hides the section.
+  team             Json     @default("[]")
   rejectReason String?             @map("reject_reason")
   submittedAt  DateTime            @default(now()) @map("submitted_at") @db.Timestamptz(6)
   reviewedAt   DateTime?           @map("reviewed_at") @db.Timestamptz(6)

@@ -355,6 +355,21 @@ export const businessProfilePatchSchema = z
       .optional(),
     announcements: z.array(z.object({ text: z.string().max(600), at: z.number().optional() }).strict()).max(5).optional(),
     faq: z.array(z.object({ q: z.string().max(300), a: z.string().max(1200) }).strict()).max(10).optional(),
+    showContactName: z.boolean().optional(),
+    showPhone: z.boolean().optional(),
+    showEmail: z.boolean().optional(),
+    team: z
+      .array(
+        z
+          .object({
+            name: z.string().max(160),
+            role: z.string().max(160).optional().default(""),
+            photo: z.string().trim().max(500).optional(),
+          })
+          .strict(),
+      )
+      .max(20)
+      .optional(),
   })
   .strict();
 

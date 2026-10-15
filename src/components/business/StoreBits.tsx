@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MapPin, Store } from "lucide-react";
+import { MapPin, Store, UserRound } from "lucide-react";
 import { useI18n } from "@/context/I18nContext";
 import { businessTypeKey, type StoreRef } from "@/lib/business/shared";
 
@@ -55,6 +55,12 @@ export function StoreRefCard({ store, main = false }: { store: StoreRef; main?: 
           <VerifiedBusinessBadge />
         </span>
       </div>
+      {store.contactName ? (
+        <p className="biz-ref-place">
+          <UserRound aria-hidden="true" />
+          {t("biz.contactPerson", { name: store.contactName })}
+        </p>
+      ) : null}
       {where ? (
         <p className="biz-ref-place">
           <MapPin aria-hidden="true" />

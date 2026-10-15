@@ -95,7 +95,28 @@ export function isValidTaxNumber(value: string, city?: string) {
   return /^\d{10,11}$/.test(value);
 }
 
-export type StoreRef = { slug: string; name: string; logo?: string; categoryId?: string; city?: string; district?: string };
+export type StoreRef = {
+  slug: string;
+  name: string;
+  logo?: string;
+  categoryId?: string;
+  city?: string;
+  district?: string;
+  /** Only present when the owner chose to show the authorized person. */
+  contactName?: string;
+};
+
+export type TeamMember = { name: string; role: string; photo?: string };
+export const TEAM_LIMITS = { members: 20, name: 80, role: 80 } as const;
+
+/** Stored JSON read defensively: malformed entries are dropped, never repaired or invented. */
+export function readTeam(raw: unknown): TeamMember[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((m): m is TeamMember => !!m && typeof m.name === "string" && m.name.trim().length > 0 && typeof m.role === "string")
+    .slice(0, TEAM_LIMITS.members)
+    .map((m) => ({ name: m.name, role: m.role, ...(typeof m.photo === "string" && m.photo ? { photo: m.photo } : {}) }));
+}
 
 const BUSINESS_TYPE_KEYS: Record<string, string> = {
   emlak: "biz.type.emlak",
@@ -133,6 +154,10 @@ export type PublicStore = {
   /** Store page only (owner-entered, empty when not provided). */
   hours?: FirmExtras["hours"];
   serviceDistricts?: string[];
+  team?: TeamMember[];
+  contactName?: string;
+  /** Which private contact details the owner allows signed-in members to reveal. */
+  reveal?: { phone: boolean; email: boolean };
 };
 
 export type OwnerStats = {
@@ -166,6 +191,10 @@ export type OwnerBusiness = {
   approvedAt?: number;
   stats?: OwnerStats;
   extras: FirmExtras;
+  showContactName: boolean;
+  showPhone: boolean;
+  showEmail: boolean;
+  team: TeamMember[];
 };
 
 export type AdminBusiness = OwnerBusiness & {

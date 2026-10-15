@@ -16,6 +16,7 @@ import {
   Phone,
   Search,
   Tag,
+  UserRound,
 } from "lucide-react";
 import { ListingCard } from "@/components/ListingCard";
 import { ListingGrid } from "@/components/ListingGrid";
@@ -31,7 +32,7 @@ import { listingCategoryChain } from "@/lib/listingFacts";
 import { gatePath } from "@/lib/profile";
 import { apiGet } from "@/lib/security/client";
 
-type Section = "all" | "featured" | "about" | "contact" | "sold";
+type Section = "all" | "featured" | "about" | "team" | "contact" | "sold";
 type Sort = "new" | "old" | "priceAsc" | "priceDesc";
 type View = "list" | "grid";
 
@@ -39,6 +40,7 @@ const HASH: Record<Section, string> = {
   all: "ilanlar",
   featured: "one-cikanlar",
   about: "hakkimizda",
+  team: "ekibimiz",
   contact: "iletisim",
   sold: "satilanlar",
 };
@@ -233,25 +235,30 @@ export function StorePageClient({
   const isOwner = !!user && user.id === sellerId;
   const districts = store.serviceDistricts ?? [];
   const hours = store.hours ?? null;
+  const team = store.team ?? [];
+  const canReveal = store.reveal ? store.reveal.phone || store.reveal.email : true;
 
   const sections: { id: Section; label: string; show: boolean }[] = [
     { id: "all", label: `${t("biz.nav.all")} (${store.activeCount})`, show: true },
     { id: "featured", label: `${t("biz.nav.featured")} (${featured.length})`, show: featured.length > 0 },
     { id: "about", label: t("biz.about"), show: true },
+    { id: "team", label: t("biz.nav.team"), show: team.length > 0 },
     { id: "contact", label: t("biz.contact"), show: true },
     { id: "sold", label: t("biz.tab.sold", { n: sold.length }), show: sold.length > 0 },
   ];
+  const shownKey = sections.filter((s) => s.show).map((s) => s.id).join(",");
 
   useEffect(() => {
+    const available = new Set(shownKey.split(","));
     const fromHash = () => {
       const hash = window.location.hash.replace(/^#/, "");
       const hit = (Object.keys(HASH) as Section[]).find((k) => HASH[k] === hash);
-      if (hit && (hit !== "featured" || featured.length) && (hit !== "sold" || sold.length)) setSection(hit);
+      if (hit && available.has(hit)) setSection(hit);
     };
     fromHash();
     window.addEventListener("hashchange", fromHash);
     return () => window.removeEventListener("hashchange", fromHash);
-  }, [featured.length, sold.length]);
+  }, [shownKey]);
 
   function open(next: Section) {
     setSection(next);
@@ -264,7 +271,7 @@ export function StorePageClient({
     const res = await apiGet<{ ok?: boolean; phone?: string; email?: string; error?: string }>(
       `/api/stores/${encodeURIComponent(store.slug)}/contact`,
     ).catch(() => null);
-    if (res?.ok && res.phone && res.email) setContact({ phone: res.phone, email: res.email });
+    if (res?.ok && (res.phone || res.email)) setContact({ phone: res.phone ?? "", email: res.email ?? "" });
     else setContactErr(t(res?.error || "auth.err.server"));
   }
 
@@ -377,9 +384,30 @@ export function StorePageClient({
             ) : null}
           </section>
 
+          {team.length ? (
+            <section id="ekibimiz" className="biz-card" hidden={section !== "team"}>
+              <h2>{t("biz.nav.team")}</h2>
+              <ul className="biz-team">
+                {team.map((m, i) => (
+                  <li key={`${m.name}-${i}`}>
+                    <StoreLogo name={m.name} src={m.photo} size={72} />
+                    <strong>{m.name}</strong>
+                    {m.role ? <span>{m.role}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
           <section id="iletisim" className="biz-card biz-contact" hidden={section !== "contact"}>
             <h2>{t("biz.contact")}</h2>
             <ul className="biz-contact-list">
+              {store.contactName ? (
+                <li>
+                  <UserRound aria-hidden="true" />
+                  <span>{t("biz.contactPerson", { name: store.contactName })}</span>
+                </li>
+              ) : null}
               {where ? (
                 <li>
                   <MapPin aria-hidden="true" />
@@ -394,17 +422,17 @@ export function StorePageClient({
                   </a>
                 </li>
               ) : null}
-              {contact ? (
-                <>
-                  <li>
-                    <Phone aria-hidden="true" />
-                    <a href={`tel:+90${contact.phone.replace(/\D/g, "").replace(/^0/, "")}`}>{contact.phone}</a>
-                  </li>
-                  <li>
-                    <Mail aria-hidden="true" />
-                    <a href={`mailto:${contact.email}`}>{contact.email}</a>
-                  </li>
-                </>
+              {contact?.phone ? (
+                <li>
+                  <Phone aria-hidden="true" />
+                  <a href={`tel:+90${contact.phone.replace(/\D/g, "").replace(/^0/, "")}`}>{contact.phone}</a>
+                </li>
+              ) : null}
+              {contact?.email ? (
+                <li>
+                  <Mail aria-hidden="true" />
+                  <a href={`mailto:${contact.email}`}>{contact.email}</a>
+                </li>
               ) : null}
             </ul>
             {hours ? (
@@ -431,7 +459,7 @@ export function StorePageClient({
               </div>
             ) : null}
             <div className="biz-contact-actions">
-              {contact ? null : (
+              {contact || !canReveal ? null : (
                 <button type="button" className="biz-btn is-primary" onClick={() => void revealContact()}>
                   <Phone aria-hidden="true" className="h-4 w-4" />
                   {t("biz.showContact")}
@@ -445,7 +473,7 @@ export function StorePageClient({
               ) : null}
             </div>
             {contactErr ? <p className="biz-err">{contactErr}</p> : null}
-            <p className="biz-hint">{t("biz.contactHint")}</p>
+            <p className="biz-hint">{canReveal ? t("biz.contactHint") : t("biz.err.noContact")}</p>
           </section>
         </div>
 
