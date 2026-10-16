@@ -65,7 +65,8 @@ function isTyping(el: Element | null): el is HTMLElement {
  * keyboard: iOS keeps fixed boxes on the layout viewport, so the bar is lifted by the gap between the layout
  * and the visual viewport; Android (interactive-widget=resizes-content) shrinks the layout itself, the gap is
  * 0 and the bar simply sits above the keyboard. A focused field hidden behind the bar is scrolled into view.
- * SearchSelect lists are portaled above this bar, so reveal only keeps the input itself visible.
+ * Inline SearchSelect lists grow the form in-flow; reveal scrolls the open list above this bar.
+ * Portal lists (filters) float themselves and only need the input kept in view.
  */
 export function PostActionBar({ hint, children }: { hint?: string; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -83,14 +84,18 @@ export function PostActionBar({ hint, children }: { hint?: string; children: Rea
         bar.classList.toggle("is-kb", gap > 80 || isTyping(document.activeElement));
       });
     };
-    /** Keeps the focused field between the sticky header and the bar; open option lists position themselves. */
+    /** Keeps the focused field (and any open inline option list) between the sticky header and the bar. */
     const reveal = (el: HTMLElement) => {
       if (!el.isConnected || document.activeElement !== el) return;
       const header = document.querySelector(".site-header")?.getBoundingClientRect();
       const top = Math.max(vv ? vv.offsetTop : 0, header && header.bottom > 0 ? header.bottom : 0);
       const barTop = bar.getBoundingClientRect().top;
+      const listId = el.getAttribute("aria-controls");
+      const listEl = listId ? document.getElementById(listId) : null;
+      const inlineList = listEl?.hasAttribute("data-ss-inline") ? listEl : null;
       const r = el.getBoundingClientRect();
-      if (r.bottom > barTop - 12) window.scrollBy({ top: r.bottom - (barTop - 12) });
+      const bottom = inlineList ? Math.max(r.bottom, inlineList.getBoundingClientRect().bottom) : r.bottom;
+      if (bottom > barTop - 12) window.scrollBy({ top: bottom - (barTop - 12) });
       else if (r.top < top + 8) window.scrollBy({ top: r.top - top - 12 });
     };
     let revealTimer = 0;

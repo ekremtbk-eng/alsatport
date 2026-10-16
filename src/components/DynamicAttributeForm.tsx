@@ -177,6 +177,7 @@ export function DynamicAttributeForm({
                 disabled={locked}
                 placeholder={placeholder}
                 emptyLabel={!locked && field.dependsOn ? emptyHint(field) : "Sonuç yok"}
+                menuMode="inline"
                 onChange={(v) => onChange(field.key, v)}
               />
             </div>
