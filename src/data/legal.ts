@@ -34,7 +34,11 @@ export const LEGAL_CONTROLLER_WARNING = "Yayına alınmadan önce gerçek veri s
 export const LEGAL_UGC_NOTICE =
   "AlsatPort üzerinde yayımlanan ilanlar, açıklamalar, görseller ve diğer tüm içerikler kullanıcılar tarafından oluşturulmaktadır. Bu içeriklerin doğruluğu, güncelliği, güvenilirliği ve yürürlükteki mevzuata uygunluğu, ilgili ilan sahibi veya kullanıcıların sorumluluğundadır. AlsatPort, aracılık hizmeti sunan bir platform olup, kullanıcı kaynaklı içeriklerden doğabilecek hata, eksiklik veya aykırılıklardan, yasal zorunluluklar saklı kalmak kaydıyla sorumlu tutulamaz.";
 
-/** ISO date (YYYY-MM-DD) of the last legal-text revision. */
+/**
+ * ISO date (YYYY-MM-DD) of the last KVKK / privacy / cookie / terms revision.
+ * Prefer Production env `LEGAL_LAST_UPDATED` (set only when those legal bodies change).
+ * Fallback is the last verified legal-copy revision — do not invent future dates.
+ */
 export const LEGAL_LAST_UPDATED = env(process.env.LEGAL_LAST_UPDATED) || "2026-10-06";
 
 const TR_MONTHS = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
