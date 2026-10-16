@@ -906,6 +906,7 @@ export default function PostListingPage() {
                     value={city}
                     options={cityNames}
                     placeholder={t("post.phCity")}
+                    menuMode="inline"
                     onChange={(v) => {
                       setCity(v);
                       setDistrict("");
@@ -920,6 +921,7 @@ export default function PostListingPage() {
                     options={districts}
                     disabled={!city}
                     placeholder={city ? t("post.phDist") : t("post.phDistFirst")}
+                    menuMode="inline"
                     onChange={(v) => {
                       setDistrict(v);
                       setNeighborhood("");
@@ -932,6 +934,7 @@ export default function PostListingPage() {
                     value={neighborhood}
                     options={mahalleler}
                     placeholder={t("post.phHood")}
+                    menuMode="inline"
                     onChange={setNeighborhood}
                   />
                 ) : null}
@@ -942,6 +945,7 @@ export default function PostListingPage() {
                     options={mahalleler}
                     disabled={!district}
                     placeholder={district ? t("post.phHood") : t("flt.districtFirst")}
+                    menuMode="inline"
                     onChange={setNeighborhood}
                   />
                 ) : null}

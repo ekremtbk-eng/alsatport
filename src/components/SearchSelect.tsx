@@ -16,7 +16,10 @@ type Place = {
   placement: "above" | "below";
 };
 
-/** Places the option list in the visible viewport, above the post bar and below the header when needed. */
+/**
+ * Places a floating option list in the visible viewport (filters / toolbars).
+ * Listing forms use menuMode="inline" instead so the list expands layout and never covers other fields.
+ */
 function placeList(anchor: HTMLElement): Place {
   const r = anchor.getBoundingClientRect();
   const vv = window.visualViewport;
@@ -62,6 +65,7 @@ export function SearchSelect({
   anyLabel,
   emptyLabel,
   optionCounts,
+  menuMode = "portal",
   onChange,
 }: {
   label: string;
@@ -73,6 +77,12 @@ export function SearchSelect({
   anyLabel?: string;
   emptyLabel?: string;
   optionCounts?: Record<string, number>;
+  /**
+   * portal — floating list (filters, toolbars). Default.
+   * inline — list stays in document flow under the field so the form row grows instead of covering siblings
+   *          (listing wizard / DynamicAttributeForm).
+   */
+  menuMode?: "portal" | "inline";
   onChange: (v: string) => void;
 }) {
   const [q, setQ] = useState("");
@@ -81,6 +91,7 @@ export function SearchSelect({
   const [place, setPlace] = useState<Place | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listId = useId();
+  const inline = menuMode === "inline";
   const list = useMemo(() => {
     const s = q.trim().toLocaleLowerCase("tr");
     return options.filter((o) => {
@@ -96,7 +107,7 @@ export function SearchSelect({
   const showList = open && !disabled && mounted;
 
   useLayoutEffect(() => {
-    if (!showList) {
+    if (!showList || inline) {
       setPlace(null);
       return;
     }
@@ -115,7 +126,29 @@ export function SearchSelect({
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
     };
-  }, [showList, list.length, q]);
+  }, [showList, inline, list.length, q]);
+
+  /** After an inline list mounts, keep the input + list above the sticky post bar. */
+  useLayoutEffect(() => {
+    if (!showList || !inline) return;
+    const input = inputRef.current;
+    if (!input) return;
+    const run = () => {
+      const listEl = document.getElementById(listId);
+      const bar = document.querySelector<HTMLElement>("[data-post-bar]");
+      if (!listEl || !bar) return;
+      const vv = window.visualViewport;
+      const header = document.querySelector(".site-header")?.getBoundingClientRect();
+      const top = Math.max(vv ? vv.offsetTop : 0, header && header.bottom > 0 ? header.bottom : 0);
+      const barTop = bar.getBoundingClientRect().top;
+      const bottom = listEl.getBoundingClientRect().bottom;
+      const topEdge = input.getBoundingClientRect().top;
+      if (bottom > barTop - 12) window.scrollBy({ top: bottom - (barTop - 12) });
+      else if (topEdge < top + 8) window.scrollBy({ top: topEdge - top - 12 });
+    };
+    const t = window.setTimeout(run, 50);
+    return () => window.clearTimeout(t);
+  }, [showList, inline, listId, list.length]);
 
   const pick = (next: string) => {
     onChange(next);
@@ -123,8 +156,43 @@ export function SearchSelect({
     setOpen(false);
   };
 
-  const menu =
-    showList && place ? (
+  const optionsBody = (
+    <>
+      {anyLabel ? (
+        <li role="option" aria-selected={value === ""}>
+          <button
+            type="button"
+            className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-ink hover:bg-elev"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => pick("")}
+          >
+            {anyLabel}
+          </button>
+        </li>
+      ) : null}
+      {list.length === 0 && <li className="px-3 py-2 text-xs text-ink">{emptyLabel ?? "Sonuç yok"}</li>}
+      {list.map((o) => (
+        <li key={o} role="option" aria-selected={o === value}>
+          <button
+            type="button"
+            className={`w-full rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-elev ${
+              o === value ? "font-semibold" : ""
+            }`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => pick(o)}
+          >
+            {o}
+            {optionCounts && optionCounts[o] != null ? (
+              <span className="float-right text-[11px] text-muted">({optionCounts[o]})</span>
+            ) : null}
+          </button>
+        </li>
+      ))}
+    </>
+  );
+
+  const portalMenu =
+    !inline && showList && place ? (
       <ul
         id={listId}
         role="listbox"
@@ -138,82 +206,67 @@ export function SearchSelect({
           maxHeight: place.maxHeight,
         }}
       >
-        {anyLabel ? (
-          <li role="option" aria-selected={value === ""}>
-            <button
-              type="button"
-              className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-ink hover:bg-elev"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => pick("")}
-            >
-              {anyLabel}
-            </button>
-          </li>
-        ) : null}
-        {list.length === 0 && (
-          <li className="px-3 py-2 text-xs text-ink">{emptyLabel ?? "Sonuç yok"}</li>
-        )}
-        {list.map((o) => (
-          <li key={o} role="option" aria-selected={o === value}>
-            <button
-              type="button"
-              className={`w-full rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-elev ${
-                o === value ? "font-semibold" : ""
-              }`}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => pick(o)}
-            >
-              {o}
-              {optionCounts && optionCounts[o] != null ? (
-                <span className="float-right text-[11px] text-muted">({optionCounts[o]})</span>
-              ) : null}
-            </button>
-          </li>
-        ))}
+        {optionsBody}
+      </ul>
+    ) : null;
+
+  const inlineMenu =
+    inline && showList ? (
+      <ul
+        id={listId}
+        role="listbox"
+        data-ss-inline
+        data-placement="below"
+        className="flt-ss-list flt-ss-list-inline mt-1 mb-1 w-full overflow-auto overscroll-contain rounded-xl border border-line bg-panel py-1"
+      >
+        {optionsBody}
       </ul>
     ) : null;
 
   return (
     <label className={hideLabel ? "block" : "flt-group"}>
       {hideLabel ? <span className="sr-only">{label}</span> : <span className="flt-label">{label}</span>}
-      <div className="relative">
-        <input
-          ref={inputRef}
-          disabled={disabled}
-          role="combobox"
-          aria-expanded={showList}
-          aria-controls={showList ? listId : undefined}
-          aria-autocomplete="list"
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          enterKeyHint="done"
-          value={open ? q : value}
-          placeholder={placeholder ?? "Seçiniz veya yazın..."}
-          onFocus={() => {
-            if (disabled) return;
-            setQ("");
-            setOpen(true);
-          }}
-          onChange={(e) => {
-            if (disabled) return;
-            setQ(e.target.value);
-            setOpen(true);
-          }}
-          onKeyDown={(e) => {
-            // First Escape closes the list; FilterSheet ignores handled keys, so only the next one closes the sheet.
-            if (e.key === "Escape" && open) {
-              e.preventDefault();
-              e.stopPropagation();
-              setOpen(false);
-            }
-          }}
-          onBlur={() => window.setTimeout(() => setOpen(false), 160)}
-          className="flt-input pe-9 disabled:cursor-not-allowed disabled:opacity-50"
-        />
-        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink" />
-        {menu && createPortal(menu, document.body)}
+      <div className={inline ? "ss-inline-wrap" : "relative"}>
+        <div className="relative">
+          <input
+            ref={inputRef}
+            disabled={disabled}
+            role="combobox"
+            aria-expanded={showList}
+            aria-controls={showList ? listId : undefined}
+            aria-autocomplete="list"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+            enterKeyHint="done"
+            value={open ? q : value}
+            placeholder={placeholder ?? "Seçiniz veya yazın..."}
+            onFocus={() => {
+              if (disabled) return;
+              setQ("");
+              setOpen(true);
+            }}
+            onChange={(e) => {
+              if (disabled) return;
+              setQ(e.target.value);
+              setOpen(true);
+            }}
+            onKeyDown={(e) => {
+              // First Escape closes the list; FilterSheet ignores handled keys, so only the next one closes the sheet.
+              if (e.key === "Escape" && open) {
+                e.preventDefault();
+                e.stopPropagation();
+                setOpen(false);
+              }
+            }}
+            onBlur={() => window.setTimeout(() => setOpen(false), 160)}
+            className="flt-input pe-9 disabled:cursor-not-allowed disabled:opacity-50"
+          />
+          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink" />
+        </div>
+        {inlineMenu}
       </div>
+      {portalMenu && createPortal(portalMenu, document.body)}
     </label>
   );
 }

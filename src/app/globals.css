@@ -5618,6 +5618,20 @@ html[data-device="desktop"] .browse-filter-btn {
 .flt-group {
   display: block;
 }
+/* Listing-form SearchSelect: list stays in flow so the grid row grows instead of overlaying siblings. */
+.ss-inline-wrap {
+  display: block;
+}
+.flt-ss-list-inline {
+  position: relative;
+  z-index: 0;
+  width: 100%;
+  max-height: 13rem;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  box-shadow: none;
+}
 .flt-label {
   display: block;
   margin-bottom: 0.35rem;
