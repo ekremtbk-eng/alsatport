@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { sweepListings } from "@/lib/listings/lifecycle";
+import { isPreviewWriteLockActive, previewWriteBlockedResponse } from "@/lib/security/previewLock";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -18,6 +19,7 @@ function authorized(req: Request) {
 }
 
 export async function GET(req: Request) {
+  if (isPreviewWriteLockActive()) return previewWriteBlockedResponse();
   if (!authorized(req)) return NextResponse.json({ ok: false }, { status: 401 });
   const result = await sweepListings();
   return NextResponse.json({ ok: true, ...result }, { headers: { "Cache-Control": "no-store" } });

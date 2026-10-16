@@ -9,6 +9,7 @@ import { listingCreateBodySchema } from "@/lib/security/schemas";
 import { isBannedLiveAnimalCategory, isBannedLiveAnimalSlug, moderateListingDraft } from "@/lib/liveAnimalPolicy";
 import { categoryQueryIds, lookupCategory } from "@/data/categories";
 import { postedFilterHours } from "@/lib/listingQuery";
+import { PreviewWriteBlockedError } from "@/lib/security/previewLock";
 import type { StoredUser } from "@/lib/security/userStore";
 import { deleteStoredObject, isManagedStorageKey, storageKeyFromUrl } from "@/lib/storage/media";
 import { resolveListingCoords, validListingCoords } from "@/lib/placeGeo";
@@ -755,8 +756,14 @@ export async function resaleListingRecord(user: StoredUser, id: string) {
 }
 
 export async function bumpListingViews(id: string) {
-  await prisma.listing.updateMany({
-    where: { id, deletedAt: null, ...liveListingWhere() },
-    data: { views: { increment: 1 } },
-  });
+  try {
+    await prisma.listing.updateMany({
+      where: { id, deletedAt: null, ...liveListingWhere() },
+      data: { views: { increment: 1 } },
+    });
+  } catch (err) {
+    // Preview write lock must not break listing GET pages.
+    if (err instanceof PreviewWriteBlockedError) return;
+    throw err;
+  }
 }

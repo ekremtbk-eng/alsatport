@@ -2,6 +2,7 @@ import "server-only";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { del, put } from "@vercel/blob";
+import { assertPreviewWritesAllowed } from "@/lib/security/previewLock";
 
 export const MAX_UPLOAD_BYTES = 6 * 1024 * 1024;
 export const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
@@ -74,6 +75,7 @@ function blobEnabled() {
 }
 
 export async function putAvatarImage(userId: string, bytes: Buffer) {
+  assertPreviewWritesAllowed("blob.putAvatar");
   const storageKey = `avatars/${userId}/${crypto.randomUUID()}.webp`;
   const mime = "image/webp";
   if (blobEnabled()) {
@@ -95,6 +97,7 @@ export async function putAvatarImage(userId: string, bytes: Buffer) {
 export type BusinessImageKind = "logo" | "cover" | "team";
 
 export async function putBusinessImage(userId: string, kind: BusinessImageKind, bytes: Buffer) {
+  assertPreviewWritesAllowed("blob.putBusiness");
   const storageKey = `business/${userId}/${kind}-${crypto.randomUUID()}.webp`;
   const mime = "image/webp";
   if (blobEnabled()) {
@@ -125,6 +128,7 @@ export function isOwnBusinessImage(
 }
 
 export async function putListingImage(userId: string, bytes: Buffer, mime: string, ext: string) {
+  assertPreviewWritesAllowed("blob.putListing");
   const storageKey = `listings/${userId}/${crypto.randomUUID()}.${ext}`;
   if (blobEnabled()) {
     const blob = await put(storageKey, bytes, {
@@ -144,6 +148,7 @@ export async function putListingImage(userId: string, bytes: Buffer, mime: strin
 
 export async function deleteStoredObject(storageKey: string, url?: string) {
   if (!isManagedStorageKey(storageKey)) return;
+  assertPreviewWritesAllowed("blob.delete");
   if (blobEnabled()) {
     const token = process.env.BLOB_READ_WRITE_TOKEN;
     const target = url?.startsWith("https://") && storageKeyFromUrl(url) === storageKey ? url : storageKey;

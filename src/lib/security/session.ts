@@ -24,6 +24,7 @@ import {
 import { hasRole, type Role } from "@/lib/security/rbac";
 import { sha256Secret } from "@/lib/security/hash";
 import { clientIp } from "@/lib/security/rateLimit";
+import { isPreviewWriteLockActive, previewWriteBlockedResponse } from "@/lib/security/previewLock";
 import { findUserById, publicProfile, type StoredUser } from "@/lib/security/userStore";
 
 export type SessionMethod = "password" | "otp" | "oauth" | "qr" | "register";
@@ -152,6 +153,7 @@ export function attachCsrf(res: NextResponse, token: string) {
 }
 
 export async function requireMutatingRequest(req: Request) {
+  if (isPreviewWriteLockActive()) return previewWriteBlockedResponse();
   if (!originAllowed(req)) {
     return NextResponse.json({ ok: false, error: "auth.err.csrf" }, { status: 403 });
   }
