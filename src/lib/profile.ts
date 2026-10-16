@@ -85,14 +85,18 @@ export function safeNextPath(value: string | null | undefined, fallback = "/ilan
 
 export const BUSINESS_RETURN = "/kurumsal-hesap";
 
-/** Destinations that may survive e-mail verification and skip the profile-completion gate. */
-const RETURN_ALLOWLIST = new Set([BUSINESS_RETURN, "/isletme-paneli"]);
+/**
+ * Destinations that may survive e-mail verification and skip the profile-completion gate.
+ * /ilan-ver keeps a safe query string so the user can resume the listing wizard after verifying.
+ */
+const RETURN_ALLOWLIST = new Set([BUSINESS_RETURN, "/isletme-paneli", "/ilan-ver"]);
 
 export function allowlistedReturn(raw: string | null | undefined): string | null {
   const safe = safeNextPath(raw, "");
   if (!safe) return null;
   const path = safe.split(/[?#]/)[0] ?? "";
-  return RETURN_ALLOWLIST.has(path) ? path : null;
+  if (!RETURN_ALLOWLIST.has(path)) return null;
+  return path === "/ilan-ver" ? safe : path;
 }
 
 /** Giriş / kayıt sonrası hedef. Overlay’de profil tamamsa null = sayfada kal. */
@@ -117,7 +121,7 @@ export function afterAuthHref(needsProfile: boolean, stayIfComplete = false, nee
 
 export function postListingHref(user: UserProfile | null | undefined, listingPath = "/ilan-ver") {
   if (!user) return `/giris?next=${encodeURIComponent(listingPath)}`;
-  if (!isEmailVerified(user)) return "/eposta-dogrula";
+  if (!isEmailVerified(user)) return `/eposta-dogrula?next=${encodeURIComponent(listingPath)}`;
   if (!isProfileComplete(user)) {
     return `${COMPLETE_PATH}?next=${encodeURIComponent(listingPath)}`;
   }

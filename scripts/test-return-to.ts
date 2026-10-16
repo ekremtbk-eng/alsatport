@@ -66,6 +66,8 @@ console.log("— allowlist");
 check("allowlistedReturn(/kurumsal-hesap)", allowlistedReturn("/kurumsal-hesap") === "/kurumsal-hesap");
 check("allowlistedReturn(/kurumsal-hesap?x=1) strips query", allowlistedReturn("/kurumsal-hesap?x=1") === "/kurumsal-hesap");
 check("allowlistedReturn(/isletme-paneli)", allowlistedReturn("/isletme-paneli") === "/isletme-paneli");
+check("allowlistedReturn(/ilan-ver)", allowlistedReturn("/ilan-ver") === "/ilan-ver");
+check("allowlistedReturn(/ilan-ver?cat=1) keeps query", allowlistedReturn("/ilan-ver?cat=1") === "/ilan-ver?cat=1");
 for (const raw of [...HOSTILE, "/admin", "/kurumsal-hesap-evil", "/profil", "/KURUMSAL-HESAP", "", null]) {
   check(`allowlistedReturn rejects ${JSON.stringify(raw)}`, allowlistedReturn(raw) === null);
 }
@@ -92,6 +94,11 @@ check("signup without intent unchanged", withUrl("/kayit", "", () => afterAuthHr
 check("login without next unchanged (complete -> /)", withUrl("/giris", "", () => afterAuthHref(false)) === "/");
 check("login without next unchanged (incomplete -> profile)", withUrl("/giris", "", () => afterAuthHref(true)) === "/profil/bilgilerim");
 check("existing next=/ilan-ver still works", withUrl("/giris", "?next=%2Filan-ver", () => afterAuthHref(false)) === "/ilan-ver");
+check(
+  "signup with next=/ilan-ver carries through e-mail verify",
+  withUrl("/kayit", "?next=%2Filan-ver%3Fcat%3D1", () => afterAuthHref(true, false, true)) ===
+    "/eposta-dogrula?sent=1&next=%2Filan-ver%3Fcat%3D1",
+);
 for (const raw of HOSTILE) {
   const out = withUrl("/giris", `?next=${encodeURIComponent(raw)}`, () => afterAuthHref(false)) ?? "";
   check(`afterAuthHref never leaves site for ${JSON.stringify(raw)}`, sameOrigin(out) && !out.startsWith("//"), out);
