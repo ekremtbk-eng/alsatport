@@ -557,6 +557,13 @@ async function main() {
     r = await call("POST", "/api/admin/special-days", fresh, dayBody);
     const created = await prisma.specialDay.count({ where: { slug: daySlug } });
     check("A19", "Special day create with step-up succeeds", r.status === 200 && created === 1, `status ${r.status} rows=${created}`);
+    const dayId = typeof r.json.day === "object" && r.json.day && "id" in (r.json.day as object) ? String((r.json.day as { id: string }).id) : "";
+    r = await call("PATCH", `/api/admin/special-days/${dayId || "00000000-0000-0000-0000-000000000000"}`, mfa, { active: true, title: "patched" });
+    const stillOff = dayId ? await prisma.specialDay.findUnique({ where: { id: dayId }, select: { active: true, title: true } }) : null;
+    check("A20", "Special day PATCH requires fresh step-up", r.status === 403 && r.json.error === "auth.err.stepUp" && stillOff?.active === false, `status ${r.status} ${String(r.json.error)}`);
+    r = await call("PATCH", `/api/admin/special-days/${dayId}`, fresh, { active: true, title: "Security patched" });
+    const patched = dayId ? await prisma.specialDay.findUnique({ where: { id: dayId }, select: { active: true, title: true } }) : null;
+    check("A21", "Special day PATCH with step-up succeeds", r.status === 200 && patched?.active === true && patched.title === "Security patched", `status ${r.status}`);
     await prisma.specialDay.deleteMany({ where: { slug: daySlug } });
 
     const errs = [await call("GET", "/api/listings/not-a-uuid"), await call("POST", "/api/auth/login", await guestCsrf(), "{bad json" as unknown)];
