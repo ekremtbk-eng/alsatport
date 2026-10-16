@@ -17,10 +17,13 @@ export const SOCIAL_PROVIDERS = (["google", "apple"] as const).filter((p) => LEG
 export function SocialAuth({
   mode,
   variant = "stack",
+  returnTo = null,
 }: {
   mode: "login" | "register";
   onDone?: (needsProfile: boolean) => void;
   variant?: "stack" | "gate";
+  /** Safe same-origin resume path when the auth modal has no ?next= in the URL. */
+  returnTo?: string | null;
 }) {
   const { t } = useI18n();
   const params = useSearchParams();
@@ -78,7 +81,8 @@ export function SocialAuth({
   function start(provider: SocialProvider) {
     if (busy) return;
     setBusy(provider);
-    const next = new URLSearchParams(window.location.search).get("next") || params.get("next") || "/profil";
+    const next =
+      new URLSearchParams(window.location.search).get("next") || params.get("next") || returnTo || "/profil";
     window.location.assign(`/api/auth/oauth/${provider}/start?next=${encodeURIComponent(next)}`);
   }
 

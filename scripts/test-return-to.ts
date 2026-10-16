@@ -3,7 +3,7 @@
  * Pure checks always run; HTTP checks run when RETURN_TEST_BASE points at a local `next start`.
  * Never point RETURN_TEST_BASE at production for the OAuth part (it only issues GETs, but keep it local).
  */
-import { afterAuthHref, allowlistedReturn, safeNextPath } from "../src/lib/profile";
+import { afterAuthHref, allowlistedReturn, resumeAfterVerify, safeNextPath } from "../src/lib/profile";
 import { safeNextPath as oauthSafeNextPath } from "../src/lib/oauth/nextPath";
 
 let pass = 0;
@@ -62,14 +62,32 @@ for (const raw of HOSTILE) {
 }
 check("oauth.safeNextPath keeps /kurumsal-hesap", oauthSafeNextPath("/kurumsal-hesap") === "/kurumsal-hesap");
 
-console.log("— allowlist");
+console.log("— allowlist (skip profile)");
 check("allowlistedReturn(/kurumsal-hesap)", allowlistedReturn("/kurumsal-hesap") === "/kurumsal-hesap");
 check("allowlistedReturn(/kurumsal-hesap?x=1) strips query", allowlistedReturn("/kurumsal-hesap?x=1") === "/kurumsal-hesap");
 check("allowlistedReturn(/isletme-paneli)", allowlistedReturn("/isletme-paneli") === "/isletme-paneli");
 check("allowlistedReturn(/ilan-ver)", allowlistedReturn("/ilan-ver") === "/ilan-ver");
 check("allowlistedReturn(/ilan-ver?cat=1) keeps query", allowlistedReturn("/ilan-ver?cat=1") === "/ilan-ver?cat=1");
+check("allowlistedReturn does not skip-profile for /favoriler", allowlistedReturn("/favoriler") === null);
+check("allowlistedReturn does not skip-profile for /mesajlar", allowlistedReturn("/mesajlar") === null);
 for (const raw of [...HOSTILE, "/admin", "/kurumsal-hesap-evil", "/profil", "/KURUMSAL-HESAP", "", null]) {
   check(`allowlistedReturn rejects ${JSON.stringify(raw)}`, allowlistedReturn(raw) === null);
+}
+
+console.log("— resumeAfterVerify");
+check("resumeAfterVerify(/favoriler)", resumeAfterVerify("/favoriler") === "/favoriler");
+check("resumeAfterVerify(/favoriler?tab=aramalar) keeps query", resumeAfterVerify("/favoriler?tab=aramalar") === "/favoriler?tab=aramalar");
+check("resumeAfterVerify(/mesajlar)", resumeAfterVerify("/mesajlar") === "/mesajlar");
+check(
+  "resumeAfterVerify(/mesajlar/<id>) keeps conversation path",
+  resumeAfterVerify("/mesajlar/11111111-1111-4111-8111-111111111111") === "/mesajlar/11111111-1111-4111-8111-111111111111",
+);
+check("resumeAfterVerify(/ilan-ver?cat=1)", resumeAfterVerify("/ilan-ver?cat=1") === "/ilan-ver?cat=1");
+check("resumeAfterVerify(/ilan/abc) keeps listing path", resumeAfterVerify("/ilan/abc") === "/ilan/abc");
+check("resumeAfterVerify rejects /admin", resumeAfterVerify("/admin") === null);
+check("resumeAfterVerify rejects /api/x", resumeAfterVerify("/api/x") === null);
+for (const raw of HOSTILE) {
+  check(`resumeAfterVerify rejects ${JSON.stringify(raw)}`, resumeAfterVerify(raw) === null);
 }
 
 console.log("— afterAuthHref");
@@ -98,6 +116,32 @@ check(
   "signup with next=/ilan-ver carries through e-mail verify",
   withUrl("/kayit", "?next=%2Filan-ver%3Fcat%3D1", () => afterAuthHref(true, false, true)) ===
     "/eposta-dogrula?sent=1&next=%2Filan-ver%3Fcat%3D1",
+);
+check(
+  "login next=/favoriler goes to favorites (does not skip profile when incomplete)",
+  withUrl("/giris", "?next=%2Ffavoriler", () => afterAuthHref(true)) === "/profil/bilgilerim?next=%2Ffavoriler",
+);
+check(
+  "login next=/favoriler when complete goes to favorites",
+  withUrl("/giris", "?next=%2Ffavoriler", () => afterAuthHref(false)) === "/favoriler",
+);
+check(
+  "signup next=/mesajlar carries through e-mail verify",
+  withUrl("/kayit", "?next=%2Fmesajlar", () => afterAuthHref(true, false, true)) ===
+    "/eposta-dogrula?sent=1&next=%2Fmesajlar",
+);
+check(
+  "overlay preferredNext=/ilan/x carries through e-mail verify",
+  withUrl("/magazalar", "", () => afterAuthHref(true, true, true, "/ilan/demo-1")) ===
+    "/eposta-dogrula?sent=1&next=%2Filan%2Fdemo-1",
+);
+check(
+  "overlay preferredNext stays on page when complete (no navigate)",
+  withUrl("/magazalar", "", () => afterAuthHref(false, true, false, "/magazalar")) === null,
+);
+check(
+  "overlay preferredNext hostile is dropped on verify",
+  withUrl("/magazalar", "", () => afterAuthHref(true, true, true, "https://evil.com")) === "/eposta-dogrula?sent=1",
 );
 for (const raw of HOSTILE) {
   const out = withUrl("/giris", `?next=${encodeURIComponent(raw)}`, () => afterAuthHref(false)) ?? "";

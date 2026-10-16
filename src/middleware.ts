@@ -140,9 +140,14 @@ export async function middleware(request: NextRequest) {
     (accessHold ? await verifyAuthToken(accessHold, "access") : null) ||
     (refreshHold ? await verifyAuthToken(refreshHold, "refresh") : null);
   if (holdClaims?.ev === 0 && !isEmailHoldAllowed(path)) {
+    const here = `${path}${request.nextUrl.search}`;
     const url = request.nextUrl.clone();
     url.pathname = "/eposta-dogrula";
     url.search = "";
+    // Preserve a same-origin resume path so favorites / messages / listing form can continue after verify.
+    if (here.startsWith("/") && !here.startsWith("//") && !here.includes("\\") && here.length <= 300) {
+      url.searchParams.set("next", here);
+    }
     return NextResponse.redirect(url);
   }
 
