@@ -53,9 +53,6 @@ export function PostStepper({
   );
 }
 
-/** SearchSelect list height (max-h-52) and the smallest height that still shows two options. */
-const LIST_MAX = 208;
-const LIST_MIN = 84;
 const NON_TEXT = new Set(["button", "checkbox", "radio", "range", "submit", "reset", "file", "color", "image"]);
 function isTyping(el: Element | null): el is HTMLElement {
   if (!(el instanceof HTMLElement)) return false;
@@ -68,6 +65,7 @@ function isTyping(el: Element | null): el is HTMLElement {
  * keyboard: iOS keeps fixed boxes on the layout viewport, so the bar is lifted by the gap between the layout
  * and the visual viewport; Android (interactive-widget=resizes-content) shrinks the layout itself, the gap is
  * 0 and the bar simply sits above the keyboard. A focused field hidden behind the bar is scrolled into view.
+ * SearchSelect lists are portaled above this bar, so reveal only keeps the input itself visible.
  */
 export function PostActionBar({ hint, children }: { hint?: string; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -85,27 +83,15 @@ export function PostActionBar({ hint, children }: { hint?: string; children: Rea
         bar.classList.toggle("is-kb", gap > 80 || isTyping(document.activeElement));
       });
     };
-    /**
-     * Keeps the focused field, and a search-select's open list, between the sticky header and the bar.
-     * When the gap is too small the list is shortened (it scrolls inside), so no option hides behind the bar.
-     */
+    /** Keeps the focused field between the sticky header and the bar; open option lists position themselves. */
     const reveal = (el: HTMLElement) => {
       if (!el.isConnected || document.activeElement !== el) return;
       const header = document.querySelector(".site-header")?.getBoundingClientRect();
       const top = Math.max(vv ? vv.offsetTop : 0, header && header.bottom > 0 ? header.bottom : 0);
       const barTop = bar.getBoundingClientRect().top;
-      const listId = el.getAttribute("aria-controls");
-      const list = listId ? document.getElementById(listId) : null;
-      if (list) list.style.maxHeight = "";
       const r = el.getBoundingClientRect();
-      const listH = list ? Math.min(list.scrollHeight, LIST_MAX) + 6 : 0;
-      const need = r.bottom + listH + 12 - barTop;
-      if (need > 0) window.scrollBy({ top: Math.max(0, Math.min(need, r.top - top - 8)) });
+      if (r.bottom > barTop - 12) window.scrollBy({ top: r.bottom - (barTop - 12) });
       else if (r.top < top + 8) window.scrollBy({ top: r.top - top - 12 });
-      if (list) {
-        const space = bar.getBoundingClientRect().top - el.getBoundingClientRect().bottom - 14;
-        if (space < listH) list.style.maxHeight = `${Math.max(LIST_MIN, Math.floor(space))}px`;
-      }
     };
     let revealTimer = 0;
     const revealSoon = (delay: number) => {

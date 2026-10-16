@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useApp } from "@/context/AppContext";
 import { AuthModal } from "@/components/AuthModal";
+import { currentReturnPath } from "@/lib/profile";
 
 export type AuthModalReason = "search" | "filter" | "member" | "login";
 
@@ -17,6 +18,8 @@ type AuthModalState = {
   open: boolean;
   signupOpen: boolean;
   reason: AuthModalReason;
+  /** Safe same-origin path captured when the modal opened (header Giriş / Üye Ol). */
+  returnTo: string | null;
   openAuth: (reason?: AuthModalReason) => void;
   closeAuth: () => void;
   openRegister: () => void;
@@ -31,20 +34,36 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [signupOpen, setSignupOpen] = useState(false);
   const [reason, setReason] = useState<AuthModalReason>("login");
+  const [returnTo, setReturnTo] = useState<string | null>(null);
 
-  const closeAuth = useCallback(() => setOpen(false), []);
-  const closeRegister = useCallback(() => setSignupOpen(false), []);
-
-  const openAuth = useCallback((next: AuthModalReason = "login") => {
-    setSignupOpen(false);
-    setReason(next);
-    setOpen(true);
+  const captureReturn = useCallback(() => {
+    setReturnTo(currentReturnPath());
   }, []);
+
+  const closeAuth = useCallback(() => {
+    setOpen(false);
+    setReturnTo(null);
+  }, []);
+  const closeRegister = useCallback(() => {
+    setSignupOpen(false);
+    setReturnTo(null);
+  }, []);
+
+  const openAuth = useCallback(
+    (next: AuthModalReason = "login") => {
+      captureReturn();
+      setSignupOpen(false);
+      setReason(next);
+      setOpen(true);
+    },
+    [captureReturn],
+  );
 
   const openRegister = useCallback(() => {
+    captureReturn();
     setOpen(false);
     setSignupOpen(true);
-  }, []);
+  }, [captureReturn]);
 
   const requireAuth = useCallback(
     (next: AuthModalReason = "member") => {
@@ -61,13 +80,14 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
       open,
       signupOpen,
       reason,
+      returnTo,
       openAuth,
       closeAuth,
       openRegister,
       closeRegister,
       requireAuth,
     }),
-    [open, signupOpen, reason, openAuth, closeAuth, openRegister, closeRegister, requireAuth],
+    [open, signupOpen, reason, returnTo, openAuth, closeAuth, openRegister, closeRegister, requireAuth],
   );
 
   return (

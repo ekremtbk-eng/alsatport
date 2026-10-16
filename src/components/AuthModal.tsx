@@ -5,7 +5,7 @@ import { AuthStage, type AuthTab } from "@/components/AuthStage";
 import { useAuthModal } from "@/context/AuthModalContext";
 
 export function AuthModal() {
-  const { open, signupOpen, reason, closeAuth, closeRegister, openAuth, openRegister } = useAuthModal();
+  const { open, signupOpen, reason, returnTo, closeAuth, closeRegister, openAuth, openRegister } = useAuthModal();
   const visible = open || signupOpen;
   const tab: AuthTab = signupOpen ? "signup" : "login";
 
@@ -32,6 +32,7 @@ export function AuthModal() {
     <AuthStage
       tab={tab}
       variant="overlay"
+      returnTo={returnTo}
       promptKey={reason === "login" ? "auth.modal.join" : `auth.modal.${reason}`}
       onTab={(next) => {
         if (next === "signup") openRegister();

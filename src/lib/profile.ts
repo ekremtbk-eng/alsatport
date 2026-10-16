@@ -85,24 +85,93 @@ export function safeNextPath(value: string | null | undefined, fallback = "/ilan
 
 export const BUSINESS_RETURN = "/kurumsal-hesap";
 
-/** Destinations that may survive e-mail verification and skip the profile-completion gate. */
-const RETURN_ALLOWLIST = new Set([BUSINESS_RETURN, "/isletme-paneli"]);
+/**
+ * Destinations that skip the profile-completion gate after auth (and also survive e-mail verification).
+ * /ilan-ver keeps a safe query string so the user can resume the listing wizard after verifying.
+ */
+const SKIP_PROFILE_ALLOWLIST = new Set([BUSINESS_RETURN, "/isletme-paneli", "/ilan-ver"]);
 
+/** Extra destinations that survive e-mail verification without skipping the profile gate. */
+const VERIFY_RESUME_EXTRA = new Set(["/favoriler", "/mesajlar"]);
+
+const KEEP_FULL = new Set(["/ilan-ver", "/favoriler"]);
+
+function pathOnly(safe: string) {
+  return safe.split(/[?#]/)[0] ?? "";
+}
+
+function matchAllowlist(safe: string, roots: Set<string>): string | null {
+  const path = pathOnly(safe);
+  const hit =
+    roots.has(path) ||
+    (roots.has("/mesajlar") && path.startsWith("/mesajlar/") && path.length > "/mesajlar/".length);
+  if (!hit) return null;
+  if (KEEP_FULL.has(path) || path.startsWith("/mesajlar")) return safe;
+  return path;
+}
+
+/** Skip-profile destinations (business / store panel / listing wizard). */
 export function allowlistedReturn(raw: string | null | undefined): string | null {
   const safe = safeNextPath(raw, "");
   if (!safe) return null;
-  const path = safe.split(/[?#]/)[0] ?? "";
-  return RETURN_ALLOWLIST.has(path) ? path : null;
+  return matchAllowlist(safe, SKIP_PROFILE_ALLOWLIST);
+}
+
+/** Public pages the header auth modal may resume after e-mail verification. */
+const MODAL_RESUME_ROOTS = new Set(["/", "/magazalar", "/kategoriler", "/ara", "/son-48-saat"]);
+const MODAL_RESUME_PREFIXES = [
+  "/ilan/",
+  "/magaza/",
+  "/satici/",
+  "/kategoriler/",
+  "/ustalar-hizmetler",
+  "/vasita",
+  "/emlak",
+  "/profil",
+];
+
+/**
+ * Same-origin resume after e-mail verification: skip-profile allowlist, favorites, messages,
+ * or a fixed set of public pages (header modal). Encoded `/`/`\` and open redirects are rejected.
+ */
+export function resumeAfterVerify(raw: string | null | undefined): string | null {
+  const safe = safeNextPath(raw, "");
+  if (!safe || /%2f|%5c|%00|\\/i.test(safe)) return null;
+  const skip = matchAllowlist(safe, SKIP_PROFILE_ALLOWLIST);
+  if (skip) return skip;
+  const extra = matchAllowlist(safe, VERIFY_RESUME_EXTRA);
+  if (extra) return extra;
+  const path = pathOnly(safe);
+  if (!path || path.startsWith("/admin") || path.startsWith("/api")) return null;
+  if (MODAL_RESUME_ROOTS.has(path)) return safe;
+  if (MODAL_RESUME_PREFIXES.some((p) => path === p || path.startsWith(p))) return safe;
+  return null;
+}
+
+/** Current page as a safe next value for the header auth modal (null on auth-loop pages). */
+export function currentReturnPath(): string | null {
+  if (typeof window === "undefined") return null;
+  const here = `${window.location.pathname}${window.location.search}`;
+  return resumeAfterVerify(here);
 }
 
 /** Giriş / kayıt sonrası hedef. Overlay’de profil tamamsa null = sayfada kal. */
-export function afterAuthHref(needsProfile: boolean, stayIfComplete = false, needsEmailVerify = false): string | null {
+export function afterAuthHref(
+  needsProfile: boolean,
+  stayIfComplete = false,
+  needsEmailVerify = false,
+  preferredNext?: string | null,
+): string | null {
   const search = typeof window !== "undefined" ? window.location.search : "";
   const path = typeof window !== "undefined" ? window.location.pathname : "/";
-  const q = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search).get("next");
-  const carry = allowlistedReturn(q);
-  if (needsEmailVerify) return carry ? `/eposta-dogrula?sent=1&next=${encodeURIComponent(carry)}` : "/eposta-dogrula?sent=1";
-  if (carry) return carry;
+  const q =
+    new URLSearchParams(search.startsWith("?") ? search.slice(1) : search).get("next") || preferredNext || null;
+  const skipProfile = allowlistedReturn(q);
+  if (needsEmailVerify) {
+    const carry = resumeAfterVerify(q) ?? resumeAfterVerify(preferredNext);
+    return carry ? `/eposta-dogrula?sent=1&next=${encodeURIComponent(carry)}` : "/eposta-dogrula?sent=1";
+  }
+  if (skipProfile) return skipProfile;
   const blocked = AUTH_LOOP_PATHS.has(path);
   const dest = q ? safeNextPath(q, "/") : blocked ? "/" : path;
   if (needsProfile) {
@@ -117,7 +186,7 @@ export function afterAuthHref(needsProfile: boolean, stayIfComplete = false, nee
 
 export function postListingHref(user: UserProfile | null | undefined, listingPath = "/ilan-ver") {
   if (!user) return `/giris?next=${encodeURIComponent(listingPath)}`;
-  if (!isEmailVerified(user)) return "/eposta-dogrula";
+  if (!isEmailVerified(user)) return `/eposta-dogrula?next=${encodeURIComponent(listingPath)}`;
   if (!isProfileComplete(user)) {
     return `${COMPLETE_PATH}?next=${encodeURIComponent(listingPath)}`;
   }

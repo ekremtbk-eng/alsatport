@@ -35,12 +35,15 @@ export function AuthStage({
   variant = "page",
   onClose,
   promptKey,
+  returnTo = null,
 }: {
   tab: AuthTab;
   onTab: (next: AuthTab) => void;
   variant?: "page" | "overlay";
   onClose?: () => void;
   promptKey?: string;
+  /** Safe same-origin resume path from the auth modal (header Giriş / Üye Ol). */
+  returnTo?: string | null;
 }) {
   const { loginWithPassword, registerAccount, user } = useApp();
   const { t } = useI18n();
@@ -195,7 +198,7 @@ export function AuthStage({
 
   function finish(needsProfile: boolean, needsEmailVerify = false) {
     onClose?.();
-    const dest = afterAuthHref(needsProfile, variant === "overlay", needsEmailVerify);
+    const dest = afterAuthHref(needsProfile, variant === "overlay", needsEmailVerify, returnTo);
     if (dest) router.push(dest);
   }
 
@@ -396,6 +399,7 @@ export function AuthStage({
               <SocialAuth
                 mode={tab === "login" ? "login" : "register"}
                 variant="gate"
+                returnTo={returnTo}
                 onDone={() => onClose?.()}
               />
 
