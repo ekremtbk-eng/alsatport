@@ -35,7 +35,8 @@ function serialize(row: {
 export async function PATCH(req: Request, ctx: Ctx) {
   const blocked = await requireMutatingRequest(req);
   if (blocked) return blocked;
-  const auth = await requireAdmin();
+  // Same step-up bar as create/delete: site-wide copy/activation must not ride on MFA alone.
+  const auth = await requireAdmin({ stepUp: true });
   if ("error" in auth) return auth.error;
   const { id } = await ctx.params;
   if (!isUuid(id)) return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
