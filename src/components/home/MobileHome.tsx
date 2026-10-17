@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -17,7 +18,7 @@ import { LocationOptions } from "@/components/LocationOptions";
 import { SmartSearch } from "@/components/home/SmartSearch";
 import { applyLocationPick, placeLabel } from "@/data/locations";
 import { isPublicListing } from "@/lib/categoryCounts";
-import { BRAND_MARK_SRC } from "@/lib/brand";
+import { BRAND_MARK } from "@/lib/brand";
 import type { Listing } from "@/data/store";
 
 /** Home shortcuts: popular leaves first, then the remaining roots. `short` swaps long root names for the nav label. */
@@ -166,8 +167,16 @@ export function MobileHome() {
             <ArrowRight className="h-4 w-4" aria-hidden />
           </AuthGateLink>
         </div>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={BRAND_MARK_SRC} alt="" className="mh-hero-mark" width={112} height={112} decoding="async" />
+        <Image
+          src={BRAND_MARK.src}
+          alt=""
+          width={112}
+          height={112}
+          className="mh-hero-mark"
+          sizes="112px"
+          priority
+          unoptimized
+        />
       </section>
 
       <section className="mh-sec" aria-labelledby="mh-cats">

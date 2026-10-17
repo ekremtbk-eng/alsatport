@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { BRAND_LOGO_DARK, BRAND_LOGO_LIGHT, BRAND_MARK_SRC, BRAND_NAME } from "@/lib/brand";
+import { BRAND_LOGO_DARK, BRAND_LOGO_LIGHT, BRAND_MARK, BRAND_NAME } from "@/lib/brand";
 
 export function Logo({
   compact = false,
@@ -14,19 +15,31 @@ export function Logo({
   tone?: "light" | "dark";
 }) {
   const logo = tone === "dark" ? BRAND_LOGO_DARK : BRAND_LOGO_LIGHT;
+  // Brand assets are already display-sized WebP; skip /_next/image re-encode latency on LCP.
+  // aspectRatio reserves CSS width while height is set in rem (avoids footer/header CLS).
   const inner = compact ? (
-    /* eslint-disable-next-line @next/next/no-img-element */
-    <img src={BRAND_MARK_SRC} alt="" width={44} height={44} className="brand-mark" decoding="async" />
+    <Image
+      src={BRAND_MARK.src}
+      alt=""
+      width={44}
+      height={44}
+      className="brand-mark"
+      sizes="44px"
+      priority
+      unoptimized
+      style={{ aspectRatio: "1 / 1" }}
+    />
   ) : (
-    /* eslint-disable-next-line @next/next/no-img-element */
-    <img
+    <Image
       src={logo.src}
       alt={BRAND_NAME}
       width={logo.width}
       height={logo.height}
       className={`brand-logo-img brand-logo-${tone}`}
-      decoding="async"
-      fetchPriority="high"
+      sizes="(max-width: 768px) 140px, 180px"
+      priority
+      unoptimized
+      style={{ aspectRatio: `${logo.width} / ${logo.height}` }}
     />
   );
   if (!linked) {
