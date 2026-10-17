@@ -18,6 +18,7 @@ import { type ListingRef, isLiveRow, liveListingWhere, newPeriod } from "@/lib/l
 import { invalidateCategoryCounts } from "@/lib/listings/categoryCounts";
 import { enforcePetSpecs } from "@/lib/listings/petSpecPolicy";
 import { vehicleSpecError } from "@/lib/listings/vehicleSpecPolicy";
+import { eidsBlocksActivePublish, eidsPublishBlockedResponse } from "@/lib/listings/eidsPublishLock";
 import type { ApprovedVehicle } from "@/data/vehicleRequests";
 import { approvedVehicles } from "@/lib/vehicleRequests/store";
 import { type ListingCurrency, listingCurrencyOf, parseListingCurrency } from "@/lib/listings/currency";
@@ -487,6 +488,9 @@ export async function createListing(user: StoredUser, input: ListingInput) {
   if (input.urgent && !(await sellerCanUseUrgent(user.id))) {
     return { error: "urgent.err.businessOnly" as const, status: 403 as const };
   }
+  if (eidsBlocksActivePublish(input.categoryId)) {
+    return eidsPublishBlockedResponse();
+  }
   input.images = ownedImages(input.images, user.id);
   if (!input.images.length) return { error: "photo.minN" as const };
   const category = await ensureCategoryRow(input.categoryId);
@@ -628,6 +632,12 @@ export async function updateListingRecord(user: StoredUser, id: string, patch: R
       : parsed.status === "passive"
         ? "passive"
         : "active";
+  if (
+    nextStatus === "active" &&
+    eidsBlocksActivePublish(parsed.categoryId, { status: existing.status, categoryId: existing.categoryId })
+  ) {
+    return eidsPublishBlockedResponse();
+  }
   const reactivated =
     existing.status === "passive" &&
     nextStatus === "active" &&
@@ -709,6 +719,9 @@ export async function renewListingRecord(user: StoredUser, id: string) {
   if (existing.status !== "active" && existing.status !== "passive" && existing.status !== "expired") {
     return { error: "auth.err.forbidden" as const, status: 403 };
   }
+  if (eidsBlocksActivePublish(existing.categoryId, existing)) {
+    return eidsPublishBlockedResponse();
+  }
   if (isLiveRow(existing)) return { error: "listing.err.notRenewable" as const, status: 409 };
   const moved = await prisma.listing.updateMany({
     where: { id, status: existing.status, deletedAt: null },
@@ -745,6 +758,9 @@ export async function resaleListingRecord(user: StoredUser, id: string) {
   if (!existing) return { error: "auth.err.session" as const, status: 404 };
   if (!canMutateListing(user, existing.sellerId)) return { error: "auth.err.forbidden" as const, status: 403 };
   if (existing.status !== "sold") return { error: "listing.err.notSold" as const, status: 409 };
+  if (eidsBlocksActivePublish(existing.categoryId, existing)) {
+    return eidsPublishBlockedResponse();
+  }
   const moved = await prisma.listing.updateMany({
     where: { id, status: "sold", deletedAt: null },
     data: { status: "active", soldAt: null, ...newPeriod() },
