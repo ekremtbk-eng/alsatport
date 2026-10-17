@@ -1,4 +1,14 @@
-import { BRAND_LOGO_DARK, BRAND_LOGO_LIGHT, BRAND_LOGO_SRC, BRAND_MARK_SRC } from "@/lib/brand";
+import {
+  BRAND_LOGO_DARK,
+  BRAND_LOGO_LIGHT,
+  BRAND_LOGO_SRC,
+  BRAND_MARK_FULL_SRC,
+  BRAND_MARK_SRC,
+} from "@/lib/brand";
+
+/** Original PNG paths for brand-kit downloads (full resolution). */
+const LOGO_LIGHT_PNG = "/assets/alsatport-logo-light.png";
+const LOGO_DARK_PNG = "/assets/alsatport-logo-dark.png";
 
 export type BrandKitFile = { label: string; src: string; download: string; type: "PNG" | "JPG" | "ICO" };
 export type BrandKitItem = {
@@ -22,18 +32,18 @@ export const BRAND_KIT: BrandKitItem[] = [
     title: "Logo — açık zemin",
     note: "Şeffaf arka planlı ana logo. Sitenin üst menüsünde kullanılır.",
     surface: "light",
-    size: `${BRAND_LOGO_LIGHT.width} × ${BRAND_LOGO_LIGHT.height} px`,
+    size: "377 × 111 px",
     preview: BRAND_LOGO_LIGHT.src,
-    files: [{ label: "PNG indir", src: BRAND_LOGO_LIGHT.src, download: "alsatport-logo.png", type: "PNG" }],
+    files: [{ label: "PNG indir", src: LOGO_LIGHT_PNG, download: "alsatport-logo.png", type: "PNG" }],
   },
   {
     id: "logo-dark",
     title: "Logo — koyu zemin",
     note: "Şeffaf arka planlı, beyaz yazılı logo. Koyu ve yeşil zeminler içindir.",
     surface: "dark",
-    size: `${BRAND_LOGO_DARK.width} × ${BRAND_LOGO_DARK.height} px`,
+    size: "720 × 220 px",
     preview: BRAND_LOGO_DARK.src,
-    files: [{ label: "PNG indir", src: BRAND_LOGO_DARK.src, download: "alsatport-logo-dark.png", type: "PNG" }],
+    files: [{ label: "PNG indir", src: LOGO_DARK_PNG, download: "alsatport-logo-dark.png", type: "PNG" }],
   },
   {
     id: "icon",
@@ -42,7 +52,7 @@ export const BRAND_KIT: BrandKitItem[] = [
     surface: "neutral",
     size: "512 × 512 px",
     preview: BRAND_MARK_SRC,
-    files: [{ label: "PNG indir", src: BRAND_MARK_SRC, download: "alsatport-icon.png", type: "PNG" }],
+    files: [{ label: "PNG indir", src: BRAND_MARK_FULL_SRC, download: "alsatport-icon.png", type: "PNG" }],
   },
   {
     id: "icon-square",

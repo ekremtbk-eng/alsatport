@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
-import { BRAND_MARK_SRC, BRAND_NAME } from "@/lib/brand";
+import { BRAND_MARK, BRAND_NAME } from "@/lib/brand";
 import { useDevice } from "@/context/DeviceContext";
 import { useI18n } from "@/context/I18nContext";
 
@@ -33,8 +34,16 @@ export function MobileSplash() {
 
   return (
     <div className="m-splash" role="dialog" aria-label={BRAND_NAME} aria-live="polite">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={BRAND_MARK_SRC} alt="" className="m-splash-mark" width={120} height={120} />
+      <Image
+        src={BRAND_MARK.src}
+        alt=""
+        className="m-splash-mark"
+        width={120}
+        height={120}
+        sizes="120px"
+        priority
+        unoptimized
+      />
       <div className="m-splash-foot">
         <strong>{BRAND_NAME}</strong>
         <span>{t("home.tag")}</span>
