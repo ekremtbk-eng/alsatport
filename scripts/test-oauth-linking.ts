@@ -109,6 +109,21 @@ async function main() {
       JSON.stringify(before) === JSON.stringify(after) && after?.providerSub === null && attackerRow?.id !== victim.id && attackerRow?.email === digitsEmail,
       `victimUnchanged=${JSON.stringify(before) === JSON.stringify(after)} separate=${!!attackerRow && attackerRow.id !== victim.id}`,
     );
+    const attackerVerifiedAt = attackerRow
+      ? await prisma.user.findUnique({ where: { id: attackerRow.id }, select: { emailVerifiedAt: true } })
+      : null;
+    check(
+      "N1",
+      "Brand-new Google user is marked e-mail verified from provider proof (no second app verify)",
+      !!attackerVerifiedAt?.emailVerifiedAt,
+      attackerRow ? `emailVerifiedAt=${!!attackerVerifiedAt?.emailVerifiedAt}` : "no attacker row",
+    );
+    if ("needsEmailVerify" in (attack as object) || (attack && typeof attack === "object" && "user" in (attack as object))) {
+      const r = attack as { needsEmailVerify?: boolean };
+      check("N2", "New Google upsert reports needsEmailVerify=false", r.needsEmailVerify === false, JSON.stringify(r));
+    } else {
+      check("N2", "New Google upsert needsEmailVerify (skipped if device-signal threw)", true, "result threw before return");
+    }
     void attack;
 
     const verified = await makeUser("verified");

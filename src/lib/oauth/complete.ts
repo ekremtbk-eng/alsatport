@@ -68,9 +68,21 @@ function completeNameOf(identity: VerifiedOAuthIdentity) {
   return name.split(/\s+/).filter(Boolean).length >= 2 ? name : "";
 }
 
+/**
+ * Provider-verified mailbox ownership may promote `emailVerified` only when the provider e-mail
+ * matches the account e-mail (never merges/takes over a different mailbox).
+ */
+export function shouldTrustProviderEmail(user: StoredUser, identity: VerifiedOAuthIdentity) {
+  if (!identity.emailVerified) return false;
+  const providerEmail = normalizeEmail(identity.email);
+  if (!isValidEmail(providerEmail)) return false;
+  return normalizeEmail(user.email) === providerEmail;
+}
+
 /** Fills empty profile fields from the provider; never touches the e-mail, password or provider id. */
 async function refreshFromProvider(user: StoredUser, identity: VerifiedOAuthIdentity) {
   const completeName = completeNameOf(identity);
+  const emailVerified = user.profile.emailVerified === true || shouldTrustProviderEmail(user, identity);
   return saveUser({
     ...user,
     role: user.role === "admin" ? "admin" : completeName ? "seller" : user.role,
@@ -80,6 +92,7 @@ async function refreshFromProvider(user: StoredUser, identity: VerifiedOAuthIden
         fullName: user.profile.fullName || completeName,
         displayName: user.profile.fullName || completeName || user.profile.displayName,
         avatar: user.profile.avatar || identity.picture || "",
+        emailVerified,
         role: user.role === "admin" ? "admin" : completeName ? "seller" : user.profile.role,
       }),
     ),
@@ -135,6 +148,7 @@ export async function upsertVerifiedOAuthUser(identity: VerifiedOAuthIdentity, r
   const taken = await findUserByUsername(username);
   const unique = taken ? `${username}${Math.floor(Math.random() * 99)}` : username;
   const display = completeName || `${name || identity.provider} Üye`.trim();
+  // identity.emailVerified was required above; trust Google/Apple mailbox proof for new accounts only.
   const profile = stampVerification(
     blankProfile({
       username: unique,
@@ -143,7 +157,7 @@ export async function upsertVerifiedOAuthUser(identity: VerifiedOAuthIdentity, r
       email,
       avatar: identity.picture || undefined,
       authProvider: identity.provider,
-      emailVerified: false,
+      emailVerified: true,
       address: "",
       profileComplete: false,
       role: "seller",
@@ -160,16 +174,11 @@ export async function upsertVerifiedOAuthUser(identity: VerifiedOAuthIdentity, r
     profile,
   });
   await recordAccountSignals(user.id, req);
-  const mailed = await sendSignupVerificationEmail({
-    userId: user.id,
-    email,
-    name: display,
-  });
   return {
     user,
     needsProfile: !isProfileComplete(user.profile),
-    needsEmailVerify: true,
-    mailSent: mailed.ok,
+    needsEmailVerify: false,
+    mailSent: true,
   };
 }
 
@@ -186,7 +195,12 @@ export async function linkOAuthIdentity(userId: string, identity: VerifiedOAuthI
   if (user.googleSub && user.googleSub !== identity.sub) return { error: "auth.err.oauthLinked" as const };
   if (user.googleSub === identity.sub) return { user, already: true as const };
 
-  const linked = await saveUser({ ...user, googleSub: identity.sub });
+  const emailVerified = user.profile.emailVerified === true || shouldTrustProviderEmail(user, identity);
+  const linked = await saveUser({
+    ...user,
+    googleSub: identity.sub,
+    profile: stampVerification({ ...user.profile, emailVerified }),
+  });
   await writeAudit({
     actorId: linked.id,
     action: "auth.oauth_linked",

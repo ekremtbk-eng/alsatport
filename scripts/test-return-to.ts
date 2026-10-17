@@ -84,6 +84,23 @@ check(
 );
 check("resumeAfterVerify(/ilan-ver?cat=1)", resumeAfterVerify("/ilan-ver?cat=1") === "/ilan-ver?cat=1");
 check("resumeAfterVerify(/ilan/abc) keeps listing path", resumeAfterVerify("/ilan/abc") === "/ilan/abc");
+check(
+  "resumeAfterVerify peels /hesap-tamamla?next=/ilan-ver",
+  resumeAfterVerify("/hesap-tamamla?next=/ilan-ver") === "/ilan-ver",
+);
+check(
+  "resumeAfterVerify peels encoded /hesap-tamamla?next=%2Filan-ver",
+  resumeAfterVerify(`/hesap-tamamla?next=${encodeURIComponent("/ilan-ver")}`) === "/ilan-ver",
+);
+check(
+  "resumeAfterVerify peels COMPLETE_PATH?next=/ilan-ver?cat=1",
+  resumeAfterVerify(`/profil/bilgilerim?next=${encodeURIComponent("/ilan-ver?cat=1")}`) === "/ilan-ver?cat=1",
+);
+check(
+  "resumeAfterVerify peels nested hesap-tamamla then rejects evil",
+  resumeAfterVerify(`/hesap-tamamla?next=${encodeURIComponent("//evil.com")}`) === null,
+);
+check("resumeAfterVerify rejects bare /hesap-tamamla", resumeAfterVerify("/hesap-tamamla") === null);
 check("resumeAfterVerify rejects /admin", resumeAfterVerify("/admin") === null);
 check("resumeAfterVerify rejects /api/x", resumeAfterVerify("/api/x") === null);
 for (const raw of HOSTILE) {
