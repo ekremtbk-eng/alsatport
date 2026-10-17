@@ -92,7 +92,7 @@ type AppState = {
   removeListing: (id: string) => Promise<void>;
   updateListingPrice: (id: string, price: number) => void;
   setListingStatus: (id: string, status: Listing["status"]) => void;
-  renewListing: (id: string) => Promise<boolean>;
+  renewListing: (id: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   setListingSale: (id: string, action: "sold" | "resale") => Promise<{ ok: boolean; error?: string }>;
   sendMessage: (conversationId: string, text: string, fromMe?: boolean) => Promise<boolean>;
   startConversation: (listing: Listing) => Promise<string>;
@@ -913,10 +913,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const renewListing = useCallback(async (id: string) => {
-    const res = await apiPost<{ ok: boolean; listing?: Listing }>("/api/listings/renew", { id });
-    if (!res.ok || !res.listing) return false;
+    const res = await apiPost<{ ok: boolean; error?: string; listing?: Listing }>("/api/listings/renew", { id });
+    if (!res.ok || !res.listing) return { ok: false as const, error: res.error ?? "listing.err.notRenewable" };
     setListings((prev) => prev.map((l) => (l.id === id ? res.listing! : l)));
-    return true;
+    return { ok: true as const };
   }, []);
 
   const setListingSale = useCallback(async (id: string, action: "sold" | "resale") => {

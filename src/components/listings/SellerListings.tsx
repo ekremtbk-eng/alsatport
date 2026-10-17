@@ -55,8 +55,7 @@ export function SellerListings({ rounded = "rounded-xl" }: { rounded?: string })
     setNotice(res.ok ? { ok: true, text: t(okKey) } : { ok: false, text: t(res.error ?? "auth.err.server") });
   }
 
-  const republish = (id: string) =>
-    run(id, async () => ((await renewListing(id)) ? { ok: true } : { ok: false, error: "listing.err.notRenewable" }), "my.republished");
+  const republish = (id: string) => run(id, () => renewListing(id), "my.republished");
 
   return (
     <div>

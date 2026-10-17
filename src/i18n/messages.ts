@@ -3037,6 +3037,13 @@ export const MESSAGES = pack({
   "listing.err.notRenewable": ["Bu ilan şu anda yeniden yayınlanamaz. Yalnızca süresi dolan veya pasif ilanlar yeniden yayınlanabilir.", "This ad cannot be republished now. Only expired or inactive ads can be republished.", "Diese Anzeige kann jetzt nicht erneut veröffentlicht werden.", "لا يمكن إعادة نشر هذا الإعلان الآن.", "Это объявление сейчас нельзя опубликовать снова."],
   "listing.err.notSellable": ["Bu ilan satıldı olarak işaretlenemez.", "This ad cannot be marked as sold.", "Diese Anzeige kann nicht als verkauft markiert werden.", "لا يمكن وضع علامة مباع على هذا الإعلان.", "Это объявление нельзя отметить как проданное."],
   "listing.err.notSold": ["Bu ilan satıldı durumunda değil.", "This ad is not marked as sold.", "Diese Anzeige ist nicht als verkauft markiert.", "هذا الإعلان ليس مباعاً.", "Объявление не отмечено как проданное."],
+  "listing.err.eidsRequired": [
+    "Vasıta ve emlak ilanları geçici olarak durduruldu. Bu kategorilerde ilan vermek veya yenilemek için yasal yetki doğrulaması (EİDS) hazırlanıyor. Diğer kategorilerde ilan vermeye devam edebilirsiniz.",
+    "Vehicle and real-estate ads are temporarily paused. Publishing or renewing in these categories waits on legal authority verification (EİDS). You can still post in other categories.",
+    "Fahrzeug- und Immobilienanzeigen sind vorübergehend pausiert. Veröffentlichen/Erneuern wartet auf die rechtliche Berechtigungsprüfung (EİDS). Andere Kategorien bleiben nutzbar.",
+    "إعلانات المركبات والعقارات متوقفة مؤقتاً. النشر أو التجديد ينتظر التحقق القانوني (EİDS). يمكنك النشر في الفئات الأخرى.",
+    "Объявления о транспорте и недвижимости временно приостановлены. Публикация/продление ждут юридической проверки полномочий (EİDS). Другие категории доступны.",
+  ],
   "admin.lst.pending": ["Onay bekleyen", "Pending", "In Prüfung", "قيد المراجعة", "На модерации"],
   "admin.lst.active": ["Aktif", "Active", "Aktiv", "نشط", "Активно"],
   "admin.lst.expired": ["Süresi Doldu", "Expired", "Abgelaufen", "منتهي", "Истекло"],
