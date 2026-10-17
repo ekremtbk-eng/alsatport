@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { writeAudit } from "@/lib/admin/audit";
 import { readTeam } from "@/lib/business/shared";
+import { anonymizeAccountInTransaction } from "@/lib/security/accountDeletion";
 import { hashPassword, verifyPasswordHash } from "@/lib/security/password";
 import { LIMITS, clientIp } from "@/lib/security/rateLimit";
 import { throttle } from "@/lib/security/throttle";
@@ -17,8 +18,6 @@ import {
 import { readJson } from "@/lib/security/parseBody";
 import { accountDeleteSchema } from "@/lib/security/schemas";
 import { deleteStoredObject, isManagedStorageKey, isOwnBusinessImage, storageKeyFromUrl } from "@/lib/storage/media";
-
-const DELETED_MESSAGE_BODY = "Bu mesaj, hesabını silen bir kullanıcıya aitti.";
 
 export async function POST(req: Request) {
   const blocked = await requireMutatingRequest(req);
@@ -56,74 +55,15 @@ export async function POST(req: Request) {
     where: { userId: user.id },
     select: { logoUrl: true, coverUrl: true, team: true },
   });
-  const now = new Date();
   const unusableHash = await hashPassword(randomBytes(32).toString("base64url"));
 
-  const removedListings = await prisma.$transaction(async (tx) => {
-    const listings = await tx.listing.updateMany({
-      where: { sellerId: user.id, deletedAt: null },
-      data: { status: "removed", deletedAt: now },
-    });
-    await tx.listingImage.deleteMany({ where: { listing: { sellerId: user.id } } });
-    await tx.message.updateMany({
-      where: { senderId: user.id },
-      data: { body: DELETED_MESSAGE_BODY, deletedAt: now },
-    });
-    await tx.conversation.updateMany({
-      where: { OR: [{ buyerId: user.id }, { sellerId: user.id }] },
-      data: { lastMessage: null },
-    });
-    await tx.favorite.deleteMany({ where: { userId: user.id } });
-    await tx.savedSearch.deleteMany({ where: { userId: user.id } });
-    await tx.userBlock.deleteMany({ where: { OR: [{ blockerId: user.id }, { blockedId: user.id }] } });
-    await tx.qrToken.deleteMany({ where: { userId: user.id } });
-    await tx.verificationOtp.deleteMany({ where: { userId: user.id } });
-    await tx.conversationRead.deleteMany({ where: { userId: user.id } });
-    await tx.sellerReview.deleteMany({ where: { OR: [{ authorId: user.id }, { sellerId: user.id }] } });
-    await tx.businessAccount.deleteMany({ where: { userId: user.id } });
-    await tx.profile.update({
-      where: { userId: user.id },
-      data: {
-        displayName: "Silinmiş kullanıcı",
-        fullName: null,
-        avatarUrl: null,
-        phone: null,
-        phoneVerifiedAt: null,
-        birthDate: null,
-        nationalId: null,
-        address: null,
-        city: null,
-        verified: false,
-        businessName: null,
-        businessVerifiedAt: null,
-        profileComplete: false,
-        notifPriceDrop: false,
-        notifSavedSearch: false,
-        notifNearby: false,
-        twoFactorEnabled: false,
-        recoveryEmail: null,
-        recoveryEmailVerifiedAt: null,
-        marketingEmail: false,
-        marketingSms: false,
-        marketingPush: false,
-        marketingUpdatedAt: now,
-      },
-    });
-    await tx.user.update({
-      where: { id: user.id },
-      data: {
-        email: `deleted-${user.id}@deleted.invalid`,
-        username: `silinmis_${user.id.replace(/-/g, "").slice(0, 16)}`,
-        // users_email_provider_hash requires a hash for email accounts; a random one can never match.
-        passwordHash: user.provider === "email" ? unusableHash : null,
-        providerSub: null,
-        emailVerifiedAt: null,
-        bannedAt: now,
-        bannedReason: "account_deleted",
-      },
-    });
-    return listings.count;
-  });
+  const { removedListings } = await prisma.$transaction((tx) =>
+    anonymizeAccountInTransaction(tx, {
+      userId: user.id,
+      provider: user.provider,
+      unusablePasswordHash: unusableHash,
+    }),
+  );
   await revokeUserSessions(user.id, "account-deleted");
 
   await Promise.all(
