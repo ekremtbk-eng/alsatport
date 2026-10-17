@@ -19,6 +19,7 @@ import { SmartSearch } from "@/components/home/SmartSearch";
 import { applyLocationPick, placeLabel } from "@/data/locations";
 import { isPublicListing } from "@/lib/categoryCounts";
 import { BRAND_MARK } from "@/lib/brand";
+import { warmVehicleBrandSearch } from "@/data/searchVehicleBrands";
 import type { Listing } from "@/data/store";
 
 /** Home shortcuts: popular leaves first, then the remaining roots. `short` swaps long root names for the nav label. */
@@ -125,6 +126,7 @@ export function MobileHome() {
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
+            onPointerDown={warmVehicleBrandSearch}
             onFocus={() => setSuggestOn(true)}
             onBlur={() => window.setTimeout(() => setSuggestOn(false), 180)}
             placeholder={t("home.hero.ph")}
