@@ -8,3 +8,6 @@ next-env.d.ts
 .data
 data/auth-users.json
 data/abuse-signals.json
+# Local ops temp — may hold Neon/Vercel connection metadata; never commit
+.tmp-*/
+*.env.check
