@@ -29,7 +29,9 @@ export function CompletionGuard() {
       path === "/kayit" ||
       path === "/welcome" ||
       path === "/hesap-tamamla" ||
-      path === "/hizmet-vermek-istiyorum";
+      path === "/hizmet-vermek-istiyorum" ||
+      path === "/eposta-dogrula" ||
+      path === "/sifre-sifirla";
     if (skip) {
       setOpen(false);
       return;

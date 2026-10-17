@@ -133,10 +133,31 @@ const MODAL_RESUME_PREFIXES = [
 /**
  * Same-origin resume after e-mail verification: skip-profile allowlist, favorites, messages,
  * or a fixed set of public pages (header modal). Encoded `/`/`\` and open redirects are rejected.
+ *
+ * Profile-completion hops (`/hesap-tamamla` / COMPLETE_PATH) may wrap a real destination in `?next=`;
+ * those wrappers are peeled before allowlisting so `/ilan-ver` survives email-hold redirects.
  */
 export function resumeAfterVerify(raw: string | null | undefined): string | null {
+  if (!raw || raw.length > 300 || !raw.startsWith("/") || raw.startsWith("//") || /[\\\u0000-\u001f\u007f]/.test(raw)) {
+    return null;
+  }
+  // Peel profile-completion wrappers before encoded-slash checks: `?next=%2Filan-ver` is legitimate.
+  try {
+    const wrapped = new URL(raw, SAME_ORIGIN_BASE);
+    if (
+      wrapped.origin === SAME_ORIGIN_BASE &&
+      (wrapped.pathname === "/hesap-tamamla" || wrapped.pathname === COMPLETE_PATH)
+    ) {
+      const nested = wrapped.searchParams.get("next");
+      if (nested) return resumeAfterVerify(nested);
+      return null;
+    }
+  } catch {
+    return null;
+  }
+  if (/%2f|%5c|%00|\\/i.test(raw)) return null;
   const safe = safeNextPath(raw, "");
-  if (!safe || /%2f|%5c|%00|\\/i.test(safe)) return null;
+  if (!safe) return null;
   const skip = matchAllowlist(safe, SKIP_PROFILE_ALLOWLIST);
   if (skip) return skip;
   const extra = matchAllowlist(safe, VERIFY_RESUME_EXTRA);

@@ -124,6 +124,16 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(url);
       }
     }
+    // Listing wizard: verify e-mail before profile-complete hop so `next=/ilan-ver` is not nested
+    // under `/hesap-tamamla` (which email-hold would then wrap and resumeAfterVerify would drop).
+    if (path.startsWith("/ilan-ver") && claims.ev === 0) {
+      const next = `${path}${request.nextUrl.search}`;
+      const url = request.nextUrl.clone();
+      url.pathname = "/eposta-dogrula";
+      url.search = "";
+      url.searchParams.set("next", next.startsWith("/") && !next.startsWith("//") ? next : path);
+      return NextResponse.redirect(url);
+    }
     if (path.startsWith("/ilan-ver") && claims.role === "member" && claims.pc !== 1) {
       const next = `${path}${request.nextUrl.search}`;
       const url = request.nextUrl.clone();
