@@ -4,7 +4,7 @@ import { recordSecurityNotice } from "@/lib/security/alerts";
 import { hashPassword } from "@/lib/security/password";
 import { resetStampMatches, verifyPasswordResetToken } from "@/lib/security/passwordReset";
 import { clientIp } from "@/lib/security/rateLimit";
-import { requireMutatingRequest, revokeUserSessions } from "@/lib/security/session";
+import { clearSession, requireMutatingRequest, revokeUserSessions } from "@/lib/security/session";
 import { THROTTLE, throttle, tooMany } from "@/lib/security/throttle";
 import { writeAudit } from "@/lib/admin/audit";
 import { findUserById, saveUser } from "@/lib/security/userStore";
@@ -44,5 +44,6 @@ export async function POST(req: Request) {
   after(() =>
     recordSecurityNotice(user.id, "security.password", "Şifreniz sıfırlandı", "AlsatPort hesabınızın şifresi sıfırlama bağlantısıyla değiştirildi."),
   );
-  return NextResponse.json({ ok: true });
+  // Drop cookies on this browser so a still-open tab cannot keep a revoked JWT shell.
+  return clearSession(NextResponse.json({ ok: true, sessionsEnded: ended }));
 }

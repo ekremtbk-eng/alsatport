@@ -87,8 +87,12 @@ export async function middleware(request: NextRequest) {
   const n = nonce();
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", n);
-
+  // For server page-session gates: resume path after revoked-session redirect to /giris.
   const path = request.nextUrl.pathname;
+  const pathWithSearch = `${path}${request.nextUrl.search}`;
+  if (pathWithSearch.startsWith("/") && !pathWithSearch.startsWith("//") && pathWithSearch.length <= 300) {
+    requestHeaders.set("x-alsatport-path", pathWithSearch);
+  }
   if (path.startsWith("/api/") && !path.startsWith("/api/payments/webhook/") && !path.startsWith("/api/auth/oauth/")) {
     const write = !["GET", "HEAD", "OPTIONS"].includes(request.method);
     const limited = apiRateLimit(request, write);

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Lock } from "lucide-react";
 import { PasswordRules } from "@/components/PasswordRules";
 import { apiPost } from "@/lib/security/client";
+import { useApp } from "@/context/AppContext";
 import { useI18n } from "@/context/I18nContext";
 import { isStrongPassword } from "@/lib/security/passwordPolicy";
 
@@ -44,6 +45,7 @@ function forgetToken() {
 export default function ResetPasswordPage() {
   const { t } = useI18n();
   const router = useRouter();
+  const { logout } = useApp();
   const [token, setToken] = useState("");
   const [phase, setPhase] = useState<Phase>("checking");
   const [password, setPassword] = useState("");
@@ -113,6 +115,8 @@ export default function ResetPasswordPage() {
     forgetToken();
     setPassword("");
     setConfirm("");
+    // Cookies were cleared by the reset API; drop client auth state + Router Cache before /giris.
+    logout();
     setPhase("done");
   }
 

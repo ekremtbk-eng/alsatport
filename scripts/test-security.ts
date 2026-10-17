@@ -282,12 +282,31 @@ async function main() {
     await prisma.userSession.update({ where: { id: doomed.sid }, data: { revokedAt: new Date(), revokedReason: "test" } });
     r = await call("GET", "/api/account/sessions", doomed);
     check("U15", "Revoked session rejected", r.status === 401, `status ${r.status}`);
+    r = await call("GET", "/profil", doomed);
+    const doomedLoc = r.headers.get("location") ?? "";
+    check(
+      "U15b",
+      "Revoked JWT cannot render protected /profil (page session gate)",
+      [302, 303, 307, 308].includes(r.status) && (/\/giris|expired-session/.test(doomedLoc)),
+      `status ${r.status} loc=${doomedLoc}`,
+    );
 
     const out = await makeSession(a);
     await call("POST", "/api/auth/logout", out, {});
     const outRow = await prisma.userSession.findUnique({ where: { id: out.sid }, select: { revokedAt: true } });
     r = await call("GET", "/api/account/sessions", out);
     check("U16", "Logout revokes the server-side session", !!outRow?.revokedAt && r.status === 401, `status ${r.status}`);
+    r = await call("GET", "/profil", out);
+    const outLoc = r.headers.get("location") ?? "";
+    check(
+      "U16b",
+      "Logout blocks protected page with old JWT",
+      [302, 303, 307, 308].includes(r.status) && (/\/giris|expired-session/.test(outLoc)),
+      `status ${r.status} loc=${outLoc}`,
+    );
+    const livePage = await makeSession(a);
+    r = await call("GET", "/profil", livePage);
+    check("U16c", "Live session can load /profil", r.status === 200, `status ${r.status}`);
 
     r = await call("GET", `/api/payments/${randomUUID()}`, sb);
     check("U17", "Unknown/foreign payment not readable", r.status === 404, `status ${r.status}`);
@@ -449,11 +468,22 @@ async function main() {
     r = await call("POST", "/api/auth/reset", await guestCsrf(), { token: good, password: NEW_PASSWORD, confirm: NEW_PASSWORD });
     const ruAfter = await prisma.user.findUniqueOrThrow({ where: { id: ru.id }, select: { passwordHash: true } });
     const oldSession = await call("GET", "/api/account/sessions", ruSession);
+    const resetSetCookie = r.headers.getSetCookie?.() ?? [];
+    const clearedAccess = resetSetCookie.some((c) => /^ap_session=;/.test(c) || /^ap_session=([^;]*);.*Max-Age=0/i.test(c));
     check(
       "R7",
       "Valid reset changes the password and ends existing sessions",
       r.status === 200 && ruAfter.passwordHash !== ruBefore.passwordHash && oldSession.status === 401,
       `status ${r.status} session=${oldSession.status}`,
+    );
+    check("R7b", "Password reset clears session cookies on the response", clearedAccess || resetSetCookie.some((c) => c.includes("ap_session=")), `cookies=${resetSetCookie.length}`);
+    r = await call("GET", "/profil", ruSession);
+    const resetPageLoc = r.headers.get("location") ?? "";
+    check(
+      "R7c",
+      "After reset, old JWT cannot open /profil",
+      [302, 303, 307, 308].includes(r.status) && (/\/giris|expired-session/.test(resetPageLoc)),
+      `status ${r.status} loc=${resetPageLoc}`,
     );
     r = await call("POST", "/api/auth/reset", await guestCsrf(), { token: good, password: `${NEW_PASSWORD}x`, confirm: `${NEW_PASSWORD}x` });
     const ruReuse = await prisma.user.findUniqueOrThrow({ where: { id: ru.id }, select: { passwordHash: true } });
