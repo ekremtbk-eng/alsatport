@@ -28,6 +28,15 @@ export function csrfMatches(req: Request) {
   return timingSafeEqual(header, cookie);
 }
 
+const LOOPBACK_HOST = /^(localhost|127\.0\.0\.1|\[::1\])$/i;
+
+function isIsolatedLoopbackTest() {
+  if (process.env.VERCEL) return false;
+  const e = process.env.VERCEL_ENV;
+  if (e === "production" || e === "preview" || e === "development") return false;
+  return process.env.ALSATPORT_LOOPBACK_TEST === "1";
+}
+
 export function originAllowed(req: Request) {
   const origin = req.headers.get("origin");
   if (!origin) return true;
@@ -41,6 +50,21 @@ export function originAllowed(req: Request) {
     allowed.add("http://localhost:3001");
     allowed.add("http://127.0.0.1:3001");
     allowed.add("http://localhost:3000");
+  }
+  // Isolated loopback E2E only: Next may expose req.url as localhost while Chromium
+  // navigates via 127.0.0.1 (or the reverse). Never active on Vercel.
+  if (isIsolatedLoopbackTest()) {
+    try {
+      const o = new URL(origin);
+      if (o.protocol === "http:" && LOOPBACK_HOST.test(o.hostname)) {
+        const port = o.port || "80";
+        allowed.add(`http://localhost:${port}`);
+        allowed.add(`http://127.0.0.1:${port}`);
+        allowed.add(`http://[::1]:${port}`);
+      }
+    } catch {
+      /* ignore */
+    }
   }
   try {
     return allowed.has(new URL(origin).origin);
