@@ -7,12 +7,13 @@
   },
   "scripts": {
     "dev": "next dev --turbopack --port 3001",
-    "build": "prisma generate && node scripts/prisma-deploy.mjs && next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint .",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:seed:demo": "tsx prisma/seed-demo.ts",
+    "db:maintain": "node scripts/prisma-deploy.mjs",
     "test:security": "tsx scripts/test-security.ts",
     "test:mobile-filters": "tsx scripts/test-mobile-filters.ts",
     "db:setup": "prisma migrate deploy && prisma db seed"

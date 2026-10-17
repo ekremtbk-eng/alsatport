@@ -68,15 +68,18 @@ function flatten(): SeedRow[] {
 
 async function seedCategories() {
   const rows = flatten();
-  const inserted = new Set<string>();
+  const attempted = rows.length;
+  const before = await prisma.category.count();
+  const seen = new Set<string>();
   let remaining = [...rows];
+  let createManyInserted = 0;
 
   while (remaining.length) {
-    const batch = remaining.filter((r) => !r.parentId || inserted.has(r.parentId));
+    const batch = remaining.filter((r) => !r.parentId || seen.has(r.parentId));
     if (!batch.length) {
       throw new Error(`Category parent cycle or missing parent: ${remaining.map((r) => r.id).join(", ")}`);
     }
-    await prisma.category.createMany({
+    const result = await prisma.category.createMany({
       data: batch.map((r) => ({
         id: r.id,
         parentId: r.parentId,
@@ -91,18 +94,34 @@ async function seedCategories() {
       })),
       skipDuplicates: true,
     });
-    for (const r of batch) inserted.add(r.id);
-    remaining = remaining.filter((r) => !inserted.has(r.id));
+    createManyInserted += result.count;
+    for (const r of batch) seen.add(r.id);
+    remaining = remaining.filter((r) => !seen.has(r.id));
   }
 
-  return inserted.size;
+  const after = await prisma.category.count();
+  return {
+    attempted,
+    inserted: createManyInserted,
+    countBefore: before,
+    countAfter: after,
+  };
 }
 
 async function seedSpecialDays() {
+  const attempted = SPECIAL_DAY_SEEDS.length;
+  let inserted = 0;
+  let skippedExisting = 0;
+  const before = await prisma.specialDay.count();
+
   for (const row of SPECIAL_DAY_SEEDS) {
-    await prisma.specialDay.upsert({
-      where: { slug: row.slug },
-      create: {
+    const existing = await prisma.specialDay.findUnique({ where: { slug: row.slug }, select: { id: true } });
+    if (existing) {
+      skippedExisting++;
+      continue;
+    }
+    await prisma.specialDay.create({
+      data: {
         slug: row.slug,
         name: row.name,
         kind: row.kind,
@@ -119,17 +138,31 @@ async function seedSpecialDays() {
         closing: row.closing,
         cta: row.cta,
       },
-      update: {},
     });
+    inserted++;
   }
-  return SPECIAL_DAY_SEEDS.length;
+
+  const after = await prisma.specialDay.count();
+  return {
+    attempted,
+    inserted,
+    skippedExisting,
+    countBefore: before,
+    countAfter: after,
+  };
 }
 
 async function main() {
-  const count = await seedCategories();
-  console.log(`Seeded ${count} categories (insert-only).`);
+  const cats = await seedCategories();
+  console.log(
+    `categories: inserted=${cats.inserted} attempted=${cats.attempted} ` +
+      `countBefore=${cats.countBefore} countAfter=${cats.countAfter} (insert-only, skipDuplicates)`,
+  );
   const days = await seedSpecialDays();
-  console.log(`Seeded ${days} special days (insert-only).`);
+  console.log(
+    `specialDays: inserted=${days.inserted} attempted=${days.attempted} skippedExisting=${days.skippedExisting} ` +
+      `countBefore=${days.countBefore} countAfter=${days.countAfter} (insert-only)`,
+  );
 }
 
 main()
