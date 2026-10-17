@@ -18,6 +18,7 @@ import { findCategory } from "@/data/categories";
 import { applyLocationPick, locationPickFromParams } from "@/data/locations";
 import { LocationOptions } from "@/components/LocationOptions";
 import { useDevice } from "@/context/DeviceContext";
+import { warmVehicleBrandSearch } from "@/data/searchVehicleBrands";
 
 function readUrlState(pathname: string) {
   if (typeof window === "undefined") return { q: "", city: "", catId: "" };
@@ -128,6 +129,7 @@ export function Header() {
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
+                  onPointerDown={warmVehicleBrandSearch}
                   onFocus={() => setSuggestOn(true)}
                   onBlur={() => window.setTimeout(() => setSuggestOn(false), 180)}
                   placeholder={t("nav.search")}

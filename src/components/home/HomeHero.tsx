@@ -11,6 +11,7 @@ import { applyLocationPick, locationPickFromParams } from "@/data/locations";
 import { LocationOptions } from "@/components/LocationOptions";
 import { HOME_HERO_CATEGORIES, HOME_POPULAR_SEARCHES } from "@/data/homeHubs";
 import { findCategory } from "@/data/categories";
+import { warmVehicleBrandSearch } from "@/data/searchVehicleBrands";
 
 function readUrlState() {
   if (typeof window === "undefined") return { q: "", city: "", catId: "" };
@@ -122,6 +123,7 @@ export function HomeHero() {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
+              onPointerDown={warmVehicleBrandSearch}
               onFocus={() => setSuggestOn(true)}
               onBlur={() => window.setTimeout(() => setSuggestOn(false), 180)}
               placeholder={t("home.hero.ph")}

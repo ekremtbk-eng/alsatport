@@ -1,7 +1,6 @@
 import { isBannedLiveAnimalCategory, isBannedLiveAnimalSlug } from "@/lib/liveAnimalPolicy";
 import { otherCategories, shoppingCategories } from "@/data/shoppingCatalog";
 import { SEA_EQUIP_GROUPS } from "@/data/seaEquip";
-import { VEHICLE_BRANDS } from "@/data/vehicleCatalog";
 import { isListingFilterEnabled } from "@/lib/listingQuery";
 
 export type ListingFilter =
@@ -1521,6 +1520,11 @@ export function searchCategories(query: string): Category[] {
   });
 }
 
+/**
+ * Brand labels attached to category nodes (e.g. shopping).
+ * Vehicle catalog brands/models are loaded on demand via `@/data/searchVehicleBrands`
+ * so Header/home do not statically pull `vehicleCatalog`.
+ */
 export function searchBrands(query: string): string[] {
   const q = query.trim().toLocaleLowerCase("tr");
   if (q.length < 2) return [];
@@ -1534,16 +1538,6 @@ export function searchBrands(query: string): string[] {
   };
   for (const c of allCategoryNodes()) {
     for (const brand of c.brands ?? []) push(brand);
-    if (hits.length >= 6) return hits;
-  }
-  for (const brand of VEHICLE_BRANDS) {
-    push(brand.name);
-    for (const model of brand.models) {
-      push(model.name);
-      if (q.length >= 3 && model.name.toLocaleLowerCase("tr").includes(q)) {
-        push(`${brand.name} ${model.name}`);
-      }
-    }
     if (hits.length >= 6) return hits;
   }
   return hits.slice(0, 6);

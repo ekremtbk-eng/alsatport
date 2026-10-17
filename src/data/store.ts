@@ -1,6 +1,4 @@
 import type { ChassisStatus } from "./listingSchema";
-import { buildDemoListings } from "./demoSeed";
-import { buildDemoCars } from "./demoCars";
 
 export type Listing = {
   id: string;
@@ -482,8 +480,20 @@ const coreListings: Listing[] = [
   },
 ];
 
+/**
+ * Demo seed pulls vehicleCatalog via listingOptions — keep it out of the production
+ * client graph with a dead-branch require (no static import).
+ */
 export const listings: Listing[] =
-  process.env.NODE_ENV === "production" ? [] : [...coreListings, ...buildDemoCars(), ...buildDemoListings()];
+  process.env.NODE_ENV === "production"
+    ? []
+    : [
+        ...coreListings,
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- dev-only, stripped in prod builds
+        ...require("./demoCars").buildDemoCars(),
+        // eslint-disable-next-line @typescript-eslint/no-require-imports -- dev-only, stripped in prod builds
+        ...require("./demoSeed").buildDemoListings(),
+      ];
 
 export const conversations: Conversation[] = [
   {

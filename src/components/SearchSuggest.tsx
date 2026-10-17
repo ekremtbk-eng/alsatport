@@ -10,6 +10,11 @@ import {
   searchBrands,
   searchCategories,
 } from "@/data/categories";
+import {
+  mergeBrandHits,
+  prefetchVehicleCatalog,
+  searchVehicleBrands,
+} from "@/data/searchVehicleBrands";
 import { CategoryIcon } from "./CategoryIcon";
 import { catName, useI18n } from "@/context/I18nContext";
 import { useApp } from "@/context/AppContext";
@@ -34,9 +39,40 @@ export function SearchSuggest({
   const { categoryCounts, listings: catalog } = useApp();
   const q = query.trim();
   const cats = q.length >= 2 ? searchCategories(q).slice(0, 6) : [];
-  const brands = q.length >= 2 ? searchBrands(q) : [];
+  const categoryBrands = q.length >= 2 ? searchBrands(q) : [];
+  const [vehicleBrandHits, setVehicleBrandHits] = useState<string[]>([]);
   const [listings, setListings] = useState<ListingHit[]>([]);
   const [hi, setHi] = useState(0);
+
+  // Prefetch on focus/active — do not wait for 2 chars (avoids first-type delay).
+  useEffect(() => {
+    if (!active) return;
+    void prefetchVehicleCatalog();
+  }, [active]);
+
+  useEffect(() => {
+    if (q.length < 2) {
+      setVehicleBrandHits([]);
+      return;
+    }
+    let cancelled = false;
+    void searchVehicleBrands(q)
+      .then((hits) => {
+        if (!cancelled) setVehicleBrandHits(hits);
+      })
+      .catch(() => {
+        // Chunk load failure: keep category-node brands; never block suggest UI.
+        if (!cancelled) setVehicleBrandHits([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [q]);
+
+  const brands = useMemo(
+    () => (q.length >= 2 ? mergeBrandHits(categoryBrands, vehicleBrandHits) : []),
+    [q, categoryBrands, vehicleBrandHits],
+  );
 
   const attrs = useMemo(() => {
     if (q.length < 3) return [];
