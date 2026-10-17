@@ -8,11 +8,14 @@ export function Logo({
   compact = false,
   linked = true,
   tone = "light",
+  /** When true (default), next/image emits a high-priority preload. Footer / below-fold callers should pass false. */
+  priority = true,
 }: {
   compact?: boolean;
   linked?: boolean;
   /** Surface the logo sits on: "dark" uses the white wordmark. */
   tone?: "light" | "dark";
+  priority?: boolean;
 }) {
   const logo = tone === "dark" ? BRAND_LOGO_DARK : BRAND_LOGO_LIGHT;
   // Brand assets are already display-sized WebP; skip /_next/image re-encode latency on LCP.
@@ -25,7 +28,7 @@ export function Logo({
       height={44}
       className="brand-mark"
       sizes="44px"
-      priority
+      priority={priority}
       unoptimized
       style={{ aspectRatio: "1 / 1" }}
     />
@@ -37,7 +40,7 @@ export function Logo({
       height={logo.height}
       className={`brand-logo-img brand-logo-${tone}`}
       sizes="(max-width: 768px) 140px, 180px"
-      priority
+      priority={priority}
       unoptimized
       style={{ aspectRatio: `${logo.width} / ${logo.height}` }}
     />

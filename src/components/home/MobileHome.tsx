@@ -167,6 +167,10 @@ export function MobileHome() {
             <ArrowRight className="h-4 w-4" aria-hidden />
           </AuthGateLink>
         </div>
+        {/*
+          No `priority`: cold phone path already preloads the same mark via MobileSplash;
+          without priority, next/image stays lazy so CSS-hidden desk mounts do not force a fetch/preload.
+        */}
         <Image
           src={BRAND_MARK.src}
           alt=""
@@ -174,7 +178,6 @@ export function MobileHome() {
           height={112}
           className="mh-hero-mark"
           sizes="112px"
-          priority
           unoptimized
         />
       </section>

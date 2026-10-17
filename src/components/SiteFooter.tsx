@@ -16,7 +16,7 @@ export function SiteFooter() {
     <footer className="site-footer-pro">
       <div className="ft-inner">
         <div className="ft-bar">
-          <Logo tone="dark" />
+          <Logo tone="dark" priority={false} />
           <nav className="ft-links" aria-label={t("footer.explore")}>
             <Link href="/">{t("nav.home")}</Link>
             <Link href="/ara">{t("footer.allListings")}</Link>
