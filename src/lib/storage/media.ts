@@ -61,7 +61,7 @@ export function storageKeyFromUrl(url: string) {
  * Public host of *this* project's Blob store. Any other `*.blob.vercel-storage.com` host is someone
  * else's store and must never count as one of our managed (moderated, EXIF-stripped) uploads.
  */
-function ownBlobHost() {
+export function ownBlobHost() {
   const explicit = process.env.BLOB_PUBLIC_HOST?.trim().toLowerCase();
   if (explicit) return explicit;
   const storeId = process.env.BLOB_READ_WRITE_TOKEN?.split("_")[3]?.trim().toLowerCase();
