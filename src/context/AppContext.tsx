@@ -43,7 +43,7 @@ import {
   resetCsrfToken,
 } from "@/lib/security/client";
 import { listingPatchForProfile, type ListingEntitlementPatch } from "@/lib/entitlements";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { applyExpiryToListing } from "@/lib/listingQuota";
 import { isUsableListingImage } from "@/lib/listingMedia";
 
@@ -176,6 +176,7 @@ function mergeServerNotifs(prev: AppNotification[], server: AppNotification[]) {
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [listings, setListings] = useState<Listing[]>(() =>
     process.env.NODE_ENV === "production" ? [] : seedListings,
@@ -241,7 +242,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             window.clearTimeout(sessionRetry.current);
             setSessionIssue(null);
             const next = check.kind === "ok" ? check.data.user : null;
+            const hadUser = !!userRef.current;
             setUser(next);
+            // Remote revoke / expiry: drop Client Router Cache so soft-nav cannot flash prior private shells.
+            if (hadUser && !next) router.refresh();
             if (next && check.kind === "ok") {
               applyListingPatch(next.id, check.data.listingPatch ?? listingPatchForProfile(next));
             }
@@ -264,7 +268,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     })();
     sessionInflight.current = job;
     return job;
-  }, [applyListingPatch]);
+  }, [applyListingPatch, router]);
   useEffect(() => () => window.clearTimeout(sessionRetry.current), []);
   const refreshSessionRef = useRef(refreshSession);
   refreshSessionRef.current = refreshSession;
@@ -795,7 +799,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     window.clearTimeout(sessionRetry.current);
     setSessionIssue(null);
     setUser(null);
-  }, []);
+    setNotifications((prev) => prev.filter((n) => !n.id.startsWith(SERVER_NOTIF_PREFIX)));
+    // Invalidate App Router client cache for protected trees (profil/mesajlar/admin shells).
+    router.refresh();
+  }, [router]);
 
   const toggleFavorite = useCallback((id: string) => {
     const want = !(favPending.current.get(id) ?? favoritesRef.current.includes(id));

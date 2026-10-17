@@ -407,6 +407,36 @@ async function optionalHttp() {
       [302, 303, 307, 308].includes(r.status),
       `status ${r.status} loc=${r.location.slice(0, 80)}`,
     );
+
+    // Cache-Control on sensitive auth/session endpoints
+    r = await call("GET", "/api/auth/expired-session?next=/profil");
+    check(
+      "H27",
+      "expired-session sends private no-store Cache-Control",
+      /private/i.test(r.cacheControl) && /no-store/i.test(r.cacheControl),
+      `cc=${r.cacheControl || "(unset)"} loc=${r.location}`,
+    );
+    r = await call("GET", "/api/auth/session", keepTok.cookie);
+    check(
+      "H28",
+      "session API uses no-store semantics from clients (200 live)",
+      r.status === 200 && !!r.json.user,
+      `status ${r.status}`,
+    );
+    // Soft-nav simulation: revoked JWT full RSC must not embed personal fields
+    r = await call("GET", "/profil", rscTok.cookie, undefined, undefined, {
+      RSC: "1",
+      Accept: "text/x-component",
+    });
+    check(
+      "H29",
+      "Full RSC revoked /profil has redirect markers, no email/PII",
+      r.status === 200 &&
+        /expired-session|\/giris/.test(r.text) &&
+        !new RegExp(user.email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).test(r.text) &&
+        !/@sectest\.invalid/.test(r.text),
+      `status ${r.status}`,
+    );
   } finally {
     const ids = (
       await prisma.user.findMany({

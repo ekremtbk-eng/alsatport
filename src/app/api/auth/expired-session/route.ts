@@ -17,5 +17,7 @@ export async function GET(req: Request) {
   if (next && next !== "/") {
     dest.searchParams.set("next", next);
   }
-  return clearSession(NextResponse.redirect(dest));
+  const res = clearSession(NextResponse.redirect(dest));
+  res.headers.set("Cache-Control", "private, no-store, max-age=0, must-revalidate");
+  return res;
 }
