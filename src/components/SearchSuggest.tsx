@@ -24,11 +24,13 @@ type ListingHit = { id: string; title: string; categoryId: string; city: string 
 type SuggestItem = { href: string; kind: "all" | "cat" | "brand" | "listing" | "attr"; title: string; sub?: string; icon?: string };
 
 export function SearchSuggest({
+  id,
   query,
   onPick,
   extraParams,
   active,
 }: {
+  id?: string;
   query: string;
   onPick: () => void;
   extraParams?: Record<string, string>;
@@ -202,7 +204,7 @@ export function SearchSuggest({
   if (q.length < 2) return null;
 
   return (
-    <div className="search-suggest" role="listbox">
+    <div id={id} className="search-suggest" role="listbox">
       {items.map((item, i) => (
         <Link
           key={`${item.kind}-${item.href}-${item.title}`}

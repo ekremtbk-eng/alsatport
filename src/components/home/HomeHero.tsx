@@ -77,6 +77,7 @@ export function HomeHero() {
   const pathname = usePathname();
   const initial = readUrlState();
   const detailedId = useId();
+  const suggestListId = useId();
   const [tab, setTab] = useState<"quick" | "detailed">("quick");
   const [q, setQ] = useState(initial.q);
   const [city, setCity] = useState(initial.city);
@@ -216,9 +217,11 @@ export function HomeHero() {
                 autoComplete="off"
                 role="combobox"
                 aria-autocomplete="list"
+                aria-controls={suggestListId}
                 aria-expanded={q.trim().length > 1 && suggestOn}
               />
               <SearchSuggest
+                id={suggestListId}
                 query={q}
                 active={suggestOn}
                 extraParams={{
