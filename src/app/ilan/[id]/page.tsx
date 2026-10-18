@@ -36,13 +36,19 @@ export async function generateMetadata({ params }: Ctx): Promise<Metadata> {
   if (isBlockedLiveAnimalListing(listing)) {
     return { title: "İlan · AlsatPort", robots: { index: false, follow: false } };
   }
+  const cat = findCategory(listing.categoryId);
   const priceLabel = formatMoney(listing.price, "tr", listing.currency);
   const place = placeLabel(listing.city, listing.district, " / ");
-  const title = `${listing.title} · ${priceLabel}`;
-  const description = [priceLabel, place, listing.subtitle || listing.description || listing.title]
-    .filter(Boolean)
+  const title = place
+    ? `${listing.title} · ${place} · ${priceLabel}`
+    : cat
+      ? `${listing.title} · ${cat.name} · ${priceLabel}`
+      : `${listing.title} · ${priceLabel}`;
+  const snippet = (listing.description || listing.subtitle || listing.title).replace(/\s+/g, " ").trim();
+  const description = [cat?.name, priceLabel, place, snippet]
+    .filter((part, i, arr) => Boolean(part) && arr.indexOf(part) === i)
     .join(" · ")
-    .slice(0, 180);
+    .slice(0, 160);
   return pageMetadata({
     title,
     description,
@@ -72,7 +78,7 @@ export default async function ListingDetailPage({ params }: Ctx) {
     const listing = row && isLiveRow(row) ? toClientListing(row) : null;
     if (row && listing && !isBlockedLiveAnimalListing(listing)) {
       initialListing = hideSellerPhone(listing);
-      if (!isDemoListingRow(row)) {
+      if (!isDemoListingRow(row) && !isServiceCategoryId(row.categoryId)) {
         const cat = findCategory(listing.categoryId);
         schema = listingJsonLd({
           id: listing.id,
