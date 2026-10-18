@@ -20,8 +20,8 @@ import {
 import { storageKeyFromUrl, tryDeleteStoredObject } from "@/lib/storage/media";
 import { resolveListingCoords, validListingCoords } from "@/lib/placeGeo";
 import { publicAccountName, verifiedBusinessName } from "@/lib/publicName";
-import { type ListingRef, isLiveRow, liveListingWhere, newPeriod } from "@/lib/listings/lifecycle";
-import { invalidateCategoryCounts } from "@/lib/listings/categoryCounts";
+import { type ListingRef, isLiveRow, newPeriod } from "@/lib/listings/lifecycle";
+import { invalidateCategoryCounts, publicCountWhere, publicLiveWithImageWhere } from "@/lib/listings/categoryCounts";
 import { enforcePetSpecs } from "@/lib/listings/petSpecPolicy";
 import { vehicleSpecError } from "@/lib/listings/vehicleSpecPolicy";
 import { eidsBlocksActivePublish, eidsPublishBlockedResponse } from "@/lib/listings/eidsPublishLock";
@@ -196,11 +196,11 @@ export async function findListingRecord(id: string) {
 }
 
 export async function listPublicAndOwnedListings(viewerId?: string) {
-  const live = liveListingWhere();
+  const publicLive = publicLiveWithImageWhere();
   const rows = await prisma.listing.findMany({
     where: {
       deletedAt: null,
-      OR: viewerId ? [live, { sellerId: viewerId }] : [live],
+      OR: viewerId ? [publicLive, { sellerId: viewerId }] : [publicLive],
     },
     include: listingInclude,
     orderBy: [{ featured: "desc" }, { vip: "desc" }, { postedAt: "desc" }],
@@ -225,20 +225,21 @@ export async function queryListings(params: {
   sellerId?: string;
 }) {
   const and: Prisma.ListingWhereInput[] = [{ deletedAt: null }];
-  const live = liveListingWhere();
+  const publicLive = publicLiveWithImageWhere();
   if (params.sellerId) {
     if (!isUuid(params.sellerId)) return [];
     and.push({ sellerId: params.sellerId });
-    and.push(live);
+    // Storefront / seller pages only expose the same public set as search & counts.
+    and.push(publicLive);
   } else if (params.mine && params.viewerId) {
     and.push({ sellerId: params.viewerId });
     if (params.status) and.push({ status: uiStatus(params.status) });
   } else if (params.viewerId) {
     and.push({
-      OR: [live, { sellerId: params.viewerId }],
+      OR: [publicLive, { sellerId: params.viewerId }],
     });
   } else {
-    and.push(live);
+    and.push(publicLive);
   }
   if (params.categoryId) {
     const ids = categoryQueryIds(params.categoryId);
@@ -296,9 +297,8 @@ export async function suggestPublicListings(rawQuery: string, take = 8) {
   if (q.length < 2) return [];
   const rows = await prisma.listing.findMany({
     where: {
-      deletedAt: null,
+      ...publicCountWhere(),
       AND: [
-        liveListingWhere(),
         {
           OR: [
             { title: { contains: q, mode: "insensitive" } },
@@ -738,12 +738,16 @@ export async function deleteListingRecord(user: StoredUser, id: string) {
  * (pending/rejected/removed), drafts and sold listings use their own flows.
  */
 export async function renewListingRecord(user: StoredUser, id: string) {
-  const existing = await prisma.listing.findFirst({ where: { id, deletedAt: null } });
+  const existing = await prisma.listing.findFirst({
+    where: { id, deletedAt: null },
+    include: { images: { select: { id: true }, take: 1 } },
+  });
   if (!existing) return { error: "auth.err.session" as const, status: 404 };
   if (!canMutateListing(user, existing.sellerId)) return { error: "auth.err.forbidden" as const, status: 403 };
   if (existing.status !== "active" && existing.status !== "passive" && existing.status !== "expired") {
     return { error: "auth.err.forbidden" as const, status: 403 };
   }
+  if (!existing.images.length) return { error: "photo.minN" as const, status: 400 };
   if (eidsBlocksActivePublish(existing.categoryId, existing)) {
     return eidsPublishBlockedResponse();
   }
@@ -779,10 +783,14 @@ export async function markListingSold(user: StoredUser, id: string) {
 
 /** Puts a sold listing back on sale with a fresh 15-day period. */
 export async function resaleListingRecord(user: StoredUser, id: string) {
-  const existing = await prisma.listing.findFirst({ where: { id, deletedAt: null } });
+  const existing = await prisma.listing.findFirst({
+    where: { id, deletedAt: null },
+    include: { images: { select: { id: true }, take: 1 } },
+  });
   if (!existing) return { error: "auth.err.session" as const, status: 404 };
   if (!canMutateListing(user, existing.sellerId)) return { error: "auth.err.forbidden" as const, status: 403 };
   if (existing.status !== "sold") return { error: "listing.err.notSold" as const, status: 409 };
+  if (!existing.images.length) return { error: "photo.minN" as const, status: 400 };
   if (eidsBlocksActivePublish(existing.categoryId, existing)) {
     return eidsPublishBlockedResponse();
   }
@@ -799,7 +807,7 @@ export async function resaleListingRecord(user: StoredUser, id: string) {
 export async function bumpListingViews(id: string) {
   try {
     await prisma.listing.updateMany({
-      where: { id, deletedAt: null, ...liveListingWhere() },
+      where: { id, ...publicCountWhere() },
       data: { views: { increment: 1 } },
     });
   } catch (err) {

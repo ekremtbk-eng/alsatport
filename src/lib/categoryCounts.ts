@@ -14,8 +14,22 @@ export function isActiveListing(listing: Pick<Listing, "status">) {
   return listing.status === "active";
 }
 
-export function isPublicListing(listing: Listing) {
-  return isActiveListing(listing) && !isBlockedLiveAnimalListing(listing) && listingHasCoverPhoto(listing);
+/** Mirrors server `isLiveRow` for client Listing shapes (`expiresAt` is epoch ms when set). */
+export function isListingWithinPeriod(listing: Pick<Listing, "expiresAt">, now = Date.now()) {
+  return !listing.expiresAt || listing.expiresAt > now;
+}
+
+/**
+ * Public vitrine / search / favorites: active, not past expiresAt, cover photo, not blocked live-animal.
+ * Aligns with `publicCountWhere` + `isLiveRow` (status/period) and cover-photo gate.
+ */
+export function isPublicListing(listing: Listing, now = Date.now()) {
+  return (
+    isActiveListing(listing) &&
+    isListingWithinPeriod(listing, now) &&
+    !isBlockedLiveAnimalListing(listing) &&
+    listingHasCoverPhoto(listing)
+  );
 }
 
 /**
