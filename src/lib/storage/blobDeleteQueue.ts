@@ -342,6 +342,62 @@ export async function enqueueAccountBlobDeletes(
   return { enqueued };
 }
 
+export type ListingEditBlobDeleteTarget = {
+  storageKey: string;
+  url?: string;
+};
+
+/**
+ * Managed listing keys dropped from an edit payload. Keeps URLs still present in `keepUrls`.
+ * External / unmanaged / foreign-owner keys are omitted (never queued, never deleted).
+ */
+export function collectListingEditBlobDeleteTargets(input: {
+  sellerId: string;
+  existingImages: Array<{ storageKey: string; url: string }>;
+  keepUrls: ReadonlyArray<string>;
+}): ListingEditBlobDeleteTarget[] {
+  const keep = new Set(input.keepUrls);
+  const out: ListingEditBlobDeleteTarget[] = [];
+  const seen = new Set<string>();
+
+  for (const img of input.existingImages) {
+    if (keep.has(img.url)) continue;
+    const key = (img.storageKey?.trim() || storageKeyFromUrl(img.url)).trim();
+    if (!key || !isManagedStorageKey(key)) continue;
+    const gate = assertQueueableBlobKey(key, input.sellerId);
+    if (!gate.ok) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ storageKey: key, ...(img.url ? { url: img.url } : {}) });
+  }
+  return out;
+}
+
+/**
+ * Enqueue removed listing photos inside the interactive listing-update transaction.
+ * Any managed own key that cannot be queued throws — caller must not commit the image rewrite.
+ */
+export async function enqueueListingEditBlobDeletes(
+  tx: BlobDeleteQueueTx,
+  sellerId: string,
+  targets: ListingEditBlobDeleteTarget[],
+): Promise<{ enqueued: number }> {
+  let enqueued = 0;
+  for (const t of targets) {
+    if (!isManagedStorageKey(t.storageKey)) continue;
+    const result = await enqueuePendingBlobDelete(tx, {
+      storageKey: t.storageKey,
+      reason: "listing_edit",
+      expectedOwnerUserId: sellerId,
+    });
+    if (!result.ok) {
+      throw new Error(`blob_queue.enqueue_failed:${result.error}`);
+    }
+    enqueued += 1;
+  }
+  return { enqueued };
+}
+
 /**
  * Mark a queue row done only after a confirmed physical delete.
  * No-op when the row is missing. Does not create rows.
