@@ -78,6 +78,7 @@ import { STD_DATE_PRESETS } from "@/components/StdFilterSidebar";
 import { useApprovedVehicles } from "@/components/VehicleRequestBox";
 import { FilterRow, FilterSwitchRow } from "@/components/mfilter/FilterRow";
 import { OptionPicker } from "@/components/mfilter/OptionPicker";
+import { isBrandSelectField } from "@/lib/brandMarks";
 import { RangePicker, rangeLabel } from "@/components/mfilter/RangePicker";
 import { catName, useI18n } from "@/context/I18nContext";
 import { categoryPath, rootOf, visibleChildren, type Category } from "@/data/categories";
@@ -615,6 +616,7 @@ export function QuickFilterPanel({
               popular={popularOptions(f.key, options)}
               popularLabel={t("mf.popularBrands")}
               allLabel={t("mf.allBrands")}
+              visual={isBrandSelectField(f.key) ? "brand" : "none"}
               onPick={(v) => {
                 set(f.key, v);
                 if (multi) return;

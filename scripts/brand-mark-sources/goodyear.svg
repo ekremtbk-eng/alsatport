@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Goodyear">
+  <!-- Simplified G identifier on brand gold. Trademark: Goodyear. -->
+  <circle cx="12" cy="12" r="10" fill="#1A1A1A"/>
+  <circle cx="12" cy="12" r="7.2" fill="none" stroke="#FFCC00" stroke-width="1.6"/>
+  <path fill="#FFCC00" d="M15.4 10.2c-.55-.95-1.55-1.55-2.85-1.55-1.95 0-3.45 1.55-3.45 3.45s1.5 3.45 3.45 3.45c1.2 0 2.2-.55 2.8-1.4l-1.55-.95c-.3.4-.75.65-1.25.65-.95 0-1.65-.75-1.65-1.75s.7-1.75 1.65-1.75c.45 0 .85.2 1.1.5l1.75-1.15z"/>
+</svg>

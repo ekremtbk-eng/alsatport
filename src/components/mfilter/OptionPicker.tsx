@@ -2,6 +2,7 @@
 
 import { Check, Search } from "lucide-react";
 import { useMemo, useState } from "react";
+import { BrandMark } from "@/components/BrandMark";
 import { useI18n } from "@/context/I18nContext";
 
 function fold(s: string) {
@@ -29,6 +30,7 @@ export function OptionPicker({
   popular,
   popularLabel,
   allLabel,
+  visual = "none",
   onPick,
 }: {
   label: string;
@@ -46,6 +48,8 @@ export function OptionPicker({
   popular?: string[];
   popularLabel?: string;
   allLabel?: string;
+  /** brand — show BrandMark beside each option (mobile filter cards). */
+  visual?: "brand" | "none";
   onPick: (value: string) => void;
 }) {
   const { t } = useI18n();
@@ -83,6 +87,11 @@ export function OptionPicker({
         <span className={multi ? "qf-check" : "qf-radio"} aria-hidden>
           {multi && on ? <Check className="h-3.5 w-3.5" /> : null}
         </span>
+        {visual === "brand" ? (
+          <span className="qf-opt-mark">
+            <BrandMark label={o} size={22} />
+          </span>
+        ) : null}
         <span className="qf-opt-name">{o}</span>
         {counts?.[o] ? <span className="qf-opt-count">{counts[o].toLocaleString("tr-TR")}</span> : null}
       </button>

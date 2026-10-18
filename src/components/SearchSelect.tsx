@@ -3,6 +3,8 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
+import { BrandMark } from "@/components/BrandMark";
+import { CategoryIcon } from "@/components/CategoryIcon";
 
 const LIST_MAX = 208;
 const LIST_MIN = 84;
@@ -55,6 +57,8 @@ function placeList(anchor: HTMLElement): Place {
   return { top: r.bottom + LIST_GAP, left, width, maxHeight, placement: "below" };
 }
 
+export type SearchSelectVisual = "brand" | "category" | "none";
+
 export function SearchSelect({
   label,
   value,
@@ -66,6 +70,8 @@ export function SearchSelect({
   emptyLabel,
   optionCounts,
   menuMode = "portal",
+  visual = "none",
+  optionIcons,
   onChange,
 }: {
   label: string;
@@ -83,6 +89,10 @@ export function SearchSelect({
    *          (listing wizard / DynamicAttributeForm).
    */
   menuMode?: "portal" | "inline";
+  /** brand — BrandMark beside options; category — CategoryIcon via optionIcons map */
+  visual?: SearchSelectVisual;
+  /** Maps option label → CategoryIcon name when visual="category" */
+  optionIcons?: Record<string, string>;
   onChange: (v: string) => void;
 }) {
   const [q, setQ] = useState("");
@@ -92,6 +102,7 @@ export function SearchSelect({
   const inputRef = useRef<HTMLInputElement>(null);
   const listId = useId();
   const inline = menuMode === "inline";
+  const showVisual = visual === "brand" || visual === "category";
   const list = useMemo(() => {
     const s = q.trim().toLocaleLowerCase("tr");
     return options.filter((o) => {
@@ -156,17 +167,31 @@ export function SearchSelect({
     setOpen(false);
   };
 
+  const optionVisual = (o: string) => {
+    if (visual === "brand") return <BrandMark label={o} size={18} />;
+    if (visual === "category") {
+      const icon = optionIcons?.[o] ?? "grid";
+      return (
+        <span className="ss-cat-ico" aria-hidden="true">
+          <CategoryIcon name={icon} className="h-4 w-4" />
+        </span>
+      );
+    }
+    return null;
+  };
+
   const optionsBody = (
     <>
       {anyLabel ? (
         <li role="option" aria-selected={value === ""}>
           <button
             type="button"
-            className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-ink hover:bg-elev"
+            className="ss-opt"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => pick("")}
           >
-            {anyLabel}
+            {showVisual ? <span className="ss-opt-mark ss-opt-mark-empty" aria-hidden="true" /> : null}
+            <span className="ss-opt-label">{anyLabel}</span>
           </button>
         </li>
       ) : null}
@@ -175,15 +200,14 @@ export function SearchSelect({
         <li key={o} role="option" aria-selected={o === value}>
           <button
             type="button"
-            className={`w-full rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-elev ${
-              o === value ? "font-semibold" : ""
-            }`}
+            className={`ss-opt ${o === value ? "is-on" : ""}`}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => pick(o)}
           >
-            {o}
+            {showVisual ? <span className="ss-opt-mark">{optionVisual(o)}</span> : null}
+            <span className="ss-opt-label">{o}</span>
             {optionCounts && optionCounts[o] != null ? (
-              <span className="float-right text-[11px] text-muted">({optionCounts[o]})</span>
+              <span className="ss-opt-count">({optionCounts[o]})</span>
             ) : null}
           </button>
         </li>
@@ -198,6 +222,7 @@ export function SearchSelect({
         role="listbox"
         data-ss-portal
         data-placement={place.placement}
+        data-visual={visual}
         className="flt-ss-list fixed z-[80] overflow-auto overscroll-contain rounded-xl border border-line bg-card py-1 shadow-md"
         style={{
           top: place.top,
@@ -217,6 +242,7 @@ export function SearchSelect({
         role="listbox"
         data-ss-inline
         data-placement="below"
+        data-visual={visual}
         className="flt-ss-list flt-ss-list-inline mt-1 mb-1 w-full overflow-auto overscroll-contain rounded-xl border border-line bg-panel py-1"
       >
         {optionsBody}
@@ -227,7 +253,12 @@ export function SearchSelect({
     <label className={hideLabel ? "block" : "flt-group"}>
       {hideLabel ? <span className="sr-only">{label}</span> : <span className="flt-label">{label}</span>}
       <div className={inline ? "ss-inline-wrap" : "relative"}>
-        <div className="relative">
+        <div className={`relative ${showVisual ? "ss-has-mark" : ""}`}>
+          {showVisual && value && !open ? (
+            <span className="ss-input-mark" aria-hidden="true">
+              {optionVisual(value)}
+            </span>
+          ) : null}
           <input
             ref={inputRef}
             disabled={disabled}
@@ -260,7 +291,7 @@ export function SearchSelect({
               }
             }}
             onBlur={() => window.setTimeout(() => setOpen(false), 160)}
-            className="flt-input pe-9 disabled:cursor-not-allowed disabled:opacity-50"
+            className={`flt-input pe-9 disabled:cursor-not-allowed disabled:opacity-50 ${showVisual ? "ss-input-visual" : ""}`}
           />
           <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink" />
         </div>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Komatsu">
+  
+  <rect x="2" y="2" width="20" height="20" rx="2" fill="#FFD100"/>
+  <path fill="#1A1A1A" d="M7 5.5h2.6v5.1L14.8 5.5H18l-5.4 5.7L18.2 18.5H14.8l-4.4-5.6v5.6H7z"/>
+</svg>

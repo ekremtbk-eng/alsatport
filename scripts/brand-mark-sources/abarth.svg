@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Abarth">
+  <!-- Simplified shield + A (scorpion omitted  complex artwork). Trademark: Abarth. -->
+  <path fill="#E4002B" d="M12 2.2 19.5 5.2v6.3c0 4.6-3.1 8.4-7.5 9.7-4.4-1.3-7.5-5.1-7.5-9.7V5.2L12 2.2z"/>
+  <path fill="#FFD100" d="M12 6.2 15.6 16h-2.1l-.55-1.6H10.05L9.5 16H7.4L12 6.2zm0 3.1-.85 2.5h1.7L12 9.3z"/>
+</svg>

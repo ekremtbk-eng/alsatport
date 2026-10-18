@@ -15,6 +15,8 @@
     "db:seed:demo": "tsx prisma/seed-demo.ts",
     "db:maintain": "node scripts/prisma-deploy.mjs",
     "check:vehicle-search-index": "tsx scripts/check-vehicle-brand-search-index.ts",
+    "build:brand-marks": "tsx scripts/optimize-manual-brand-marks.ts && tsx scripts/build-brand-marks.ts",
+    "test:brand-marks": "tsx scripts/test-brand-marks.ts",
     "test:security": "tsx scripts/test-security.ts",
     "test:mobile-filters": "tsx scripts/test-mobile-filters.ts",
     "db:setup": "prisma migrate deploy && prisma db seed"
@@ -35,6 +37,7 @@
     "react-dom": "^19.1.0",
     "server-only": "^0.0.1",
     "sharp": "^0.35.5",
+    "simple-icons": "^16.35.0",
     "tsx": "^4.20.5",
     "zod": "^4.6.5"
   },

@@ -120,6 +120,9 @@ export function CategoryPicker({
                 onClick={() => pick(cat)}
                 data-cat-id={cat.id}
               >
+                <span className="cat-pick-ico">
+                  <CategoryIcon name={cat.icon} className="h-5 w-5" />
+                </span>
                 <span className="min-w-0 flex-1">
                   <span className="cat-pick-name">{label}</span>
                   {path ? <span className="cat-pick-path">{path}</span> : null}
