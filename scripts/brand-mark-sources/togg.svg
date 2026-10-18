@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Togg">
+  <!-- Simplified geometric identifying mark (PD-shape style). Trademark: Togg. -->
+  <rect x="2" y="2" width="20" height="20" rx="5" fill="#00A3E0"/>
+  <path fill="#fff" d="M6.5 7.2h11v2.4H13.6v7.2h-3.2V9.6H6.5z"/>
+</svg>

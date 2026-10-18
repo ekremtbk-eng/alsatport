@@ -6,6 +6,7 @@ import { CategoryDrill } from "@/components/CategoryDrill";
 import { CurrencyChips } from "@/components/CurrencyChips";
 import { listingCurrencySymbol } from "@/lib/listings/currency";
 import { SearchSelect } from "@/components/SearchSelect";
+import { isBrandSelectField } from "@/lib/brandMarks";
 import { TutorFilterChips } from "@/components/TutorFilterChips";
 import { StdFilterSidebar } from "@/components/StdFilterSidebar";
 import { useApprovedVehicles } from "@/components/VehicleRequestBox";
@@ -299,6 +300,7 @@ function FieldControl({
         hideLabel={hideLabel}
         anyLabel={t("flt.any")}
         optionCounts={optionCounts}
+        visual={isBrandSelectField(field.key) ? "brand" : "none"}
         onChange={(v) => onChange(field.key, v)}
       />
     );

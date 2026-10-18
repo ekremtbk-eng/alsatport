@@ -6,6 +6,7 @@ import { CountrySwitch } from "@/components/CountrySwitch";
 import { CurrencyChips } from "@/components/CurrencyChips";
 import { FilterSheet } from "@/components/FilterSheet";
 import { SearchSelect } from "@/components/SearchSelect";
+import { isBrandSelectField } from "@/lib/brandMarks";
 import { STD_DATE_PRESETS } from "@/components/StdFilterSidebar";
 import { useI18n } from "@/context/I18nContext";
 import {
@@ -176,6 +177,7 @@ function FieldBlock({
         disabled={locked}
         placeholder={locked ? t(LOCK_HINTS[field.dependsOn ?? ""] ?? "flt.cityFirst") : t("flt.any")}
         anyLabel={t("flt.any")}
+        visual={isBrandSelectField(field.key) ? "brand" : "none"}
         onChange={(v) => set(field.key, v)}
       />
     );

@@ -1,6 +1,7 @@
 "use client";
 
 import { SearchSelect } from "@/components/SearchSelect";
+import { isBrandSelectField } from "@/lib/brandMarks";
 import {
   bodiesOfModel,
   enginesOfModel,
@@ -178,6 +179,7 @@ export function DynamicAttributeForm({
                 placeholder={placeholder}
                 emptyLabel={!locked && field.dependsOn ? emptyHint(field) : "Sonuç yok"}
                 menuMode="inline"
+                visual={isBrandSelectField(field.key) ? "brand" : "none"}
                 onChange={(v) => onChange(field.key, v)}
               />
             </div>

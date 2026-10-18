@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { CategoryIcon } from "@/components/CategoryIcon";
 import { catName, useI18n } from "@/context/I18nContext";
 import { useApp } from "@/context/AppContext";
 import {
@@ -54,6 +55,8 @@ export function CategoryDrill({
     }
     const kids = visibleChildren(selected);
     setCursor(kids.length ? selected : parentOf(selected) ?? null);
+    // Only re-sync when the selected category id changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: selected object identity may churn
   }, [selected?.id]);
 
   const levelCats = cursor ? visibleChildren(cursor) : uniqueRoots;
@@ -125,6 +128,9 @@ export function CategoryDrill({
                 className={`cat-drill-row ${active ? "is-on" : ""}`}
                 onClick={() => choose(cat)}
               >
+                <span className="cat-drill-ico" aria-hidden="true">
+                  <CategoryIcon name={cat.icon} className="h-4 w-4" />
+                </span>
                 <span className="cat-drill-name">{labelOf(t, cat)}</span>
                 <span className="cat-drill-n">{formatListingCount(n)}</span>
                 {kids.length ? <ChevronRight className="h-4 w-4 cat-drill-chev" aria-hidden /> : null}
