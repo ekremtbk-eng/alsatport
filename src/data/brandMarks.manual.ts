@@ -11,10 +11,25 @@ export const MANUAL_BRAND_MARKS: Record<string, ManualBrandMark> = {
     "hex": "E4002B",
     "file": "/brand-marks/abarth.svg"
   },
+  "agv": {
+    "title": "AGV",
+    "hex": "ED1C24",
+    "file": "/brand-marks/agv.svg"
+  },
   "alpine": {
     "title": "Alpine",
     "hex": "0033A0",
     "file": "/brand-marks/alpine.svg"
+  },
+  "alpinestars": {
+    "title": "Alpinestars",
+    "hex": "1A1A1A",
+    "file": "/brand-marks/alpinestars.svg"
+  },
+  "anker": {
+    "title": "Anker",
+    "hex": "00A3E0",
+    "file": "/brand-marks/anker.svg"
   },
   "arcelik": {
     "title": "Arçelik",
@@ -55,6 +70,26 @@ export const MANUAL_BRAND_MARKS: Record<string, ManualBrandMark> = {
     "title": "Chery",
     "hex": "313131",
     "file": "/brand-marks/chery.svg"
+  },
+  "continental": {
+    "title": "Continental",
+    "hex": "FFA500",
+    "file": "/brand-marks/continental.svg"
+  },
+  "daihatsu": {
+    "title": "Daihatsu",
+    "hex": "E31C23",
+    "file": "/brand-marks/daihatsu.svg"
+  },
+  "dodge": {
+    "title": "Dodge",
+    "hex": "C1002E",
+    "file": "/brand-marks/dodge.svg"
+  },
+  "focal": {
+    "title": "Focal",
+    "hex": "1A1A1A",
+    "file": "/brand-marks/focal.svg"
   },
   "fossil": {
     "title": "Fossil",
@@ -106,20 +141,55 @@ export const MANUAL_BRAND_MARKS: Record<string, ManualBrandMark> = {
     "hex": "2D2A74",
     "file": "/brand-marks/michelin.svg"
   },
+  "olympus": {
+    "title": "Olympus",
+    "hex": "1A1A1A",
+    "file": "/brand-marks/olympus.svg"
+  },
   "omega": {
     "title": "Omega",
     "hex": "1A1A1A",
     "file": "/brand-marks/omega.svg"
+  },
+  "osram": {
+    "title": "Osram",
+    "hex": "F5A800",
+    "file": "/brand-marks/osram.svg"
   },
   "philips": {
     "title": "Philips",
     "hex": "0B5ED7",
     "file": "/brand-marks/philips.svg"
   },
+  "pirelli": {
+    "title": "Pirelli",
+    "hex": "D4002A",
+    "file": "/brand-marks/pirelli.svg"
+  },
   "realme": {
     "title": "Realme",
     "hex": "FFC915",
     "file": "/brand-marks/realme.svg"
+  },
+  "saab": {
+    "title": "Saab",
+    "hex": "1A1A1A",
+    "file": "/brand-marks/saab.svg"
+  },
+  "seiko": {
+    "title": "Seiko",
+    "hex": "1A1A1A",
+    "file": "/brand-marks/seiko.svg"
+  },
+  "skf": {
+    "title": "SKF",
+    "hex": "004B87",
+    "file": "/brand-marks/skf.svg"
+  },
+  "thule": {
+    "title": "Thule",
+    "hex": "1A1A1A",
+    "file": "/brand-marks/thule.svg"
   },
   "tissot": {
     "title": "Tissot",

@@ -64,6 +64,12 @@ const HEX: Record<string, string> = {
   daihatsu: "E31C23",
   togg: "00A3E0",
   hidromek: "F36C00",
+  agv: "ED1C24",
+  alpinestars: "1A1A1A",
+  anker: "00A3E0",
+  focal: "1A1A1A",
+  olympus: "1A1A1A",
+  alfaromeo: "A52A2A",
 };
 
 const TITLES: Record<string, string> = {
@@ -115,6 +121,12 @@ const TITLES: Record<string, string> = {
   daihatsu: "Daihatsu",
   togg: "Togg",
   hidromek: "Hidromek",
+  agv: "AGV",
+  alpinestars: "Alpinestars",
+  anker: "Anker",
+  focal: "Focal",
+  olympus: "Olympus",
+  alfaromeo: "Alfa Romeo",
 };
 
 function sanitizeSvg(raw: string): string | null {

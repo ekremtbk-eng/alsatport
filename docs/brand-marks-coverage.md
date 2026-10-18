@@ -1,14 +1,14 @@
 # Brand mark coverage
 
-Generated: 2026-10-18T19:11:14.964Z
+Generated: 2026-10-18T19:55:53.837Z
 
 - Catalog brands scanned: **205**
-- With logo (Simple Icons + manual): **142** (69.3%)
+- With logo (Simple Icons + manual): **156** (76.1%)
   - Simple Icons (CC0): **115**
-  - Manual (Wikimedia PD-textlogo / simplified ID marks): **27**
-- Missing (letter fallback): **63**
+  - Manual (Wikimedia PD-textlogo / simplified ID marks): **41**
+- Missing (letter fallback): **49**
 - Unique Simple Icons SVG paths: **102**
-- Unique manual SVG files: **27**
+- Unique manual SVG files: **41**
 
 ## Priority brands (requested)
 
@@ -34,23 +34,16 @@ Generated: 2026-10-18T19:11:14.964Z
 
 ## Missing brands
 
-- AGV
 - Alfa Romeo
-- Alpinestars
-- Anker
 - Arai
 - Baseus
 - Bell
-- Continental
 - Daewoo
-- Daihatsu
 - Dainese
-- Dodge
 - DS
 - Dunlop
 - Fabrikasyon
 - Febi
-- Focal
 - Forma
 - Genesis
 - GMC
@@ -74,27 +67,20 @@ Generated: 2026-10-18T19:11:14.964Z
 - Mann Filter
 - NGK
 - Nolan
-- Olympus
 - Orijinal
-- Osram
 - Petlas
 - PIAA
 - Pioneer
-- Pirelli
 - Rev'it
 - Rockford Fosgate
 - Rolex
-- Saab
 - Sachs
 - Schuberth
-- Seiko
 - Shoei
-- SKF
 - Spidi
 - SsangYong
 - TCL
 - TCX
-- Thule
 - Tofaş
 - TRW
 
@@ -219,7 +205,10 @@ Generated: 2026-10-18T19:11:14.964Z
 ## Covered (manual files)
 
 - Abarth
+- AGV
 - Alpine
+- Alpinestars
+- Anker
 - Arçelik
 - Beko
 - Brembo
@@ -228,6 +217,10 @@ Generated: 2026-10-18T19:11:14.964Z
 - Canon
 - Casio
 - Chery
+- Continental
+- Daihatsu
+- Dodge
+- Focal
 - Fossil
 - Goodyear
 - GoPro
@@ -238,10 +231,42 @@ Generated: 2026-10-18T19:11:14.964Z
 - Liebherr
 - Mercedes-Benz
 - Michelin
+- Olympus
 - Omega
+- Osram
 - Philips
+- Pirelli
 - Realme
+- Saab
+- Seiko
+- SKF
+- Thule
 - Tissot
 - Togg
 - Valeo
 - Zeekr
+
+## Manual batch sources & licensing (2026-10-18)
+
+PD-textlogo / PD-shape clears **copyright** only; Commons tags many as **Trademarked**.
+Used nominatively in filters/forms. See also `docs/brand-marks-sources.md`.
+
+| Slug | Brand | Source basis |
+|------|-------|--------------|
+| agv | AGV | Commons `Agv motorsports logo.svg` (PD-textlogo + Trademarked) |
+| alpinestars | Alpinestars | Commons `Alpinestars logo.svg` (PD-textlogo + Trademarked) |
+| anker | Anker | Official Innovations wordmark (Commons-cited PD-textlogo source) |
+| continental | Continental | Commons `Continental wordmark.svg` (PD-textlogo + Trademarked) |
+| daihatsu | Daihatsu | Commons `Daihatsu symbol.svg` (PD-shape + Trademarked) |
+| dodge | Dodge | Commons `Dodge black logo.svg` (PD-textlogo + Trademarked) |
+| focal | Focal | Commons `Focal logo.svg` (PD-shape + Trademarked) |
+| olympus | Olympus | Commons `Olympus Corporation logo.svg` (PD-textlogo + Trademarked) |
+| osram | Osram | Commons `Osram Logo.svg` (PD-textlogo + Trademarked) |
+| pirelli | Pirelli | Commons `Pirelli - logo black (Italy, 1970).svg` (PD-textlogo + Trademarked) |
+| saab | Saab | Commons `Saab wordmark blue.svg` (PD-textlogo + Trademarked) |
+| seiko | Seiko | Commons `Seiko logo.svg` (PD-textlogo + Trademarked) |
+| skf | SKF | Commons `SKF logo.svg` (PD-textlogo; cleaned broken xlink uses) |
+| thule | Thule | Commons `Thule Group Logo.svg` (PD-textlogo + Trademarked) |
+
+**Intentionally not mapped:** Alfa Romeo (model wordmarks only), GMC (wrong Commons file risk),
+Fabrikasyon / Orijinal (generic labels), and other missing brands listed above.

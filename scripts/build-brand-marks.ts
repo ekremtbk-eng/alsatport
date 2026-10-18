@@ -379,6 +379,31 @@ ${foundSi.map((m) => `- ${m}`).join("\n")}
 ## Covered (manual files)
 
 ${foundManual.map((m) => `- ${m}`).join("\n")}
+
+## Manual batch sources & licensing (2026-10-18)
+
+PD-textlogo / PD-shape clears **copyright** only; Commons tags many as **Trademarked**.
+Used nominatively in filters/forms. See also \`docs/brand-marks-sources.md\`.
+
+| Slug | Brand | Source basis |
+|------|-------|--------------|
+| agv | AGV | Commons \`Agv motorsports logo.svg\` (PD-textlogo + Trademarked) |
+| alpinestars | Alpinestars | Commons \`Alpinestars logo.svg\` (PD-textlogo + Trademarked) |
+| anker | Anker | Official Innovations wordmark (Commons-cited PD-textlogo source) |
+| continental | Continental | Commons \`Continental wordmark.svg\` (PD-textlogo + Trademarked) |
+| daihatsu | Daihatsu | Commons \`Daihatsu symbol.svg\` (PD-shape + Trademarked) |
+| dodge | Dodge | Commons \`Dodge black logo.svg\` (PD-textlogo + Trademarked) |
+| focal | Focal | Commons \`Focal logo.svg\` (PD-shape + Trademarked) |
+| olympus | Olympus | Commons \`Olympus Corporation logo.svg\` (PD-textlogo + Trademarked) |
+| osram | Osram | Commons \`Osram Logo.svg\` (PD-textlogo + Trademarked) |
+| pirelli | Pirelli | Commons \`Pirelli - logo black (Italy, 1970).svg\` (PD-textlogo + Trademarked) |
+| saab | Saab | Commons \`Saab wordmark blue.svg\` (PD-textlogo + Trademarked) |
+| seiko | Seiko | Commons \`Seiko logo.svg\` (PD-textlogo + Trademarked) |
+| skf | SKF | Commons \`SKF logo.svg\` (PD-textlogo; cleaned broken xlink uses) |
+| thule | Thule | Commons \`Thule Group Logo.svg\` (PD-textlogo + Trademarked) |
+
+**Intentionally not mapped:** Alfa Romeo (model wordmarks only), GMC (wrong Commons file risk),
+Fabrikasyon / Orijinal (generic labels), and other missing brands listed above.
 `;
 
 fs.mkdirSync(path.dirname(reportFile), { recursive: true });
