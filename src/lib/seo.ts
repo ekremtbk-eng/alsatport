@@ -12,19 +12,94 @@ import { SITE_SITELINKS } from "@/data/sitelinks";
 import { isKktcCity } from "@/data/locations";
 import { CANONICAL_ORIGIN } from "@/lib/site";
 
-export const SEO_TITLE = "AlSatPort — Al, Sat, Keşfet!";
+export const SEO_TITLE = "AlSatPort – Ücretsiz İlan Ver, İkinci El Ürünleri Keşfet";
 export const SEO_DESCRIPTION =
-  "AlsatPort: emlak, vasıta, ikinci el ve hizmet ilanları. Türkiye genelinde al, sat, keşfet.";
+  "AlSatPort'ta ücretsiz ilan ver, ikinci el telefon, bilgisayar, elektronik ve farklı kategorilerdeki ilanları keşfet. Alıcılarla doğrudan iletişim kur.";
 export const SEO_KEYWORDS = [
   "alsatport",
-  "ilan",
+  "ücretsiz ilan",
   "ikinci el",
-  "emlak",
-  "vasıta",
-  "sahibinden",
+  "cep telefonu",
+  "bilgisayar",
+  "elektronik",
+  "ilan",
   "alışveriş",
   "kategori",
 ];
+
+/** Hub pages with non-brand search intent — keep copy unique; do not stamp onto every leaf. */
+const PRIORITY_CATEGORY_SEO: Record<string, { title: string; description: string }> = {
+  "cep-telefonu": {
+    title: "İkinci El Cep Telefonu İlanları · AlSatPort",
+    description:
+      "İkinci el ve sıfır cep telefonu, akıllı telefon ve aksesuar ilanlarını AlSatPort'ta keşfet. Ücretsiz ilan ver, alıcılarla doğrudan iletişim kur.",
+  },
+  bilgisayar: {
+    title: "İkinci El Bilgisayar İlanları · AlSatPort",
+    description:
+      "Dizüstü, masaüstü, tablet ve bilgisayar parçası ilanlarını AlSatPort'ta incele. Ücretsiz ilan ver, Türkiye genelinde alıcı ve satıcılarla buluş.",
+  },
+  "teknik-elektronik": {
+    title: "Teknik Elektronik İlanları · AlSatPort",
+    description:
+      "Ölçüm cihazları, elektronik bileşenler ve teknik elektronik ilanlarını AlSatPort'ta bul. Ücretsiz ilan ver, doğrudan iletişim kur.",
+  },
+  "ikinci-el": {
+    title: "İkinci El ve Sıfır Alışveriş İlanları · AlSatPort",
+    description:
+      "İkinci el telefon, bilgisayar, elektronik ve daha fazla kategoride güncel ilanlar. AlSatPort'ta ücretsiz ilan ver, ürünleri keşfet.",
+  },
+  "yedek-parca": {
+    title: "Yedek Parça ve Aksesuar İlanları · AlSatPort",
+    description:
+      "Otomotiv, motosiklet ve deniz aracı yedek parça ile aksesuar ilanlarını AlSatPort'ta keşfet. Ücretsiz ilan ver, alıcılarla iletişim kur.",
+  },
+};
+
+/** Title/description for category hub and leaf listing pages. */
+export function categorySeoCopy(cat: Category): { title: string; description: string } {
+  const custom = PRIORITY_CATEGORY_SEO[cat.slug];
+  if (custom) return custom;
+  const kids = visibleChildren(cat);
+  if (kids.length) {
+    return {
+      title: `${cat.name} ilanları · AlSatPort`,
+      description: `${cat.name} ve alt kategorileri: ${kids
+        .slice(0, 8)
+        .map((c) => c.name)
+        .join(", ")}. AlSatPort'ta ücretsiz ilan ver, güncel ilanlara göz at.`,
+    };
+  }
+  return {
+    title: `${cat.name} ilanları · AlSatPort`,
+    description: `${cat.name} ilanları AlSatPort'ta. Ücretsiz ilan ver, Türkiye ve KKTC genelinde alıcılarla doğrudan iletişim kur.`,
+  };
+}
+
+/** True when `/kategoriler/{slug}` is not the canonical URL (leaf → `/ara?kategori=…`, hizmet, iş vb.). */
+export function categoryHubNeedsCanonicalRedirect(cat: Category) {
+  const canonical = hrefForCategory(cat);
+  const hubPath = `/kategoriler/${cat.slug}`;
+  const hubEncoded = `/kategoriler/${encodeURIComponent(cat.slug)}`;
+  return canonical !== hubPath && canonical !== hubEncoded;
+}
+
+/** Merge extra query keys onto a canonical path that may already include `?kategori=`. */
+export function withPreservedSearchParams(
+  canonicalPath: string,
+  searchParams: Record<string, string | string[] | undefined>,
+) {
+  const url = new URL(canonicalPath, CANONICAL_ORIGIN);
+  const hasCategory = url.searchParams.has("kategori") || url.searchParams.has("cat");
+  for (const [key, raw] of Object.entries(searchParams)) {
+    const value = (Array.isArray(raw) ? raw[0] : raw)?.trim() ?? "";
+    if (!value || url.searchParams.has(key)) continue;
+    /** Do not let a second category alias override / duplicate the canonical leaf. */
+    if (hasCategory && (key === "kategori" || key === "cat")) continue;
+    url.searchParams.set(key, value);
+  }
+  return `${url.pathname}${url.search}`;
+}
 
 export function absUrl(path = "/") {
   const p = path.startsWith("/") ? path : `/${path}`;
@@ -46,7 +121,7 @@ export function defaultOgImage() {
     url: absUrl(OG_IMAGE_PATH),
     width: 1200,
     height: 630,
-    alt: `${LEGAL_BRAND} — Al, Sat, Keşfet!`,
+    alt: `${LEGAL_BRAND} – Ücretsiz İlan Ver, İkinci El Ürünleri Keşfet`,
     type: "image/png",
   };
 }
@@ -270,7 +345,9 @@ export function topCategoryListJsonLd() {
 export function categoryJsonLd(cat: Category) {
   const crumbs = categoryCrumbs(cat);
   const children = visibleChildren(cat);
-  const url = absUrl(categoryPath(cat.slug));
+  const path = hrefForCategory(cat);
+  const url = absUrl(path);
+  const copy = categorySeoCopy(cat);
   const breadcrumb = {
     "@type": "BreadcrumbList",
     itemListElement: [
@@ -280,7 +357,7 @@ export function categoryJsonLd(cat: Category) {
         "@type": "ListItem",
         position: i + 3,
         name: c.name,
-        item: absUrl(categoryPath(c.slug)),
+        item: absUrl(hrefForCategory(c)),
       })),
     ],
   };
@@ -288,8 +365,8 @@ export function categoryJsonLd(cat: Category) {
     "@type": "CollectionPage",
     "@id": `${url}#page`,
     url,
-    name: `${cat.name} ilanları`,
-    description: `${cat.name} kategorisindeki ilanlar AlsatPort'ta.`,
+    name: copy.title,
+    description: copy.description,
     isPartOf: { "@id": `${CANONICAL_ORIGIN}/#website` },
     about: {
       "@type": "Thing",
@@ -305,7 +382,7 @@ export function categoryJsonLd(cat: Category) {
             "@type": "ListItem",
             position: i + 1,
             name: ch.name,
-            url: absUrl(categoryPath(ch.slug)),
+            url: absUrl(hrefForCategory(ch)),
           })),
         }
       : null;
@@ -329,11 +406,12 @@ export function listingJsonLd(input: {
     { "@type": "ListItem", position: 2, name: "Kategoriler", item: absUrl("/kategoriler") },
   ];
   if (input.categorySlug && input.categoryName) {
+    const cat = findCategory(input.categorySlug);
     crumbs.push({
       "@type": "ListItem",
       position: 3,
       name: input.categoryName,
-      item: absUrl(categoryPath(input.categorySlug)),
+      item: absUrl(cat ? hrefForCategory(cat) : categoryPath(input.categorySlug)),
     });
     crumbs.push({ "@type": "ListItem", position: 4, name: input.title, item: url });
   } else {
