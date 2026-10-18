@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useCookies } from "@/context/CookieContext";
 import { FooterApps } from "@/components/FooterApps";
+import { SocialIcon } from "@/components/BrandIcons";
 import { KvkkLink } from "@/components/LegalNoticeModal";
 import { useI18n } from "@/context/I18nContext";
 import { Logo } from "@/components/Logo";
 import { SupportMailLink } from "@/components/SupportMailLink";
-import { LEGAL_UGC_NOTICE } from "@/data/legal";
+import { LEGAL_UGC_NOTICE, SOCIAL_ACCOUNTS } from "@/data/legal";
 
 export function SiteFooter() {
   const { openPrefs } = useCookies();
@@ -16,7 +17,27 @@ export function SiteFooter() {
     <footer className="site-footer-pro">
       <div className="ft-inner">
         <div className="ft-bar">
-          <Logo tone="dark" priority={false} />
+          <div className="ft-brand">
+            <Logo tone="dark" priority={false} />
+            <div className="ft-follow">
+              <p className="ft-h">{t("apps.follow")}</p>
+              <ul className="ft-soc-list">
+                {SOCIAL_ACCOUNTS.map((a) => (
+                  <li key={a.id}>
+                    {a.url ? (
+                      <a className="ft-soc" href={a.url} target="_blank" rel="noopener noreferrer" aria-label={a.label} title={a.label}>
+                        <SocialIcon id={a.id} />
+                      </a>
+                    ) : (
+                      <span className="ft-soc is-soon" role="img" aria-label={`${a.label} · ${t("apps.soon")}`} title={`${a.label} · ${t("apps.soon")}`}>
+                        <SocialIcon id={a.id} />
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
           <nav className="ft-links" aria-label={t("footer.explore")}>
             <Link href="/">{t("nav.home")}</Link>
             <Link href="/ara">{t("footer.allListings")}</Link>

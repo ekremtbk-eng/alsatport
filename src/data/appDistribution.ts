@@ -31,6 +31,16 @@ export const APP_GROUPS: readonly { id: AppGroupId; titleKey: string; targets: A
   { id: "desktop", titleKey: "apps.g.desktop", targets: ["windows", "mac", "linux"] },
 ];
 
+/**
+ * Compact footer storefront: one primary store/channel per family.
+ * Full `APP_GROUPS` / `APP_TARGETS` stay intact for future native builds and helpers.
+ */
+export const FOOTER_APP_GROUPS: readonly { id: AppGroupId; titleKey: string; targets: AppTargetId[] }[] = [
+  { id: "desktop", titleKey: "apps.g.desktop", targets: ["windows"] },
+  { id: "android", titleKey: "apps.g.android", targets: ["play"] },
+  { id: "apple", titleKey: "apps.g.apple", targets: ["appstore"] },
+];
+
 const ALLOWED_HOSTS = new Set(["play.google.com", "apps.apple.com", "alsatport.com", "www.microsoft.com", "apps.microsoft.com", "flathub.org", "snapcraft.io"]);
 
 /** Defense in depth: a configured URL is used only if it is https on an official store or our own domain. */
