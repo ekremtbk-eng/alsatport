@@ -2417,6 +2417,7 @@ export const MESSAGES = pack({
   "account.delete.done": ["Hesabınız silindi. Ana sayfaya yönlendiriliyorsunuz.", "Your account was deleted. Redirecting to the home page.", "Ihr Konto wurde gelöscht. Weiterleitung…", "تم حذف حسابك. جارٍ التحويل.", "Аккаунт удалён. Переход на главную."],
   "account.delete.err.phrase": ["Onay ifadesini doğru yazın.", "Type the confirmation phrase exactly.", "Bestätigung exakt eingeben.", "اكتب عبارة التأكيد بدقة.", "Введите фразу точно."],
   "account.delete.err.admin": ["Yönetici hesapları bu ekrandan silinemez.", "Admin accounts cannot be deleted here.", "Admin-Konten können hier nicht gelöscht werden.", "لا يمكن حذف حسابات المشرفين هنا.", "Аккаунты администраторов здесь не удаляются."],
+  "account.delete.err.failed": ["Hesap silme tamamlanamadı. Lütfen tekrar deneyin.", "Account deletion could not be completed. Please try again.", "Kontolöschung konnte nicht abgeschlossen werden. Bitte erneut versuchen.", "تعذر إكمال حذف الحساب. حاول مرة أخرى.", "Не удалось удалить аккаунт. Попробуйте снова."],
   "dash.g.sec": ["Hesap Güvenliği", "Account security", "Kontosicherheit", "أمان الحساب", "Безопасность аккаунта"],
   "dash.sec.pass": ["Şifre ve güvenlik", "Password and security", "Passwort und Sicherheit", "كلمة المرور والأمان", "Пароль и безопасность"],
   "dash.sec.devices": ["Giriş yapılan cihazlar", "Signed-in devices", "Angemeldete Geräte", "الأجهزة المسجّلة", "Входы с устройств"],
