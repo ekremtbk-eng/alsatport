@@ -4,14 +4,9 @@ import { LIMITS } from "@/lib/security/rateLimit";
 import { throttle } from "@/lib/security/throttle";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
 import { applyListingWatermark } from "@/lib/storage/listingWatermark";
-import {
-  MAX_UPLOAD_BYTES,
-  deleteStoredObject,
-  isHeifBytes,
-  isManagedStorageKey,
-  putListingImage,
-  sniffImage,
-} from "@/lib/storage/media";
+import { prisma } from "@/lib/db";
+import { discardUnreferencedListingUpload } from "@/lib/storage/blobDeleteQueue";
+import { MAX_UPLOAD_BYTES, isHeifBytes, putListingImage, sniffImage } from "@/lib/storage/media";
 
 export const runtime = "nodejs";
 
@@ -63,15 +58,29 @@ export async function POST(req: Request) {
   return NextResponse.json({ ok: true, ...stored });
 }
 
+/**
+ * Discard a draft listing upload that is not referenced by any active DB row.
+ * Photos already attached to a listing/profile/business must not be physically deleted here
+ * (listing edit uses the pending_blob_deletes path after a committed rewrite).
+ */
 export async function DELETE(req: Request) {
   const blocked = await requireMutatingRequest(req);
   if (blocked) return blocked;
   const auth = await requireUser("seller");
   if ("error" in auth) return auth.error;
-  const key = new URL(req.url).searchParams.get("key") ?? "";
-  if (!isManagedStorageKey(key) || !key.startsWith(`listings/${auth.user.id}/`)) {
-    return NextResponse.json({ ok: false, error: "auth.err.forbidden" }, { status: 403 });
+  const key = (new URL(req.url).searchParams.get("key") ?? "").trim();
+  const result = await discardUnreferencedListingUpload(prisma, {
+    userId: auth.user.id,
+    storageKey: key,
+  });
+  if (!result.ok) {
+    return NextResponse.json(
+      { ok: false, error: result.error, ...(result.deferred ? { deferred: true } : {}) },
+      { status: result.status },
+    );
   }
-  await deleteStoredObject(key);
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({
+    ok: true,
+    ...(result.pending ? { pending: true } : {}),
+  });
 }

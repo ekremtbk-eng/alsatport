@@ -199,11 +199,21 @@ export function PhotoUploader({
     });
   }
 
-  function removeAt(i: number) {
+  async function removeAt(i: number) {
     const url = images[i];
+    // Draft uploads: ask the API to discard storage. On 409 (still referenced) keep the
+    // thumbnail in the form so we never imply the photo was deleted.
     if (uploadedHere.current.has(url)) {
       const key = storageKeyFromUrl(url);
-      if (key) void apiDelete(`/api/uploads?key=${encodeURIComponent(key)}`);
+      if (key) {
+        const res = await apiDelete<{ ok?: boolean; error?: string; deferred?: boolean }>(
+          `/api/uploads?key=${encodeURIComponent(key)}`,
+        );
+        if (res.status === 409 || res.error === "photo.err.inUse") {
+          setError(t("photo.err.inUse"));
+          return;
+        }
+      }
       uploadedHere.current.delete(url);
     }
     onChange((prev) => prev.filter((u) => u !== url));

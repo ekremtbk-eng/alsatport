@@ -1,7 +1,13 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { readTeam } from "@/lib/business/shared";
-import { isManagedStorageKey, isOwnBusinessImage, ownBlobHost, storageKeyFromUrl } from "@/lib/storage/media";
+import {
+  isManagedStorageKey,
+  isOwnBusinessImage,
+  ownBlobHost,
+  storageKeyFromUrl,
+  tryDeleteStoredObject,
+} from "@/lib/storage/media";
 
 export const BLOB_DELETE_REASONS = ["account_delete", "listing_edit", "business_replace", "other"] as const;
 export type BlobDeleteReason = (typeof BLOB_DELETE_REASONS)[number];
@@ -469,6 +475,76 @@ export async function enqueueBusinessReplaceBlobDeletes(
     enqueued += 1;
   }
   return { enqueued };
+}
+
+export type DiscardListingUploadResult =
+  | { ok: true; deleted: boolean; pending?: boolean }
+  | { ok: false; error: string; status: 403 | 409 | 500; deferred?: boolean };
+
+type DiscardListingUploadDb = BlobDeleteQueueTx & {
+  $transaction: <T>(fn: (tx: BlobDeleteQueueTx) => Promise<T>) => Promise<T>;
+};
+
+/**
+ * Discard a seller's listing upload safely:
+ * 1) Refuse (409) when any active DB reference exists — no enqueue, no delete.
+ * 2) Enqueue `other` first; on enqueue failure do not touch the Blob.
+ * 3) Re-check refcount after enqueue; if a listing attached concurrently, keep pending and 409.
+ * 4) Opportunistic tryDelete only when still unreferenced; mark `done` only on confirmed delete.
+ */
+export async function discardUnreferencedListingUpload(
+  db: DiscardListingUploadDb,
+  input: {
+    userId: string;
+    storageKey: string;
+    deleteFn?: (storageKey: string) => Promise<{ deleted: boolean }>;
+    /** Test hook: run after enqueue commits, before the post-enqueue refcount check. */
+    afterEnqueue?: () => Promise<void>;
+  },
+): Promise<DiscardListingUploadResult> {
+  const key = input.storageKey.trim();
+  if (!isManagedStorageKey(key) || !key.startsWith(`listings/${input.userId}/`)) {
+    return { ok: false, error: "auth.err.forbidden", status: 403 };
+  }
+  const gate = assertQueueableBlobKey(key, input.userId);
+  if (!gate.ok) return { ok: false, error: "auth.err.forbidden", status: 403 };
+
+  const refsBefore = await countActiveBlobReferences(db, key).catch(() => Number.POSITIVE_INFINITY);
+  if (refsBefore > 0) {
+    return { ok: false, error: "photo.err.inUse", status: 409, deferred: true };
+  }
+
+  try {
+    await db.$transaction(async (tx) => {
+      const queued = await enqueuePendingBlobDelete(tx, {
+        storageKey: key,
+        reason: "other",
+        expectedOwnerUserId: input.userId,
+      });
+      if (!queued.ok) throw new Error(queued.error);
+    });
+  } catch {
+    // Fail closed: never delete if the queue row did not land.
+    return { ok: false, error: "photo.err.upload", status: 500 };
+  }
+
+  if (input.afterEnqueue) {
+    await input.afterEnqueue();
+  }
+
+  const refsAfter = await countActiveBlobReferences(db, key).catch(() => Number.POSITIVE_INFINITY);
+  if (refsAfter > 0) {
+    // Concurrent listing save attached the key — keep Blob + pending row for a refcount-aware worker.
+    return { ok: false, error: "photo.err.inUse", status: 409, deferred: true };
+  }
+
+  const deleteFn = input.deleteFn ?? ((storageKey: string) => tryDeleteStoredObject(storageKey));
+  const { deleted } = await deleteFn(key);
+  if (deleted) {
+    await markPendingBlobDeleteDone(db, key).catch(() => undefined);
+    return { ok: true, deleted: true };
+  }
+  return { ok: true, deleted: false, pending: true };
 }
 
 /**

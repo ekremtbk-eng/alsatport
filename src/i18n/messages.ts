@@ -2328,6 +2328,13 @@ export const MESSAGES = pack({
   "photo.err.heic": ["Bu HEIC/HEIF fotoğraf bu tarayıcıda dönüştürülemedi. iPhone'da Ayarlar › Kamera › Biçimler › En Uyumlu seçeneğini kullanın veya fotoğrafı JPG olarak paylaşın.", "This HEIC/HEIF photo could not be converted in this browser. On iPhone use Settings › Camera › Formats › Most Compatible, or share it as JPG.", "Dieses HEIC/HEIF-Foto konnte hier nicht umgewandelt werden. Am iPhone: Einstellungen › Kamera › Formate › Maximale Kompatibilität, oder als JPG teilen.", "تعذر تحويل صورة HEIC/HEIF في هذا المتصفح. في iPhone اختر الإعدادات › الكاميرا › التنسيقات › الأكثر توافقاً أو شاركها بصيغة JPG.", "Не удалось преобразовать фото HEIC/HEIF в этом браузере. На iPhone: Настройки › Камера › Форматы › Наиболее совместимый, или отправьте как JPG."],
   "photo.err.network": ["Bağlantı koptuğu için yüklenemedi. Tekrar deneyin.", "Upload failed: the connection dropped. Try again.", "Upload fehlgeschlagen: Verbindung unterbrochen.", "فشل الرفع بسبب انقطاع الاتصال. أعد المحاولة.", "Связь прервалась, попробуйте снова."],
   "photo.err.upload": ["Fotoğraf yüklenemedi. Tekrar deneyin.", "The photo could not be uploaded. Try again.", "Foto konnte nicht hochgeladen werden.", "تعذر رفع الصورة. أعد المحاولة.", "Не удалось загрузить фото."],
+  "photo.err.inUse": [
+    "Bu fotoğraf bir ilanda kullanıldığı için depolamadan silinmedi. İlandan kaldırmak için ilanı kaydedin.",
+    "This photo is still used on a listing, so it was not deleted from storage. Remove it from the listing and save.",
+    "Dieses Foto wird noch in einer Anzeige verwendet und wurde nicht gelöscht. Aus der Anzeige entfernen und speichern.",
+    "هذه الصورة مستخدمة في إعلان ولم تُحذف من التخزين. أزلها من الإعلان ثم احفظ.",
+    "Фото ещё используется в объявлении и не удалено из хранилища. Уберите его из объявления и сохраните.",
+  ],
   "photo.retry": ["Tekrar dene", "Retry", "Erneut", "إعادة المحاولة", "Повторить"],
   "photo.moveLeft": ["Öne al", "Move earlier", "Nach vorne", "تقديم", "Переместить вперёд"],
   "photo.moveRight": ["Sona al", "Move later", "Nach hinten", "تأخير", "Переместить назад"],
