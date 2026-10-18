@@ -40,6 +40,9 @@ assert(resolveBrandMark("Alpine")?.kind === "file", "Alpine is NOT Alpine Linux 
 assert(resolveBrandMark("Hidromek") === null, "Hidromek falls back (no trusted logo)");
 assert(brandInitials("Hidromek").length === 2, "Hidromek initials length");
 assert(brandInitials("Land Rover").length === 2, "Land Rover initials length");
+// Commons File:GMC_logo.svg is Greater Manchester Council — never map vehicle GMC to it.
+assert(resolveBrandMark("GMC") === null, "GMC falls back (wrong Commons file rejected)");
+assert(brandInitials("GMC").length === 2, "GMC initials length");
 assert(isBrandSelectField("brand"), "brand field");
 assert(isBrandSelectField("partBrand"), "partBrand field");
 assert(!isBrandSelectField("price"), "price is not brand");

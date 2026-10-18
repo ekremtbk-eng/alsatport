@@ -1,14 +1,14 @@
 # Brand mark coverage
 
-Generated: 2026-10-18T18:40:14.236Z
+Generated: 2026-10-18T19:11:14.964Z
 
 - Catalog brands scanned: **205**
-- With logo (Simple Icons + manual): **143** (69.8%)
+- With logo (Simple Icons + manual): **142** (69.3%)
   - Simple Icons (CC0): **115**
-  - Manual (Wikimedia PD-textlogo / simplified ID marks): **28**
-- Missing (letter fallback): **62**
+  - Manual (Wikimedia PD-textlogo / simplified ID marks): **27**
+- Missing (letter fallback): **63**
 - Unique Simple Icons SVG paths: **102**
-- Unique manual SVG files: **28**
+- Unique manual SVG files: **27**
 
 ## Priority brands (requested)
 
@@ -53,6 +53,7 @@ Generated: 2026-10-18T18:40:14.236Z
 - Focal
 - Forma
 - Genesis
+- GMC
 - Held
 - Hertz
 - Hidromek
@@ -228,7 +229,6 @@ Generated: 2026-10-18T18:40:14.236Z
 - Casio
 - Chery
 - Fossil
-- GMC
 - Goodyear
 - GoPro
 - Hankook

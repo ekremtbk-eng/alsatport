@@ -61,11 +61,6 @@ export const MANUAL_BRAND_MARKS: Record<string, ManualBrandMark> = {
     "hex": "1A1A1A",
     "file": "/brand-marks/fossil.svg"
   },
-  "gmc": {
-    "title": "GMC",
-    "hex": "C8102E",
-    "file": "/brand-marks/gmc.svg"
-  },
   "goodyear": {
     "title": "Goodyear",
     "hex": "FFCC00",

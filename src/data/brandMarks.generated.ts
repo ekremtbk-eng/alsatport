@@ -43,7 +43,7 @@ export const BRAND_MARK_ALIASES: Record<string, string> = {
   "dodge": "dodge",
   "chrysler": "chrysler",
   "ram": "ram",
-  "gmc": "manual:gmc",
+  "gmc": "gmc",
   "cadillac": "cadillac",
   "lincoln": "lincoln",
   "buick": "buick",

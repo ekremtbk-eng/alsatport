@@ -20,14 +20,15 @@ Built by `scripts/optimize-manual-brand-marks.ts` from
 
 | Kind | License / basis | Examples |
 |------|-----------------|----------|
-| Wikimedia Commons **PD-textlogo** / **PD-shape** | Public domain for copyright (simple geometry/text); trademarks still apply | BYD, Chery, Beko, Arçelik, Michelin, Bridgestone, Realme, Lexus, … |
-| Hand-authored simplified ID marks | Original simple geometry for 24×24 UI chips when no trusted Commons SVG was available | Togg, Alpine (cars), Goodyear, Komatsu, Liebherr, Abarth |
+| Wikimedia Commons **PD-textlogo** / **PD-shape** | Clears **copyright** for simple geometry/text only. Commons also tags many as **Trademarked** — PD-textlogo is **not** automatic permission for commercial trademark use. We use marks nominatively (filter/form identification only). | BYD, Chery, Beko, Arçelik, Michelin, Bridgestone, Realme, Lexus, … |
+| Hand-authored simplified ID marks | Original simple geometry for 24×24 UI chips when no trusted Commons SVG was available | Togg, Alpine (cars), Goodyear, Komatsu, Liebherr, Abarth, Mercedes-Benz |
 
 We do **not** use:
 
-- Wrong-brand icons (e.g. Alpine Linux for Alpine cars, Toggl for Togg)
+- Wrong-brand icons (e.g. Alpine Linux for Alpine cars, Toggl for Togg, Commons `GMC_logo.svg` = Greater Manchester Council ≠ GM GMC)
 - Hotlinked third-party logo CDNs
 - Complex copyrighted artwork without a clear reuse basis
+- A Commons filename that matches a catalog brand without verifying the file description
 
 ## Fallback
 
