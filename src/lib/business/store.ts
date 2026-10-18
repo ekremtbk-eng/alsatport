@@ -8,7 +8,13 @@ import { DEMO_SELLER_EMAIL_SUFFIX } from "@/lib/seoIndexing";
 import { cleanFirmExtras, readFirmExtras, type FirmExtrasInput, type PublicFirm } from "@/lib/business/firmProfile";
 import { hideSellerPhone, listingInclude, toClientListing } from "@/lib/listings/store";
 import { sanitizeMultiline, sanitizeText } from "@/lib/security/sanitize";
-import { deleteStoredObject, isOwnBusinessImage, storageKeyFromUrl } from "@/lib/storage/media";
+import {
+  collectBusinessReplaceBlobDeleteTargets,
+  countActiveBlobReferences,
+  enqueueBusinessReplaceBlobDeletes,
+  markPendingBlobDeleteDone,
+} from "@/lib/storage/blobDeleteQueue";
+import { isOwnBusinessImage, tryDeleteStoredObject } from "@/lib/storage/media";
 import type { Listing } from "@/data/store";
 import {
   BUSINESS_DESC_MIN,
@@ -169,18 +175,19 @@ function cleanProfileFields(userId: string, input: Partial<ApplyInput>, current?
   return out;
 }
 
-async function dropReplacedImages(userId: string, before: BusinessAccount | null, after: BusinessAccount) {
-  for (const key of ["logoUrl", "coverUrl"] as const) {
-    const old = before?.[key];
-    if (old && old !== after[key] && isOwnBusinessImage(userId, old)) {
-      await deleteStoredObject(storageKeyFromUrl(old), old);
-    }
-  }
-  const kept = new Set(readTeam(after.team).map((m) => m.photo));
-  for (const { photo } of readTeam(before?.team)) {
-    if (photo && !kept.has(photo) && isOwnBusinessImage(userId, photo, ["team"])) {
-      await deleteStoredObject(storageKeyFromUrl(photo), photo);
-    }
+/** After a committed business rewrite: refcount-gate then opportunistic Blob delete. */
+async function purgeReplacedBusinessImagesAfterCommit(
+  userId: string,
+  before: BusinessAccount | null,
+  after: BusinessAccount,
+) {
+  const targets = collectBusinessReplaceBlobDeleteTargets({ userId, before, after });
+  for (const target of targets) {
+    const refs = await countActiveBlobReferences(prisma, target.storageKey).catch(() => Number.POSITIVE_INFINITY);
+    if (refs > 0) continue;
+    const { deleted } = await tryDeleteStoredObject(target.storageKey, target.url);
+    if (!deleted) continue;
+    await markPendingBlobDeleteDone(prisma, target.storageKey).catch(() => undefined);
   }
 }
 
@@ -241,10 +248,24 @@ export async function submitApplication(userId: string, input: ApplyInput): Prom
   };
   // A store that was approved once keeps its public URL; otherwise the slug follows the latest name.
   const slug = existing?.approvedAt ? existing.slug : await uniqueSlug(name, existing?.id);
-  const row = existing
-    ? await prisma.businessAccount.update({ where: { id: existing.id }, data: { ...data, slug } })
-    : await prisma.businessAccount.create({ data: { ...data, slug, userId } });
-  await dropReplacedImages(userId, existing, row);
+  const removedTargets = collectBusinessReplaceBlobDeleteTargets({
+    userId,
+    before: existing,
+    after: { logoUrl, coverUrl, team: existing?.team },
+  });
+  let row: BusinessAccount;
+  try {
+    row = await prisma.$transaction(async (tx) => {
+      await enqueueBusinessReplaceBlobDeletes(tx, userId, removedTargets);
+      if (existing) {
+        return tx.businessAccount.update({ where: { id: existing.id }, data: { ...data, slug } });
+      }
+      return tx.businessAccount.create({ data: { ...data, slug, userId } });
+    });
+  } catch {
+    return fail("biz.err.updateFailed", 500);
+  }
+  await purgeReplacedBusinessImagesAfterCommit(userId, existing, row);
   return { row };
 }
 
@@ -289,8 +310,26 @@ export async function updateStoreProfile(
   if (showEmail !== undefined) data.showEmail = showEmail;
   if (cleanedTeam) data.team = cleanedTeam;
   if (!Object.keys(data).length) return { row: existing };
-  const row = await prisma.businessAccount.update({ where: { id: existing.id }, data });
-  await dropReplacedImages(userId, existing, row);
+
+  const nextLogo = typeof data.logoUrl === "string" ? data.logoUrl : existing.logoUrl;
+  const nextCover = typeof data.coverUrl === "string" ? data.coverUrl : existing.coverUrl;
+  const nextTeam = cleanedTeam ?? existing.team;
+  const removedTargets = collectBusinessReplaceBlobDeleteTargets({
+    userId,
+    before: existing,
+    after: { logoUrl: nextLogo, coverUrl: nextCover, team: nextTeam },
+  });
+
+  let row: BusinessAccount;
+  try {
+    row = await prisma.$transaction(async (tx) => {
+      await enqueueBusinessReplaceBlobDeletes(tx, userId, removedTargets);
+      return tx.businessAccount.update({ where: { id: existing.id }, data });
+    });
+  } catch {
+    return fail("biz.err.updateFailed", 500);
+  }
+  await purgeReplacedBusinessImagesAfterCommit(userId, existing, row);
   return { row };
 }
 
