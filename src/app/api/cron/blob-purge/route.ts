@@ -26,26 +26,35 @@ function authorized(req: Request) {
 
 /**
  * Retry worker for `pending_blob_deletes`.
- * Default kill switch: BLOB_PURGE_ENABLED must be exactly `1` (otherwise no-op).
- * Dry-run: BLOB_PURGE_DRY_RUN=1 is read-only (no claim, no status mutation, no Blob delete).
+ *
+ * Modes (after auth + preview lock):
+ * - DRY_RUN=1 → read-only aggregate inspect (works even when ENABLED is unset/0)
+ * - ENABLED≠1 and DRY_RUN off → disabled no-op
+ * - ENABLED=1 and DRY_RUN off → destructive sweep (Production enable requires separate approval)
+ *
  * Not registered in vercel.json yet — Production schedule requires separate approval.
  */
 export async function GET(req: Request) {
   if (isPreviewWriteLockActive()) return previewWriteBlockedResponse();
   if (!authorized(req)) return NextResponse.json({ ok: false }, { status: 401 });
 
+  const dryRun = isBlobPurgeDryRun();
   const enabled = isBlobPurgeEnabled();
+
+  // Dry-run first: never requires BLOB_PURGE_ENABLED=1 and never arms deletes.
+  if (dryRun) {
+    const result = await runBlobPurgeSweep(prisma, { enabled, dryRun: true });
+    return NextResponse.json({ ok: true, ...result }, { headers: { "Cache-Control": "no-store" } });
+  }
+
   if (!enabled) {
     return NextResponse.json(
-      { ok: true, enabled: false, dryRun: isBlobPurgeDryRun(), message: "blob_purge.disabled" },
+      { ok: true, enabled: false, dryRun: false, message: "blob_purge.disabled" },
       { headers: { "Cache-Control": "no-store" } },
     );
   }
 
   // Aggregate counts only — never echo storage keys, URLs, tokens, or PII.
-  const result = await runBlobPurgeSweep(prisma, {
-    enabled: true,
-    dryRun: isBlobPurgeDryRun(),
-  });
+  const result = await runBlobPurgeSweep(prisma, { enabled: true, dryRun: false });
   return NextResponse.json({ ok: true, ...result }, { headers: { "Cache-Control": "no-store" } });
 }
