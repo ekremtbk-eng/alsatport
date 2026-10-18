@@ -11,7 +11,13 @@ import { categoryQueryIds, lookupCategory } from "@/data/categories";
 import { postedFilterHours } from "@/lib/listingQuery";
 import { PreviewWriteBlockedError } from "@/lib/security/previewLock";
 import type { StoredUser } from "@/lib/security/userStore";
-import { deleteStoredObject, isManagedStorageKey, storageKeyFromUrl } from "@/lib/storage/media";
+import {
+  collectListingEditBlobDeleteTargets,
+  countActiveBlobReferences,
+  enqueueListingEditBlobDeletes,
+  markPendingBlobDeleteDone,
+} from "@/lib/storage/blobDeleteQueue";
+import { storageKeyFromUrl, tryDeleteStoredObject } from "@/lib/storage/media";
 import { resolveListingCoords, validListingCoords } from "@/lib/placeGeo";
 import { publicAccountName, verifiedBusinessName } from "@/lib/publicName";
 import { type ListingRef, isLiveRow, liveListingWhere, newPeriod } from "@/lib/listings/lifecycle";
@@ -616,14 +622,14 @@ export async function updateListingRecord(user: StoredUser, id: string, patch: R
         ? { lat: null, lng: null }
         : {};
 
-  if (imagesProvided) {
-    const keep = new Set(parsed.images);
-    for (const img of existing.images) {
-      if (!keep.has(img.url) && isManagedStorageKey(img.storageKey)) {
-        await deleteStoredObject(img.storageKey, img.url);
-      }
-    }
-  }
+  // Collect removals before the txn. Physical Blob delete must not run until after commit.
+  const removedBlobTargets = imagesProvided
+    ? collectListingEditBlobDeleteTargets({
+        sellerId: existing.sellerId,
+        existingImages: existing.images.map((img) => ({ storageKey: img.storageKey, url: img.url })),
+        keepUrls: parsed.images,
+      })
+    : [];
 
   // Expired, sold and moderation states only change through their own flows (renew / resale / admin).
   const nextStatus: ListingStatus =
@@ -644,37 +650,55 @@ export async function updateListingRecord(user: StoredUser, id: string, patch: R
     (!existing.expiresAt || existing.expiresAt.getTime() <= Date.now());
   const contentChanged = Object.keys(patch).some((k) => k !== "status");
 
-  const row = await prisma.$transaction(async (tx) => {
-    if (imagesProvided) {
-      await tx.listingImage.deleteMany({ where: { listingId: id } });
-      if (parsed.images.length) {
-        await tx.listingImage.createMany({ data: imageRows(id, parsed.images) });
+  let row: ListingWithRelations;
+  try {
+    row = await prisma.$transaction(async (tx) => {
+      if (imagesProvided) {
+        // Fail closed: every dropped own key must land in the queue before image rows rewrite.
+        await enqueueListingEditBlobDeletes(tx, existing.sellerId, removedBlobTargets);
+        await tx.listingImage.deleteMany({ where: { listingId: id } });
+        if (parsed.images.length) {
+          await tx.listingImage.createMany({ data: imageRows(id, parsed.images) });
+        }
       }
-    }
-    return tx.listing.update({
-      where: { id },
-      data: {
-        title: parsed.title,
-        subtitle: parsed.subtitle || "",
-        description: parsed.description,
-        categoryId: parsed.categoryId,
-        city: parsed.city,
-        district: parsed.district || "",
-        neighborhood: parsed.neighborhood || "",
-        ...coordsData,
-        price: parsed.price,
-        currency: parsed.currency,
-        status: nextStatus,
-        ...(reactivated ? newPeriod() : {}),
-        urgent: parsed.urgent,
-        refurbished: parsed.refurbished,
-        specs: (parsed.specs ?? []) as Prisma.InputJsonValue,
-        features: (parsed.features ?? []) as Prisma.InputJsonValue,
-        chassis: parsed.chassis ? (parsed.chassis as Prisma.InputJsonValue) : undefined,
-      },
-      include: listingInclude,
+      return tx.listing.update({
+        where: { id },
+        data: {
+          title: parsed.title,
+          subtitle: parsed.subtitle || "",
+          description: parsed.description,
+          categoryId: parsed.categoryId,
+          city: parsed.city,
+          district: parsed.district || "",
+          neighborhood: parsed.neighborhood || "",
+          ...coordsData,
+          price: parsed.price,
+          currency: parsed.currency,
+          status: nextStatus,
+          ...(reactivated ? newPeriod() : {}),
+          urgent: parsed.urgent,
+          refurbished: parsed.refurbished,
+          specs: (parsed.specs ?? []) as Prisma.InputJsonValue,
+          features: (parsed.features ?? []) as Prisma.InputJsonValue,
+          chassis: parsed.chassis ? (parsed.chassis as Prisma.InputJsonValue) : undefined,
+        },
+        include: listingInclude,
+      });
     });
-  });
+  } catch {
+    // Enqueue failure or any txn error rolls back — listing photos and Blob objects stay intact.
+    return { error: "listing.err.updateFailed" as const, status: 500 };
+  }
+
+  // Opportunistic physical delete after commit. Queue stays `pending` on failure / shared ref.
+  for (const target of removedBlobTargets) {
+    const refs = await countActiveBlobReferences(prisma, target.storageKey).catch(() => Number.POSITIVE_INFINITY);
+    if (refs > 0) continue;
+    const { deleted } = await tryDeleteStoredObject(target.storageKey, target.url);
+    if (!deleted) continue;
+    await markPendingBlobDeleteDone(prisma, target.storageKey).catch(() => undefined);
+  }
+
   invalidateCategoryCounts();
   return { listing: toClientListing(row), ref: listingRef(row), contentChanged, reactivated };
 }
