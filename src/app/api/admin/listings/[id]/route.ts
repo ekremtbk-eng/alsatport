@@ -42,7 +42,10 @@ export async function POST(req: Request, ctx: Ctx) {
       data: { status: "rejected", rejectedReason: reason || "rejected" },
       select: { id: true, title: true, sellerId: true, expiresAt: true },
     });
-    after(() => notifyListingEvent(row, "listing.rejected", { extra: reason, unique: String(Date.now()) }));
+    after(async () => {
+      await notifyListingEvent(row, "listing.rejected", { extra: reason, unique: String(Date.now()) });
+      if (wasLive) await notifyFavoriters(row, "favorite.gone");
+    });
   } else if (body?.action === "remove") {
     const row = await prisma.listing.update({
       where: { id },
