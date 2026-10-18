@@ -319,15 +319,15 @@ export async function runBlobPurgeSweep(
     dryRunWouldSkip: 0,
   };
 
-  if (!enabled) return result;
-
   const now = opts.now ?? new Date();
   const batchLimit = opts.batchLimit ?? blobPurgeBatchLimit();
   const maxAttempts = opts.maxAttempts ?? blobPurgeMaxAttempts();
   const staleProcessingMs = opts.staleProcessingMs ?? blobPurgeStaleProcessingMs();
 
-  // Dry-run is read-only: no claim, no status mutation, no Blob delete.
+  // Dry-run is independent of ENABLED: read-only inspect only (no claim / mutate / Blob delete).
+  // Must run even when BLOB_PURGE_ENABLED is unset/0 so Production can audit without arming deletes.
   if (dryRun) {
+    // Intentionally ignore opts.deleteFn — dry-run must never reach physical delete.
     const due = await prisma.pendingBlobDelete.findMany({
       where: { status: "pending", nextAttemptAt: { lte: now } },
       orderBy: { nextAttemptAt: "asc" },
@@ -350,6 +350,8 @@ export async function runBlobPurgeSweep(
     }
     return result;
   }
+
+  if (!enabled) return result;
 
   result.recoveredStale = await recoverStaleBlobPurgeJobs(prisma, { now, staleProcessingMs });
 
