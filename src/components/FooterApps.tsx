@@ -5,11 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import { brandIcon } from "@/lib/brand";
 import { Check, Download, Info } from "lucide-react";
 import { useI18n } from "@/context/I18nContext";
-import { SOCIAL_ACCOUNTS } from "@/data/legal";
-import { APP_GROUPS, APP_TARGETS, safeAppUrl, type AppGroupId } from "@/data/appDistribution";
+import { APP_TARGETS, FOOTER_APP_GROUPS, safeAppUrl, type AppGroupId } from "@/data/appDistribution";
 import { detectPlatform, installPath, type DevicePlatform, type PlatformInfo } from "@/lib/pwa/platform";
 import { useInstall } from "@/lib/pwa/useInstall";
-import { AppTargetIcon, SocialIcon } from "@/components/BrandIcons";
+import { AppTargetIcon } from "@/components/BrandIcons";
 
 const PLATFORM_NAME: Record<DevicePlatform, string> = {
   android: "Android",
@@ -51,7 +50,10 @@ export function FooterApps() {
   const platform = info?.platform ?? "other";
   const current = PLATFORM_GROUP[platform];
   const groups = useMemo(
-    () => (current ? [...APP_GROUPS].sort((a, b) => Number(b.id === current) - Number(a.id === current)) : APP_GROUPS),
+    () =>
+      current
+        ? [...FOOTER_APP_GROUPS].sort((a, b) => Number(b.id === current) - Number(a.id === current))
+        : FOOTER_APP_GROUPS,
     [current],
   );
 
@@ -71,25 +73,6 @@ export function FooterApps() {
 
   return (
     <section className="ft-apps" aria-labelledby="ft-apps-title" data-platform={platform}>
-      <div className="ft-follow">
-        <h2 className="ft-h">{t("apps.follow")}</h2>
-        <ul className="ft-soc-list">
-          {SOCIAL_ACCOUNTS.map((a) => (
-            <li key={a.id}>
-              {a.url ? (
-                <a className="ft-soc" href={a.url} target="_blank" rel="noopener noreferrer" aria-label={a.label} title={a.label}>
-                  <SocialIcon id={a.id} />
-                </a>
-              ) : (
-                <span className="ft-soc is-soon" role="img" aria-label={`${a.label} · ${t("apps.soon")}`} title={`${a.label} · ${t("apps.soon")}`}>
-                  <SocialIcon id={a.id} />
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-      </div>
-
       <div className="ft-get">
         <div className="ft-get-head">
           <h2 id="ft-apps-title" className="ft-h ft-h-lg">
@@ -99,7 +82,7 @@ export function FooterApps() {
         </div>
 
         <div className="ft-web">
-          <Image src={brandIcon("/icon-192.png")} alt="" width={44} height={44} className="ft-web-ico" unoptimized />
+          <Image src={brandIcon("/icon-192.png")} alt="" width={40} height={40} className="ft-web-ico" unoptimized />
           <div className="ft-web-text">
             <strong>{t("apps.web.title")}</strong>
             <span>
