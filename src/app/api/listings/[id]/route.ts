@@ -13,7 +13,7 @@ import {
   toClientListing,
   updateListingRecord,
 } from "@/lib/listings/store";
-import { isLiveRow, notifyListingEvent } from "@/lib/listings/lifecycle";
+import { isLiveRow, notifyFavoriters, notifyListingEvent } from "@/lib/listings/lifecycle";
 import { listingCreateBodySchema } from "@/lib/security/schemas";
 import { readJson } from "@/lib/security/parseBody";
 
@@ -79,6 +79,10 @@ export async function DELETE(req: Request, ctx: Ctx) {
   const deleted = await deleteListingRecord(auth.user, id);
   if ("error" in deleted) {
     return NextResponse.json({ ok: false, error: deleted.error }, { status: deleted.status });
+  }
+  const { ref, wasLive } = deleted;
+  if (wasLive) {
+    after(() => notifyFavoriters(ref, "favorite.gone"));
   }
   return NextResponse.json({ ok: true });
 }

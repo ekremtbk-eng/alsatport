@@ -723,12 +723,13 @@ export async function deleteListingRecord(user: StoredUser, id: string) {
   const existing = await prisma.listing.findFirst({ where: { id, deletedAt: null } });
   if (!existing) return { error: "auth.err.session" as const, status: 404 };
   if (!canMutateListing(user, existing.sellerId)) return { error: "auth.err.forbidden" as const, status: 403 };
+  const wasLive = isLiveRow(existing);
   await prisma.listing.update({
     where: { id },
     data: { deletedAt: new Date(), status: "removed" },
   });
   invalidateCategoryCounts();
-  return { ok: true as const };
+  return { ok: true as const, ref: listingRef(existing), wasLive };
 }
 
 /**
