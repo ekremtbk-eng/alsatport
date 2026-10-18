@@ -15,7 +15,7 @@ function dateTime(ms?: number) {
   return ms ? new Date(ms).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" }) : "—";
 }
 
-export function BusinessApplicationsPanel() {
+export function BusinessApplicationsPanel({ onChanged }: { onChanged?: () => void } = {}) {
   const { t } = useI18n();
   const guard = useStepUp();
   const [filter, setFilter] = useState<Filter>("pending");
@@ -58,9 +58,21 @@ export function BusinessApplicationsPanel() {
       setError(res.error ?? "auth.err.server");
       return;
     }
+    // Only clear the UI after a successful state change — never show "Onaylandı" on failure.
+    if (res.state && res.state !== (action === "approve" ? "approved" : action === "reject" ? "rejected" : "revoked")) {
+      setError("biz.err.state");
+      await load();
+      return;
+    }
     setReason("");
     setOpenId(null);
-    await load();
+    // After approve, leave the pending filter so the row disappears from "İnceleniyor".
+    if (action === "approve" && filter === "pending") {
+      setFilter("approved");
+    } else {
+      await load();
+    }
+    onChanged?.();
   }
 
   return (

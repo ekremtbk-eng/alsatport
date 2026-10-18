@@ -146,7 +146,12 @@ const STORE_NAME = `Biztest Elektronik ${TAG}`;
 
 async function main() {
   console.log(`Business flow → ${BASE} (tag ${TAG})\n`);
-  await prisma.rateLimitBucket.deleteMany({});
+  // Optional in older local schemas; do not fail the suite when the table is absent.
+  try {
+    await prisma.rateLimitBucket.deleteMany({});
+  } catch {
+    /* rate_limit_buckets may be missing on partial local DBs */
+  }
   const admin = await makeUser("admin", "admin");
   const corp = await makeUser("corp", "seller", true);
   const other = await makeUser("other", "member");
@@ -267,6 +272,18 @@ async function main() {
     check("A16", "Approval is audit-logged", !!audit);
     r = await call("POST", `/api/admin/business/${bizId}`, sAdmin, { action: "approve" });
     check("A17", "Double approval rejected", r.status === 409, `status ${r.status}`);
+    const approvedNotif = await prisma.notification.findFirst({
+      where: { userId: corp.id, kind: "business.approved" },
+      orderBy: { createdAt: "desc" },
+    });
+    check("A18", "Approval creates in-app notification", !!approvedNotif && approvedNotif.title.includes("onaylandı"));
+    const ov = await call("GET", "/api/admin/overview", sAdmin);
+    check(
+      "A19",
+      "Overview exposes pendingBusiness counter",
+      ov.status === 200 && typeof ov.json.pendingBusiness === "number",
+      `pendingBusiness=${String(ov.json.pendingBusiness)}`,
+    );
 
     // ---------- Public store ----------
     r = await call("GET", `/magaza/${slug}`, null);
@@ -450,11 +467,27 @@ async function main() {
     check("R6", "Revoked store contact unavailable", r.status === 404, `status ${r.status}`);
     r = await call("GET", "/magazalar", null);
     check("R7", "Revoked store removed from /magazalar", !r.text.includes(STORE_NAME));
+
+    // ---------- Users-tab verify must sync BusinessAccount (not Profile-only) ----------
+    r = await call("POST", "/api/account/business", sCorp, application);
+    check("U1", "Re-apply after revoke → pending", r.status === 200 && (r.json.business as Record<string, unknown>)?.status === "pending", `status ${r.status}`);
+    r = await call("PATCH", `/api/admin/users/${other.id}`, sAdmin, { business: { name: "Hayalet Firma", verified: true } });
+    check("U2", "Users-tab verify without application fails", r.status === 404 && r.json.error === "biz.err.none", `status ${r.status} ${String(r.json.error)}`);
+    r = await call("PATCH", `/api/admin/users/${corp.id}`, sAdmin, { business: { name: STORE_NAME, verified: true } });
+    check("U3", "Users-tab verify approves pending application", r.status === 200 && r.json.businessState === "approved", `status ${r.status} state=${String(r.json.businessState)}`);
+    const afterUsersTab = await prisma.businessAccount.findUnique({ where: { id: bizId }, select: { status: true } });
+    check("U4", "BusinessAccount.status is approved (not stuck pending)", afterUsersTab?.status === "approved");
+    r = await call("GET", "/api/account/business", sCorp);
+    check("U5", "Owner sees approved, not İnceleniyor", (r.json.business as Record<string, unknown>)?.status === "approved");
+    r = await call("PATCH", `/api/admin/users/${corp.id}`, sAdmin, { business: { name: null, verified: false } });
+    const cleared = await prisma.businessAccount.findUnique({ where: { id: bizId }, select: { status: true } });
+    check("U6", "Users-tab clear revokes approved store", r.status === 200 && cleared?.status === "revoked", `status ${r.status} db=${cleared?.status}`);
   } finally {
     const tagged = await prisma.user.findMany({ where: { email: { endsWith: `-${TAG}@biztest.invalid` } }, select: { id: true } });
     const ids = tagged.map((u) => u.id);
     await prisma.listingImage.deleteMany({ where: { listing: { sellerId: { in: ids } } } });
     await prisma.listing.deleteMany({ where: { sellerId: { in: ids } } });
+    await prisma.notification.deleteMany({ where: { userId: { in: ids } } });
     await prisma.businessAccount.deleteMany({ where: { userId: { in: ids } } });
     await prisma.auditLog.deleteMany({ where: { OR: [{ actorId: { in: ids } }, { entityId: { in: ids } }] } });
     await prisma.user.deleteMany({ where: { id: { in: ids } } });

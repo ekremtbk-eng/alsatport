@@ -19,7 +19,7 @@ import {
 } from "@/lib/storage/blobDeleteQueue";
 import { storageKeyFromUrl, tryDeleteStoredObject } from "@/lib/storage/media";
 import { resolveListingCoords, validListingCoords } from "@/lib/placeGeo";
-import { publicAccountName, verifiedBusinessName } from "@/lib/publicName";
+import { publicAccountName } from "@/lib/publicName";
 import { type ListingRef, isLiveRow, newPeriod } from "@/lib/listings/lifecycle";
 import { invalidateCategoryCounts, publicCountWhere, publicLiveWithImageWhere } from "@/lib/listings/categoryCounts";
 import { enforcePetSpecs } from "@/lib/listings/petSpecPolicy";
@@ -143,7 +143,8 @@ export function toClientListing(row: ListingWithRelations): Listing {
     description: row.description,
     sellerId: row.sellerId,
     sellerName: publicAccountName({ ...row.seller.profile, username: row.seller.username }),
-    sellerBusiness: !!verifiedBusinessName(row.seller.profile),
+    // Badge only when BusinessAccount is approved AND the profile mirror fields are set (same rule as Acil Acil).
+    sellerBusiness: sellerUrgentEligible(row.seller),
     sellerAvatar: row.seller.profile?.avatarUrl || "",
     sellerVerified: !!row.seller.profile?.verified,
     createdAt: row.createdAt.toLocaleDateString("tr-TR"),

@@ -11,7 +11,7 @@ import { StepUpProvider, useStepUp } from "@/components/admin/StepUpProvider";
 import { LEGAL_CONTROLLER_MISSING, LEGAL_CONTROLLER_READY, LEGAL_CONTROLLER_WARNING } from "@/data/legal";
 import Link from "next/link";
 
-type Overview = { pending: number; openReports: number; users: number; banned: number };
+type Overview = { pending: number; openReports: number; users: number; banned: number; pendingBusiness: number };
 type AdminListing = {
   id: string;
   title: string;
@@ -83,7 +83,13 @@ function AdminConsole() {
       setError(ov.error ?? "auth.err.forbidden");
       return;
     }
-    setOverview({ pending: ov.pending, openReports: ov.openReports, users: ov.users, banned: ov.banned });
+    setOverview({
+      pending: ov.pending,
+      openReports: ov.openReports,
+      users: ov.users,
+      banned: ov.banned,
+      pendingBusiness: ov.pendingBusiness ?? 0,
+    });
     const list = await apiGet<{ ok?: boolean; listings?: AdminListing[] }>(`/api/admin/listings?status=${listingFilter}`);
     setListings(list.listings ?? []);
     const reps = await apiGet<{ ok?: boolean; reports?: AdminReport[] }>("/api/admin/reports");
@@ -135,10 +141,13 @@ function AdminConsole() {
   async function setBusiness(id: string, name: string | null) {
     const trimmed = name?.trim() || null;
     const res = await guard(() =>
-      apiPatch<{ ok?: boolean; error?: string }>(`/api/admin/users/${id}`, { business: { name: trimmed, verified: !!trimmed } }),
+      apiPatch<{ ok?: boolean; error?: string; businessState?: string }>(`/api/admin/users/${id}`, {
+        business: { name: trimmed, verified: !!trimmed },
+      }),
     );
     if (!res.ok) setError(res.error ?? "auth.err.server");
     await searchUsers();
+    await load();
   }
 
   if (!hydrated) return <p className="p-8 text-sm text-muted">{t("auth.connecting")}</p>;
@@ -192,6 +201,7 @@ function AdminConsole() {
             onClick={() => setTab(id)}
           >
             {t(`admin.tab.${id}`)}
+            {id === "business" && overview ? ` (${overview.pendingBusiness})` : ""}
           </button>
         ))}
       </div>
@@ -372,7 +382,7 @@ function AdminConsole() {
         </div>
       ) : null}
 
-      {tab === "business" ? <BusinessApplicationsPanel /> : null}
+      {tab === "business" ? <BusinessApplicationsPanel onChanged={() => void load()} /> : null}
       {tab === "vehicles" ? <VehicleRequestsPanel /> : null}
       {tab === "days" ? <SpecialDaysPanel /> : null}
     </div>

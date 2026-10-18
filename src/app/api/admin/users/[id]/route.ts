@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { writeAudit } from "@/lib/admin/audit";
-import { revokeStoreForUser } from "@/lib/business/store";
+import { adminSyncBusinessFromUsersTab } from "@/lib/business/store";
 import { isUuid } from "@/lib/ids";
 import type { Role } from "@/lib/security/rbac";
 import { requireAdmin, requireMutatingRequest, revokeUserSessions } from "@/lib/security/session";
@@ -9,7 +9,6 @@ import { clientIp } from "@/lib/security/rateLimit";
 import { notifyOwner } from "@/lib/security/alerts";
 import { readJson } from "@/lib/security/parseBody";
 import { adminUserPatchSchema } from "@/lib/security/schemas";
-import { sanitizeText } from "@/lib/security/sanitize";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -35,15 +34,18 @@ export async function PATCH(req: Request, ctx: Ctx) {
   if (data.bannedAt || (data.role && target.role === "admin")) {
     await revokeUserSessions(id, data.bannedAt ? "banned" : "role-change");
   }
+
+  let businessState: string | undefined;
   if (body.business) {
-    const name = body.business.name ? sanitizeText(body.business.name, 120) : null;
-    const verifiedAt = body.business.verified && name ? new Date() : null;
-    await prisma.profile.updateMany({
-      where: { userId: id },
-      data: { businessName: name, businessVerifiedAt: verifiedAt },
-    });
-    if (!verifiedAt) await revokeStoreForUser(auth.user.id, id);
+    // Profile-only verify caused "İnceleniyor" to stick; always sync BusinessAccount.status.
+    const verified = !!(body.business.verified && body.business.name?.trim());
+    const synced = await adminSyncBusinessFromUsersTab(auth.user.id, id, verified);
+    if ("error" in synced) {
+      return NextResponse.json({ ok: false, error: synced.error }, { status: synced.status });
+    }
+    businessState = synced.state;
   }
+
   await writeAudit({
     actorId: auth.user.id,
     action: "user.patch",
@@ -51,7 +53,12 @@ export async function PATCH(req: Request, ctx: Ctx) {
     entityId: id,
     ip: clientIp(req),
     userAgent: req.headers.get("user-agent"),
-    payload: { banned: body.banned, role: body.role, previousRole: target.role, business: body.business },
+    payload: {
+      banned: body.banned,
+      role: body.role,
+      previousRole: target.role,
+      business: body.business ? { verified: !!body.business.verified, state: businessState } : undefined,
+    },
   });
   if (data.role && data.role !== target.role) {
     await notifyOwner(
@@ -60,5 +67,5 @@ export async function PATCH(req: Request, ctx: Ctx) {
       `role:${id}`,
     );
   }
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, ...(businessState ? { businessState } : {}) });
 }
