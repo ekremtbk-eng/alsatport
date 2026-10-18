@@ -204,10 +204,14 @@ async function main() {
     const refs2 = await countActiveBlobReferences(prisma, imgKey);
     check("C3", "refcount zero after image removed", refs2 === 0);
 
-    // account/listing routes untouched — static check
+    // 2B wires account delete to the queue (enqueueAccountBlobDeletes).
     const { readFileSync } = await import("node:fs");
     const delRoute = readFileSync("src/app/api/account/delete/route.ts", "utf8");
-    check("X1", "account delete not wired to queue", !delRoute.includes("enqueuePendingBlobDelete"));
+    check(
+      "X1",
+      "account delete wires enqueueAccountBlobDeletes",
+      delRoute.includes("enqueueAccountBlobDeletes") && delRoute.includes("markPendingBlobDeleteDone"),
+    );
   } finally {
     await prisma.pendingBlobDelete.deleteMany({
       where: { OR: [{ storageKey: { startsWith: `listings/${ownerA}/` } }, { storageKey: keyA }, { storageKey: keyB }] },

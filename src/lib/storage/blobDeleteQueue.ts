@@ -1,5 +1,6 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
+import { readTeam } from "@/lib/business/shared";
 import { isManagedStorageKey, isOwnBusinessImage, ownBlobHost, storageKeyFromUrl } from "@/lib/storage/media";
 
 export const BLOB_DELETE_REASONS = ["account_delete", "listing_edit", "business_replace", "other"] as const;
@@ -263,4 +264,105 @@ export async function enqueuePendingBlobDelete(
   }
 
   return { ok: false, error: "blob_queue.err.status" };
+}
+
+export type AccountBlobDeleteTarget = {
+  storageKey: string;
+  url?: string;
+};
+
+/**
+ * Collect platform-managed Blob keys owned by this user for account deletion.
+ * External / foreign-host URLs and non-managed keys are omitted (not queued, not deleted).
+ * Managed keys with wrong owner path are still included so enqueue can fail closed.
+ */
+export function collectAccountBlobDeleteTargets(input: {
+  userId: string;
+  listingImages: Array<{ storageKey: string; url: string }>;
+  avatarUrl?: string | null;
+  business?: { logoUrl: string | null; coverUrl: string | null; team: unknown } | null;
+}): AccountBlobDeleteTarget[] {
+  const out: AccountBlobDeleteTarget[] = [];
+  const seen = new Set<string>();
+
+  const addIfManaged = (storageKey: string, url?: string) => {
+    const key = storageKey.trim();
+    if (!key || !isManagedStorageKey(key)) return;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ storageKey: key, ...(url ? { url } : {}) });
+  };
+
+  for (const img of input.listingImages) {
+    addIfManaged(img.storageKey, img.url);
+  }
+
+  if (input.avatarUrl) {
+    const key = storageKeyFromUrl(input.avatarUrl);
+    addIfManaged(key, input.avatarUrl);
+  }
+
+  const biz = input.business;
+  if (biz) {
+    for (const url of [biz.logoUrl, biz.coverUrl]) {
+      if (!url || !isOwnBusinessImage(input.userId, url)) continue;
+      addIfManaged(storageKeyFromUrl(url), url);
+    }
+    for (const { photo } of readTeam(biz.team)) {
+      if (!photo || !isOwnBusinessImage(input.userId, photo, ["team"])) continue;
+      addIfManaged(storageKeyFromUrl(photo), photo);
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Enqueue every managed target inside the interactive transaction.
+ * Any managed key that cannot be queued throws — caller must not commit anonymization.
+ */
+export async function enqueueAccountBlobDeletes(
+  tx: BlobDeleteQueueTx,
+  userId: string,
+  targets: AccountBlobDeleteTarget[],
+): Promise<{ enqueued: number }> {
+  let enqueued = 0;
+  for (const t of targets) {
+    if (!isManagedStorageKey(t.storageKey)) continue;
+    const result = await enqueuePendingBlobDelete(tx, {
+      storageKey: t.storageKey,
+      reason: "account_delete",
+      expectedOwnerUserId: userId,
+    });
+    if (!result.ok) {
+      throw new Error(`blob_queue.enqueue_failed:${result.error}`);
+    }
+    enqueued += 1;
+  }
+  return { enqueued };
+}
+
+/**
+ * Mark a queue row done only after a confirmed physical delete.
+ * No-op when the row is missing. Does not create rows.
+ */
+export async function markPendingBlobDeleteDone(
+  tx: BlobDeleteQueueTx,
+  storageKey: string,
+  now: Date = new Date(),
+): Promise<{ ok: true; updated: boolean } | { ok: false; error: string }> {
+  const gate = assertQueueableBlobKey(storageKey);
+  if (!gate.ok) return gate;
+  const row = await tx.pendingBlobDelete.findUnique({ where: { storageKey: storageKey.trim() } });
+  if (!row) return { ok: true, updated: false };
+  if (row.status === "done") return { ok: true, updated: false };
+  await tx.pendingBlobDelete.update({
+    where: { storageKey: storageKey.trim() },
+    data: {
+      status: "done",
+      processedAt: now,
+      lastErrorCode: null,
+    },
+  });
+  return { ok: true, updated: true };
 }

@@ -146,18 +146,44 @@ export async function putListingImage(userId: string, bytes: Buffer, mime: strin
   return { storageKey, url: `/api/media/${publicPath}`, mime, byteSize: bytes.length };
 }
 
-export async function deleteStoredObject(storageKey: string, url?: string) {
-  if (!isManagedStorageKey(storageKey)) return;
+/**
+ * Attempt a managed object delete and report outcome.
+ * Unlike the historical fire-and-forget path, callers can avoid marking queue rows
+ * `done` when the store delete did not succeed (including swallowed network errors).
+ * Local missing files (ENOENT) count as deleted (idempotent).
+ */
+export async function tryDeleteStoredObject(
+  storageKey: string,
+  url?: string,
+): Promise<{ deleted: boolean }> {
+  if (!isManagedStorageKey(storageKey)) return { deleted: false };
   assertPreviewWritesAllowed("blob.delete");
   if (blobEnabled()) {
     const token = process.env.BLOB_READ_WRITE_TOKEN;
     const target = url?.startsWith("https://") && storageKeyFromUrl(url) === storageKey ? url : storageKey;
-    await del(target, { token }).catch(() => undefined);
-    return;
+    try {
+      await del(target, { token });
+      return { deleted: true };
+    } catch {
+      return { deleted: false };
+    }
   }
   const abs = path.resolve(LOCAL_ROOT, ...storageKey.split("/"));
-  if (!abs.toLowerCase().startsWith(LOCAL_ROOT.toLowerCase())) return;
-  await fs.unlink(abs).catch(() => undefined);
+  if (!abs.toLowerCase().startsWith(LOCAL_ROOT.toLowerCase())) return { deleted: false };
+  try {
+    await fs.unlink(abs);
+    return { deleted: true };
+  } catch (err) {
+    const code = err && typeof err === "object" && "code" in err ? String((err as { code?: unknown }).code) : "";
+    // Already gone — safe to treat as success for queue completion.
+    if (code === "ENOENT") return { deleted: true };
+    return { deleted: false };
+  }
+}
+
+/** Best-effort delete; errors are swallowed (legacy callers). Prefer `tryDeleteStoredObject` when queue status must stay accurate. */
+export async function deleteStoredObject(storageKey: string, url?: string) {
+  await tryDeleteStoredObject(storageKey, url);
 }
 
 export async function readLocalObject(keyParts: string[]) {

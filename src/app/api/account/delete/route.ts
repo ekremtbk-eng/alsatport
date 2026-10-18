@@ -2,7 +2,6 @@ import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { writeAudit } from "@/lib/admin/audit";
-import { readTeam } from "@/lib/business/shared";
 import { anonymizeAccountInTransaction } from "@/lib/security/accountDeletion";
 import { hashPassword, verifyPasswordHash } from "@/lib/security/password";
 import { LIMITS, clientIp } from "@/lib/security/rateLimit";
@@ -17,7 +16,13 @@ import {
 } from "@/lib/security/session";
 import { readJson } from "@/lib/security/parseBody";
 import { accountDeleteSchema } from "@/lib/security/schemas";
-import { deleteStoredObject, isManagedStorageKey, isOwnBusinessImage, storageKeyFromUrl } from "@/lib/storage/media";
+import {
+  collectAccountBlobDeleteTargets,
+  countActiveBlobReferences,
+  enqueueAccountBlobDeletes,
+  markPendingBlobDeleteDone,
+} from "@/lib/storage/blobDeleteQueue";
+import { tryDeleteStoredObject } from "@/lib/storage/media";
 
 export async function POST(req: Request) {
   const blocked = await requireMutatingRequest(req);
@@ -56,25 +61,40 @@ export async function POST(req: Request) {
     select: { logoUrl: true, coverUrl: true, team: true },
   });
   const unusableHash = await hashPassword(randomBytes(32).toString("base64url"));
+  const blobTargets = collectAccountBlobDeleteTargets({
+    userId: user.id,
+    listingImages: images,
+    avatarUrl,
+    business,
+  });
 
-  const { removedListings } = await prisma.$transaction((tx) =>
-    anonymizeAccountInTransaction(tx, {
-      userId: user.id,
-      provider: user.provider,
-      unusablePasswordHash: unusableHash,
-    }),
-  );
+  let removedListings: number;
+  try {
+    ({ removedListings } = await prisma.$transaction(async (tx) => {
+      // Fail closed: every managed own key must land in the queue before anonymization commits.
+      await enqueueAccountBlobDeletes(tx, user.id, blobTargets);
+      return anonymizeAccountInTransaction(tx, {
+        userId: user.id,
+        provider: user.provider,
+        unusablePasswordHash: unusableHash,
+      });
+    }));
+  } catch {
+    // Do not report success when enqueue or anonymization failed (txn rolled back).
+    return NextResponse.json({ ok: false, error: "account.delete.err.failed" }, { status: 500 });
+  }
+
   await revokeUserSessions(user.id, "account-deleted");
 
-  await Promise.all(
-    images.filter((img) => isManagedStorageKey(img.storageKey)).map((img) => deleteStoredObject(img.storageKey, img.url)),
-  );
-  if (avatarUrl) await deleteStoredObject(storageKeyFromUrl(avatarUrl), avatarUrl);
-  for (const url of [business?.logoUrl, business?.coverUrl]) {
-    if (isOwnBusinessImage(user.id, url)) await deleteStoredObject(storageKeyFromUrl(url!), url!);
-  }
-  for (const { photo } of readTeam(business?.team)) {
-    if (isOwnBusinessImage(user.id, photo, ["team"])) await deleteStoredObject(storageKeyFromUrl(photo!), photo!);
+  // Opportunistic physical delete after commit. Queue rows remain `pending` on failure / timeout
+  // so a future worker can retry. Never mark `done` without a confirmed delete. Skip when another
+  // active DB reference still points at the key (defense in depth; path layout makes this rare).
+  for (const target of blobTargets) {
+    const refs = await countActiveBlobReferences(prisma, target.storageKey).catch(() => Number.POSITIVE_INFINITY);
+    if (refs > 0) continue;
+    const { deleted } = await tryDeleteStoredObject(target.storageKey, target.url);
+    if (!deleted) continue;
+    await markPendingBlobDeleteDone(prisma, target.storageKey).catch(() => undefined);
   }
 
   await writeAudit({
