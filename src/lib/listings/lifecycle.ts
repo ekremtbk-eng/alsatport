@@ -33,7 +33,16 @@ function periodKey(l: ListingRef) {
 }
 
 const TEXT: Record<
-  Exclude<NotifEvent, `security.${string}` | "message.new" | "favorite.sold" | "favorite.gone">,
+  Exclude<
+    NotifEvent,
+    | `security.${string}`
+    | "message.new"
+    | "favorite.sold"
+    | "favorite.gone"
+    | "business.approved"
+    | "business.rejected"
+    | "business.revoked"
+  >,
   (l: ListingRef, extra?: string) => { title: string; body: string }
 > = {
   "listing.published": (l) => ({

@@ -21,6 +21,9 @@ export const NOTIF_EVENTS = [
   "security.recovery",
   "security.twoFactor",
   "security.email",
+  "business.approved",
+  "business.rejected",
+  "business.revoked",
 ] as const;
 
 export type NotifEvent = (typeof NOTIF_EVENTS)[number];
@@ -50,6 +53,9 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   "security.recovery": ON,
   "security.twoFactor": ON,
   "security.email": ON,
+  "business.approved": ON,
+  "business.rejected": ON,
+  "business.revoked": ON,
 };
 
 /** Security e-mails are sent regardless of preferences; only the in-app copy can be muted. */

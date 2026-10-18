@@ -16,6 +16,7 @@ import {
   markPendingBlobDeleteDone,
 } from "@/lib/storage/blobDeleteQueue";
 import { isOwnBusinessImage, tryDeleteStoredObject } from "@/lib/storage/media";
+import { notifySafe } from "@/lib/notifications/store";
 import type { Listing } from "@/data/store";
 import {
   BUSINESS_DESC_MIN,
@@ -390,6 +391,14 @@ export async function adminBusinessAction(
       }),
       prisma.profile.updateMany({ where: { userId: row.userId }, data: { businessName: row.name, businessVerifiedAt: now } }),
     ]);
+    await notifySafe({
+      userId: row.userId,
+      event: "business.approved",
+      title: "Kurumsal başvurunuz onaylandı",
+      body: `"${row.name}" mağaza başvurunuz onaylandı. Mağaza sayfanız yayında; işletme panelinden profilinizi yönetebilirsiniz.`,
+      href: "/isletme-paneli",
+      eventKey: `business.approved:${id}:${now.getTime()}`,
+    });
     return { row: updated, previous: row.status };
   }
 
@@ -399,6 +408,14 @@ export async function adminBusinessAction(
     const updated = await prisma.businessAccount.update({
       where: { id },
       data: { ...reviewed, status: "rejected", rejectReason: reason },
+    });
+    await notifySafe({
+      userId: row.userId,
+      event: "business.rejected",
+      title: "Kurumsal başvurunuz reddedildi",
+      body: `"${row.name}" başvurunuz reddedildi. Gerekçe: ${reason}`,
+      href: "/kurumsal-hesap",
+      eventKey: `business.rejected:${id}:${now.getTime()}`,
     });
     return { row: updated, previous: row.status };
   }
@@ -411,15 +428,64 @@ export async function adminBusinessAction(
     }),
     prisma.profile.updateMany({ where: { userId: row.userId }, data: { businessName: null, businessVerifiedAt: null } }),
   ]);
+  await notifySafe({
+    userId: row.userId,
+    event: "business.revoked",
+    title: "Kurumsal statünüz kaldırıldı",
+    body: reason
+      ? `"${row.name}" kurumsal statüsü kaldırıldı. Gerekçe: ${reason}`
+      : `"${row.name}" kurumsal statüsü kaldırıldı. Mağaza sayfanız artık yayında değil.`,
+    href: "/kurumsal-hesap",
+    eventKey: `business.revoked:${id}:${now.getTime()}`,
+  });
   return { row: updated, previous: row.status };
+}
+
+/**
+ * Users-tab "Kurumsal doğrula" must go through the same BusinessAccount status machine.
+ * Never set Profile.businessVerifiedAt alone — that left applicants stuck on "İnceleniyor".
+ */
+export async function adminSyncBusinessFromUsersTab(
+  adminId: string,
+  userId: string,
+  verified: boolean,
+): Promise<{ state: BusinessStatusId | "cleared" } | Fail> {
+  if (userId === adminId) return fail("auth.err.forbidden", 403);
+  const row = await prisma.businessAccount.findUnique({ where: { userId } });
+
+  if (!verified) {
+    if (row?.status === "approved") {
+      const result = await adminBusinessAction(adminId, row.id, "revoke", "");
+      if ("error" in result) return result;
+      return { state: "revoked" };
+    }
+    await prisma.profile.updateMany({
+      where: { userId },
+      data: { businessName: null, businessVerifiedAt: null },
+    });
+    return { state: "cleared" };
+  }
+
+  if (!row) return fail("biz.err.none", 404);
+  if (row.status === "approved") return { state: "approved" };
+  if (row.status !== "pending") return fail("biz.err.state", 409);
+  const result = await adminBusinessAction(adminId, row.id, "approve", "");
+  if ("error" in result) return result;
+  return { state: "approved" };
 }
 
 /** Keeps the store in sync when an admin clears the legacy "verified business name" on the user. */
 export async function revokeStoreForUser(adminId: string, userId: string) {
-  await prisma.businessAccount.updateMany({
-    where: { userId, status: "approved" },
-    data: { status: "revoked", revokedAt: new Date(), reviewedAt: new Date(), reviewedById: adminId },
-  });
+  await prisma.$transaction([
+    prisma.businessAccount.updateMany({
+      where: { userId, status: "approved" },
+      data: { status: "revoked", revokedAt: new Date(), reviewedAt: new Date(), reviewedById: adminId },
+    }),
+    prisma.profile.updateMany({
+      where: { userId },
+      data: { businessName: null, businessVerifiedAt: null },
+    }),
+  ]);
 }
 
 const publicStoreWhere = (slug: string): Prisma.BusinessAccountWhereInput => ({
