@@ -798,6 +798,7 @@ export const MESSAGES = pack({
   "biz.err.alreadyApproved": ["Kurumsal hesabınız zaten onaylı.", "Your business account is already approved.", "Ihr Firmenkonto ist bereits genehmigt.", "حسابك معتمد بالفعل.", "Аккаунт уже одобрен."],
   "biz.err.none": ["Kurumsal kayıt bulunamadı.", "Business record not found.", "Kein Firmeneintrag gefunden.", "لم يتم العثور على السجل.", "Запись не найдена."],
   "biz.err.notApproved": ["Mağaza profili yalnızca onaylı hesaplarda düzenlenebilir.", "Only approved accounts can edit the store profile.", "Nur genehmigte Konten können bearbeiten.", "التعديل للحسابات المعتمدة فقط.", "Редактировать может только одобренный аккаунт."],
+  "biz.err.updateFailed": ["İşletme profili güncellenemedi. Lütfen tekrar deneyin.", "Could not update the business profile. Please try again.", "Firmenprofil konnte nicht aktualisiert werden. Bitte erneut versuchen.", "تعذر تحديث ملف النشاط. حاول مرة أخرى.", "Не удалось обновить профиль компании. Попробуйте снова."],
   "biz.err.state": ["Bu işlem başvurunun mevcut durumunda yapılamaz.", "This action is not possible in the application's current state.", "In diesem Status nicht möglich.", "غير ممكن في الحالة الحالية.", "Недоступно в текущем статусе."],
   "biz.err.reason": ["Lütfen en az 3 karakterlik bir gerekçe yazın.", "Please enter a reason of at least 3 characters.", "Bitte Grund angeben (mind. 3 Zeichen).", "اكتب سببًا من 3 أحرف على الأقل.", "Укажите причину (от 3 символов)."],
   "admin.days.today": ["Bugün", "Today", "Heute", "اليوم", "Сегодня"],

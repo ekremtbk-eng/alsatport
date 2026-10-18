@@ -398,6 +398,79 @@ export async function enqueueListingEditBlobDeletes(
   return { enqueued };
 }
 
+export type BusinessReplaceBlobDeleteTarget = {
+  storageKey: string;
+  url?: string;
+};
+
+type BusinessImageSnapshot = {
+  logoUrl?: string | null;
+  coverUrl?: string | null;
+  team?: unknown;
+};
+
+/**
+ * Logo / cover / team photos dropped when a business profile is rewritten.
+ * External URLs and foreign-owner keys are omitted (never queued, never deleted).
+ */
+export function collectBusinessReplaceBlobDeleteTargets(input: {
+  userId: string;
+  before: BusinessImageSnapshot | null | undefined;
+  after: BusinessImageSnapshot;
+}): BusinessReplaceBlobDeleteTarget[] {
+  const out: BusinessReplaceBlobDeleteTarget[] = [];
+  const seen = new Set<string>();
+
+  const addOwn = (url: string | null | undefined, kinds?: ReadonlyArray<"logo" | "cover" | "team">) => {
+    if (!url) return;
+    if (!isOwnBusinessImage(input.userId, url, kinds ?? ["logo", "cover"])) return;
+    const key = storageKeyFromUrl(url).trim();
+    if (!key || !isManagedStorageKey(key)) return;
+    const gate = assertQueueableBlobKey(key, input.userId);
+    if (!gate.ok) return;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ storageKey: key, url });
+  };
+
+  for (const key of ["logoUrl", "coverUrl"] as const) {
+    const old = input.before?.[key];
+    if (old && old !== (input.after[key] ?? null)) addOwn(old, ["logo", "cover"]);
+  }
+
+  const kept = new Set(readTeam(input.after.team).map((m) => m.photo).filter(Boolean));
+  for (const { photo } of readTeam(input.before?.team)) {
+    if (photo && !kept.has(photo)) addOwn(photo, ["team"]);
+  }
+
+  return out;
+}
+
+/**
+ * Enqueue replaced business media inside the interactive business-update transaction.
+ * Any managed own key that cannot be queued throws — caller must not commit the profile rewrite.
+ */
+export async function enqueueBusinessReplaceBlobDeletes(
+  tx: BlobDeleteQueueTx,
+  userId: string,
+  targets: BusinessReplaceBlobDeleteTarget[],
+): Promise<{ enqueued: number }> {
+  let enqueued = 0;
+  for (const t of targets) {
+    if (!isManagedStorageKey(t.storageKey)) continue;
+    const result = await enqueuePendingBlobDelete(tx, {
+      storageKey: t.storageKey,
+      reason: "business_replace",
+      expectedOwnerUserId: userId,
+    });
+    if (!result.ok) {
+      throw new Error(`blob_queue.enqueue_failed:${result.error}`);
+    }
+    enqueued += 1;
+  }
+  return { enqueued };
+}
+
 /**
  * Mark a queue row done only after a confirmed physical delete.
  * No-op when the row is missing. Does not create rows.
