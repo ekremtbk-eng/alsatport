@@ -4,6 +4,7 @@ import { districtsOf } from "@/data/turkey";
 import { type Country, cityWhereForCountry } from "@/data/locations";
 import { prisma } from "@/lib/db";
 import { liveListingWhere } from "@/lib/listings/lifecycle";
+import { publicLiveWithImageWhere } from "@/lib/listings/categoryCounts";
 import { DEMO_SELLER_EMAIL_SUFFIX } from "@/lib/seoIndexing";
 import { cleanFirmExtras, readFirmExtras, type FirmExtrasInput, type PublicFirm } from "@/lib/business/firmProfile";
 import { hideSellerPhone, listingInclude, toClientListing } from "@/lib/listings/store";
@@ -432,7 +433,7 @@ async function storeCounts(userIds: string[]) {
   const [active, sold] = await Promise.all([
     prisma.listing.groupBy({
       by: ["sellerId"],
-      where: { sellerId: { in: userIds }, deletedAt: null, ...liveListingWhere() },
+      where: { sellerId: { in: userIds }, deletedAt: null, ...publicLiveWithImageWhere() },
       _count: { _all: true },
     }),
     prisma.listing.groupBy({
@@ -484,7 +485,7 @@ export async function findPublicStore(slug: string): Promise<{
   const [counts, activeRows, soldRows] = await Promise.all([
     storeCounts([row.userId]),
     prisma.listing.findMany({
-      where: { sellerId: row.userId, deletedAt: null, ...liveListingWhere() },
+      where: { sellerId: row.userId, deletedAt: null, ...publicLiveWithImageWhere() },
       include: listingInclude,
       orderBy: [{ featured: "desc" }, { postedAt: "desc" }],
       take: 300,

@@ -3,7 +3,7 @@ import { flattenCategories, hrefForCategory } from "@/data/categories";
 import { CORPORATE_NAV } from "@/data/corporate";
 import { prisma } from "@/lib/db";
 import { storeSitemapRows } from "@/lib/business/store";
-import { liveListingWhere } from "@/lib/listings/lifecycle";
+import { publicCountWhere } from "@/lib/listings/categoryCounts";
 import { nonDemoListingWhere, serviceCategoryIds } from "@/lib/seoIndexing";
 import { appOrigin } from "@/lib/site";
 
@@ -50,8 +50,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     listings = await prisma.listing.findMany({
       where: {
-        deletedAt: null,
-        ...liveListingWhere(),
+        ...publicCountWhere(),
         categoryId: { notIn: serviceCategoryIds() },
         AND: [nonDemoListingWhere()],
       },

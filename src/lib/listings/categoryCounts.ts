@@ -10,9 +10,15 @@ export const CATEGORY_COUNTS_TTL_MS = 30_000;
 /**
  * Publicly visible listings: active, not expired, not soft-deleted, with at least one photo
  * (pending, rejected, passive, sold, expired and removed rows have other statuses or are expired).
+ * Same predicate as category counts, anonymous `queryListings`, and `suggestPublicListings`.
  */
 export function publicCountWhere(now = new Date()): Prisma.ListingWhereInput {
   return { deletedAt: null, ...liveListingWhere(now), images: { some: {} } };
+}
+
+/** Live + has photo (caller usually already scopes `deletedAt`). */
+export function publicLiveWithImageWhere(now = new Date()): Prisma.ListingWhereInput {
+  return { ...liveListingWhere(now), images: { some: {} } };
 }
 
 export type CategoryCounts = { counts: Record<string, number>; total: number; at: number };
