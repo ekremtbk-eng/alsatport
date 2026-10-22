@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BadgeCheck, ChevronDown, List, LogIn, LogOut, PlusCircle, Shield, UserPlus, UserRound } from "lucide-react";
+import { ArrowLeftRight, BadgeCheck, ChevronDown, List, LogIn, LogOut, MonitorSmartphone, PlusCircle, Shield, UserPlus, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/context/AppContext";
@@ -89,6 +89,21 @@ export function UserMenu({ utility = false }: { utility?: boolean }) {
               {t("admin.title")}
             </Link>
           ) : null}
+          <Link href="/profil?p=cihazlar" className="user-menu-item" onClick={() => setOpen(false)}>
+            <MonitorSmartphone className="h-4 w-4" />
+            {t("sess.manage")}
+          </Link>
+          <button
+            type="button"
+            className="user-menu-item"
+            onClick={() => {
+              setOpen(false);
+              router.push("/giris?switch=1");
+            }}
+          >
+            <ArrowLeftRight className="h-4 w-4" />
+            {t("auth.switch.cta")}
+          </button>
           <button
             type="button"
             className="user-menu-item text-lime"

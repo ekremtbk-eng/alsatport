@@ -32,6 +32,8 @@ export type SessionMethod = "password" | "otp" | "oauth" | "qr" | "register";
 /** Admin step-up window for destructive actions (ban, role/business change, removals). */
 export const STEP_UP_WINDOW_MS = 15 * 60 * 1000;
 const LAST_SEEN_THROTTLE_MS = 5 * 60 * 1000;
+/** Renew a member session only once fewer than 15 days remain, so each visit is not a write. */
+const SLIDE_WHEN_REMAINING_MS = 15 * 24 * 60 * 60 * 1000;
 
 function sessionMaxAge(role: Role) {
   return role === "admin" ? ADMIN_SESSION_MAX_AGE : REFRESH_MAX_AGE;
@@ -53,7 +55,7 @@ async function deviceHash() {
   return did ? sha256Secret("device", did) : null;
 }
 
-function tokenPayload(user: StoredUser, sid: string) {
+function tokenPayload(user: StoredUser, sid: string, remember: boolean) {
   return {
     sub: user.id,
     id: user.id,
@@ -63,17 +65,24 @@ function tokenPayload(user: StoredUser, sid: string) {
     username: user.username,
     pc: user.profile.profileComplete ? (1 as const) : (0 as const),
     ev: user.profile.emailVerified ? (1 as const) : (0 as const),
+    rm: remember && user.role !== "admin" ? (1 as const) : (0 as const),
   };
 }
 
-async function setTokenCookies(res: NextResponse, user: StoredUser, session: Pick<UserSession, "id" | "expiresAt">) {
-  const payload = tokenPayload(user, session.id);
-  const refreshAge = Math.max(60, Math.floor((session.expiresAt.getTime() - Date.now()) / 1000));
-  res.cookies.set(COOKIE_ACCESS, await signAccessToken(payload), sessionCookieOptions(Math.min(ACCESS_MAX_AGE, refreshAge)));
-  res.cookies.set(COOKIE_REFRESH, await signRefreshToken(payload, refreshAge), sessionCookieOptions(refreshAge));
+/** Admins keep a persistent 12h cookie. Members get one only when Beni Hatırla is set. */
+function persistentSessionCookie(role: Role, remember: boolean) {
+  return role === "admin" || remember;
 }
 
-type StartOpts = { method: SessionMethod; mfa?: boolean };
+async function setTokenCookies(res: NextResponse, user: StoredUser, session: Pick<UserSession, "id" | "expiresAt">, remember: boolean) {
+  const payload = tokenPayload(user, session.id, remember);
+  const refreshAge = Math.max(60, Math.floor((session.expiresAt.getTime() - Date.now()) / 1000));
+  const persistent = persistentSessionCookie(user.role, payload.rm === 1);
+  res.cookies.set(COOKIE_ACCESS, await signAccessToken(payload), sessionCookieOptions(Math.min(ACCESS_MAX_AGE, refreshAge), { persistent }));
+  res.cookies.set(COOKIE_REFRESH, await signRefreshToken(payload, refreshAge), sessionCookieOptions(refreshAge, { persistent }));
+}
+
+type StartOpts = { method: SessionMethod; mfa?: boolean; remember?: boolean };
 
 /**
  * Creates a brand-new server-side session (fresh id, so a pre-login token can never be fixated)
@@ -99,7 +108,7 @@ export async function startSession(res: NextResponse, user: StoredUser, req: Req
       expiresAt: new Date(now.getTime() + sessionMaxAge(user.role) * 1000),
     },
   });
-  await setTokenCookies(res, user, session);
+  await setTokenCookies(res, user, session, opts.remember === true);
 
   const newDevice = prior > 0 && seen === 0;
   const ip = clientIp(req);
@@ -137,7 +146,7 @@ export async function startSession(res: NextResponse, user: StoredUser, req: Req
 export async function attachSession(res: NextResponse, user: StoredUser) {
   const current = await currentSession();
   if (!current || current.session.userId !== user.id) return res;
-  await setTokenCookies(res, user, current.session);
+  await setTokenCookies(res, user, current.session, current.claims.rm === 1);
   return res;
 }
 
@@ -189,13 +198,10 @@ export async function currentSession(): Promise<{ claims: AccessClaims; session:
   if (!session || session.userId !== claims.sub || session.revokedAt || session.expiresAt.getTime() <= Date.now()) {
     return null;
   }
-  if (Date.now() - session.lastSeenAt.getTime() > LAST_SEEN_THROTTLE_MS) {
-    void prisma.userSession
-      .update({ where: { id: session.id }, data: { lastSeenAt: new Date() } })
-      .catch(() => undefined);
-  }
+  const live = await touchSession(session, claims);
   if (fromRefresh) {
     try {
+      const remembered = claims.rm === 1;
       const access = await signAccessToken({
         sub: claims.sub,
         id: claims.id ?? claims.sub,
@@ -205,13 +211,66 @@ export async function currentSession(): Promise<{ claims: AccessClaims; session:
         username: claims.username,
         pc: claims.pc,
         ev: claims.ev ?? 0,
+        rm: remembered ? 1 : 0,
       });
-      (await cookies()).set(COOKIE_ACCESS, access, sessionCookieOptions(ACCESS_MAX_AGE));
+      (await cookies()).set(
+        COOKIE_ACCESS,
+        access,
+        sessionCookieOptions(ACCESS_MAX_AGE, { persistent: persistentSessionCookie(claims.role, remembered) }),
+      );
     } catch {
       /* read-only cookie context (RSC); the refresh token keeps working until its own expiry */
     }
   }
-  return { claims, session };
+  return { claims, session: live };
+}
+
+/**
+ * Records activity. A member who checked Beni Hatırla, with under 15 days left, is extended
+ * to a fresh 30 days and the refresh cookie is reissued. Browser-session and admin sessions are not.
+ */
+async function touchSession(session: UserSession, claims: AccessClaims) {
+  const now = Date.now();
+  if (now - session.lastSeenAt.getTime() <= LAST_SEEN_THROTTLE_MS) return session;
+  let extend = claims.rm === 1 && claims.role !== "admin" && session.expiresAt.getTime() - now < SLIDE_WHEN_REMAINING_MS;
+  if (extend) {
+    const owner = await prisma.user.findUnique({ where: { id: session.userId }, select: { role: true } });
+    if (owner?.role === "admin") extend = false;
+  }
+  const lastSeenAt = new Date(now);
+  const expiresAt = extend ? new Date(now + REFRESH_MAX_AGE * 1000) : session.expiresAt;
+  await prisma.userSession
+    .update({
+      where: { id: session.id },
+      data: { lastSeenAt, ...(extend ? { expiresAt } : {}) },
+    })
+    .catch(() => undefined);
+  if (extend) {
+    try {
+      const jar = await cookies();
+      const refreshAge = Math.max(60, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
+      const refresh = await signRefreshToken(
+        {
+          sub: claims.sub,
+          id: claims.id ?? claims.sub,
+          sid: session.id,
+          role: claims.role,
+          email: claims.email,
+          username: claims.username,
+          pc: claims.pc,
+          ev: claims.ev ?? 0,
+          rm: 1,
+        },
+        refreshAge,
+      );
+      jar.set(COOKIE_REFRESH, refresh, sessionCookieOptions(refreshAge));
+      const csrf = jar.get(COOKIE_CSRF)?.value;
+      if (csrf) jar.set(COOKIE_CSRF, csrf, sessionCookieOptions(refreshAge));
+    } catch {
+      /* read-only cookie context (RSC); the database expiry still moved */
+    }
+  }
+  return { ...session, lastSeenAt, expiresAt };
 }
 
 export async function claimsFromCookies(): Promise<AccessClaims | null> {

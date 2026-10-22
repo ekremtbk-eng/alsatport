@@ -18,12 +18,15 @@ export function SocialAuth({
   mode,
   variant = "stack",
   returnTo = null,
+  remember = false,
 }: {
   mode: "login" | "register";
   onDone?: (needsProfile: boolean) => void;
   variant?: "stack" | "gate";
   /** Safe same-origin resume path when the auth modal has no ?next= in the URL. */
   returnTo?: string | null;
+  /** Login-screen Beni Hatırla. Carried in the signed OAuth state, never in localStorage. */
+  remember?: boolean;
 }) {
   const { t } = useI18n();
   const params = useSearchParams();
@@ -83,7 +86,8 @@ export function SocialAuth({
     setBusy(provider);
     const next =
       new URLSearchParams(window.location.search).get("next") || params.get("next") || returnTo || "/profil";
-    window.location.assign(`/api/auth/oauth/${provider}/start?next=${encodeURIComponent(next)}`);
+    const rememberQ = mode === "login" && remember ? "&remember=1" : "";
+    window.location.assign(`/api/auth/oauth/${provider}/start?next=${encodeURIComponent(next)}${rememberQ}`);
   }
 
   if (!SOCIAL_PROVIDERS.length) return null;

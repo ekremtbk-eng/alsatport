@@ -15,7 +15,7 @@ import { normalizeTrMobile, otpSmsText, sendSms, smsReady } from "@/lib/sms";
 export async function completeLogin(
   input: StoredUser,
   req: Request,
-  opts: { method: SessionMethod; mfa?: boolean },
+  opts: { method: SessionMethod; mfa?: boolean; remember?: boolean },
   extra?: Record<string, unknown>,
 ) {
   let user = await promoteConfiguredAdmin(input);

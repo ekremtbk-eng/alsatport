@@ -50,6 +50,7 @@ export function AuthStage({
   const router = useRouter();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [emailExtra, setEmailExtra] = useState("");
@@ -81,6 +82,7 @@ export function AuthStage({
     const email = params.get("email");
     if (email && isValidEmail(email)) setIdentifier(email);
     if (params.get("reset") === "1") setNotice("auth.reset.loginNow");
+    else if (params.get("switch") === "1") setNotice("auth.switch.note");
     if (params.get("forgot") === "1") setForgotOpen(true);
     setBizIntent(allowlistedReturn(params.get("next")) === BUSINESS_RETURN);
     if (params.get("tfa") === "1") {
@@ -198,6 +200,11 @@ export function AuthStage({
 
   function finish(needsProfile: boolean, needsEmailVerify = false) {
     onClose?.();
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("switch") === "1") {
+      router.push("/profil");
+      router.refresh();
+      return;
+    }
     const dest = afterAuthHref(needsProfile, variant === "overlay", needsEmailVerify, returnTo);
     if (dest) router.push(dest);
   }
@@ -240,12 +247,8 @@ export function AuthStage({
       return;
     }
     if (tab === "login") {
-      if (!isStrongPassword(password)) {
-        setError("auth.err.passPolicy");
-        return;
-      }
       setBusy(true);
-      const res = await loginWithPassword(id, password);
+      const res = await loginWithPassword(id, password, remember);
       setBusy(false);
       if (!res.ok) {
         setError(res.error);
@@ -400,6 +403,7 @@ export function AuthStage({
                 mode={tab === "login" ? "login" : "register"}
                 variant="gate"
                 returnTo={returnTo}
+                remember={tab === "login" && remember}
                 onDone={() => onClose?.()}
               />
 
@@ -505,7 +509,14 @@ export function AuthStage({
 
               {tab === "login" ? (
                 <div className="auth-gate-row">
-                  <span />
+                  <label className="auth-gate-check">
+                    <input
+                      type="checkbox"
+                      checked={remember}
+                      onChange={(e) => setRemember(e.target.checked)}
+                    />
+                    <span>{t("auth.remember")}</span>
+                  </label>
                   <button
                     type="button"
                     className="auth-gate-forgot"

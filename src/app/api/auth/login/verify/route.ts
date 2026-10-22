@@ -7,7 +7,7 @@ import { clientIp } from "@/lib/security/rateLimit";
 import { loginVerifySchema } from "@/lib/security/schemas";
 import { requireMutatingRequest } from "@/lib/security/session";
 import { THROTTLE, throttle, tooMany } from "@/lib/security/throttle";
-import { clearLoginChallenge, readLoginChallenge, trustDevice } from "@/lib/security/twoFactor";
+import { clearLoginChallenge, loginChallengeRemembers, readLoginChallenge, trustDevice } from "@/lib/security/twoFactor";
 import { findUserById, maskEmail, maskPhoneNumber } from "@/lib/security/userStore";
 
 /** Lets the login page resume a pending second step (e.g. after a Google redirect); only masked data is returned. */
@@ -65,7 +65,8 @@ export async function POST(req: Request) {
     );
     return NextResponse.json({ ok: false, error: "auth.2fa.wrong" }, { status: 401 });
   }
-  const res = await completeLogin(user, req, { method: "otp", mfa: true });
+  const remember = await loginChallengeRemembers();
+  const res = await completeLogin(user, req, { method: "otp", mfa: true, remember });
   clearLoginChallenge(res);
   // Admins always re-verify; remembered devices apply to regular accounts only.
   if (parsed.data.trust && user.role !== "admin") await trustDevice(res, user.id);

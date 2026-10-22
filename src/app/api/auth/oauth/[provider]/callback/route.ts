@@ -82,7 +82,7 @@ async function finish(req: Request, provider: OAuthProvider, code: string, state
     if (resume) challengeUrl.searchParams.set("next", resume);
     const res = NextResponse.redirect(challengeUrl);
     res.cookies.set("ap_oauth_nonce", "", { path: "/", maxAge: 0 });
-    await setLoginChallenge(res, user.id);
+    await setLoginChallenge(res, user.id, parsed.remember);
     return res;
   }
 
@@ -103,7 +103,7 @@ async function finish(req: Request, provider: OAuthProvider, code: string, state
   }
   const res = NextResponse.redirect(dest);
   res.cookies.set("ap_oauth_nonce", "", { path: "/", maxAge: 0 });
-  await startSession(res, user, req, { method: "oauth" });
+  await startSession(res, user, req, { method: "oauth", remember: parsed.remember });
   return res;
 }
 

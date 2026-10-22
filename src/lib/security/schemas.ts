@@ -34,6 +34,7 @@ function noSqli(value: string) {
 export const loginBodySchema = z.object({
   identifier: z.string().trim().min(1, "auth.err.required").max(80).refine(noSqli, "auth.err.required"),
   password: z.string().min(1, "auth.err.required").max(128),
+  remember: z.boolean().optional(),
 });
 
 export const registerBodySchema = z.object({

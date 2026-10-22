@@ -61,7 +61,7 @@ type AppState = {
   geo: GeoState;
   hydrated: boolean;
   unreadNotifications: number;
-  loginWithPassword: (identifier: string, password: string) => Promise<AuthResult>;
+  loginWithPassword: (identifier: string, password: string, remember?: boolean) => Promise<AuthResult>;
   verifyLoginCode: (otp: string, trust: boolean) => Promise<AuthResult>;
   /** Applies a fresh profile returned by an account API. */
   adoptSession: (user: UserProfile) => void;
@@ -215,6 +215,44 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const favPending = useRef(new Map<string, boolean>());
   const favQueue = useRef(new Map<string, Promise<unknown>>());
 
+  const commitUser = useCallback((next: UserProfile | null) => {
+    const prevId = userRef.current?.id ?? null;
+    const nextId = next?.id ?? null;
+    let switched = !!prevId && prevId !== nextId;
+    try {
+      const raw = localStorage.getItem(KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      const owner = typeof parsed.accountId === "string" ? parsed.accountId : null;
+      if (nextId && owner && owner !== nextId) switched = true;
+      // Session cookies vanish on browser close without running logout. The next
+      // visit is signed out while this tab still holds the previous account's cache.
+      const scrubStale = !nextId && !prevId && !!owner;
+      if (switched || scrubStale) {
+        favPending.current.clear();
+        setFavorites([]);
+        setNotifications([]);
+        setConversations([]);
+        setSavedSearches([]);
+        setInboxUser(nextId);
+        localStorage.setItem(
+          KEY,
+          JSON.stringify({ ...parsed, accountId: nextId, notifications: [], savedSearches: [] }),
+        );
+      } else if (nextId && owner !== nextId) {
+        localStorage.setItem(KEY, JSON.stringify({ ...parsed, accountId: nextId }));
+      } else if (!nextId && prevId) {
+        localStorage.setItem(
+          KEY,
+          JSON.stringify({ ...parsed, accountId: null, notifications: [], savedSearches: [] }),
+        );
+      }
+    } catch {
+      /* ignore quota / private mode */
+    }
+    setUser(next);
+    if (switched || (prevId && !nextId)) router.refresh();
+  }, [router]);
+
   const applyListingPatch = useCallback((sellerId: string, patch: ListingEntitlementPatch) => {
     setListings((prev) =>
       prev.map((l) =>
@@ -242,10 +280,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             window.clearTimeout(sessionRetry.current);
             setSessionIssue(null);
             const next = check.kind === "ok" ? check.data.user : null;
-            const hadUser = !!userRef.current;
-            setUser(next);
-            // Remote revoke / expiry: drop Client Router Cache so soft-nav cannot flash prior private shells.
-            if (hadUser && !next) router.refresh();
+            commitUser(next);
             if (next && check.kind === "ok") {
               applyListingPatch(next.id, check.data.listingPatch ?? listingPatchForProfile(next));
             }
@@ -268,7 +303,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     })();
     sessionInflight.current = job;
     return job;
-  }, [applyListingPatch, router]);
+  }, [applyListingPatch, commitUser]);
   useEffect(() => () => window.clearTimeout(sessionRetry.current), []);
   const refreshSessionRef = useRef(refreshSession);
   refreshSessionRef.current = refreshSession;
@@ -286,6 +321,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      let accountScoped = "";
+      let pendingSearches: SavedSearch[] | null = null;
+      let pendingNotifications: AppNotification[] | null = null;
       try {
         const raw =
           localStorage.getItem(KEY) ?? LEGACY_KEYS.map((k) => localStorage.getItem(k)).find(Boolean) ?? null;
@@ -301,8 +339,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             }
             setReviews([...map.values()]);
           }
-          if (parsed.savedSearches) setSavedSearches(parsed.savedSearches);
-          if (parsed.notifications) setNotifications(parsed.notifications);
+          accountScoped = typeof parsed.accountId === "string" ? parsed.accountId : "";
+          if (Array.isArray(parsed.savedSearches)) pendingSearches = parsed.savedSearches;
+          if (Array.isArray(parsed.notifications)) pendingNotifications = parsed.notifications;
+          // Guest cache can paint immediately. An account's cache waits until that session is confirmed.
+          if (!accountScoped) {
+            if (pendingSearches) setSavedSearches(pendingSearches);
+            if (pendingNotifications) setNotifications(pendingNotifications);
+          }
           if (parsed.notifPrefs) setNotifPrefsState({ ...DEFAULT_NOTIF_PREFS, ...parsed.notifPrefs });
           if (parsed.geo) setGeo(parsed.geo);
           if (parsed.watchedPrices) setWatchedPrices(readWatchedPrices(parsed.watchedPrices));
@@ -313,6 +357,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       try {
         await getCsrfToken();
         if (!cancelled) await refreshSessionRef.current();
+        if (!cancelled && accountScoped && userRef.current?.id === accountScoped) {
+          if (pendingSearches) setSavedSearches(pendingSearches);
+          if (pendingNotifications) setNotifications(pendingNotifications);
+        }
         const db = await apiGet<{ ok?: boolean; listings?: Listing[] }>("/api/listings");
         if (!cancelled) {
           const remote = (db.listings ?? []).filter((l) => !isBlockedLiveAnimalListing(l));
@@ -415,6 +463,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           notifications: notifications.filter((n) => !n.id.startsWith(SERVER_NOTIF_PREFIX)),
           geo: hasConsent("functional") ? geoRef.current : undefined,
           watchedPrices: pricesRef.current,
+          accountId: userRef.current?.id ?? parsed.accountId ?? null,
           savedSearches: signedIn ? parsed.savedSearches : searchesRef.current,
           notifPrefs: signedIn ? parsed.notifPrefs : prefsRef.current,
         }),
@@ -650,7 +699,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (incoming.length) pushNotifs(incoming);
   }, [alertsReady, listings, pushNotifs]);
 
-  const loginWithPassword = useCallback(async (identifier: string, password: string): Promise<AuthResult> => {
+  const loginWithPassword = useCallback(async (identifier: string, password: string, remember = false): Promise<AuthResult> => {
     if (!identifier.trim() || !password) return { ok: false, error: "auth.err.required" };
     const res = await apiPost<{
       ok: boolean;
@@ -669,7 +718,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       sandboxCode?: string;
     }>(
       "/api/auth/login",
-      { identifier, password },
+      { identifier, password, remember: remember === true },
     );
     if (res.ok && res.twoFactor) {
       return {
@@ -688,9 +737,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
     }
     if (!res.ok || !res.user) return { ok: false, error: res.error ?? "auth.err.wrong" };
-    setUser(res.user);
+    commitUser(res.user);
     return { ok: true, needsProfile: !!res.needsProfile, needsEmailVerify: !!res.needsEmailVerify || res.user.emailVerified === false };
-  }, []);
+  }, [commitUser]);
 
   const verifyLoginCode = useCallback(async (otp: string, trust: boolean): Promise<AuthResult> => {
     const res = await apiPost<{
@@ -701,13 +750,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       user?: UserProfile;
     }>("/api/auth/login/verify", { otp, trust });
     if (!res.ok || !res.user) return { ok: false, error: res.error ?? "complete.err.emailCode" };
-    setUser(res.user);
+    commitUser(res.user);
     return { ok: true, needsProfile: !!res.needsProfile, needsEmailVerify: !!res.needsEmailVerify || res.user.emailVerified === false };
-  }, []);
+  }, [commitUser]);
 
   const adoptSession = useCallback((next: UserProfile) => {
-    setUser(next);
-  }, []);
+    commitUser(next);
+  }, [commitUser]);
 
   const registerAccount = useCallback(
     async (input: {
@@ -725,10 +774,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         input,
       );
       if (!res.ok || !res.user) return { ok: false, error: res.error ?? "auth.err.required" };
-      setUser(res.user);
+      commitUser(res.user);
       return { ok: true, needsProfile: !!res.needsProfile, needsEmailVerify: true };
     },
-    [],
+    [commitUser],
   );
 
   const completeProfile = useCallback(
@@ -798,11 +847,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
     window.clearTimeout(sessionRetry.current);
     setSessionIssue(null);
-    setUser(null);
-    setNotifications((prev) => prev.filter((n) => !n.id.startsWith(SERVER_NOTIF_PREFIX)));
-    // Invalidate App Router client cache for protected trees (profil/mesajlar/admin shells).
-    router.refresh();
-  }, [router]);
+    commitUser(null);
+  }, [commitUser]);
 
   const toggleFavorite = useCallback((id: string) => {
     const want = !(favPending.current.get(id) ?? favoritesRef.current.includes(id));

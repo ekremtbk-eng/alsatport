@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Ban, CheckCircle2, CircleAlert, ImagePlus, KeyRound, Link2, Mail, MessageSquareText, QrCode, ShieldCheck, Smartphone } from "lucide-react";
 import { OtpBoxes } from "@/components/auth/OtpBoxes";
 import { showFlashToast } from "@/components/FlashToast";
@@ -665,6 +666,8 @@ type SessionRow = { id: string; device: string; method: string; ip: string | nul
 
 export function SessionsPanel() {
   const { t, locale } = useI18n();
+  const { logout } = useApp();
+  const router = useRouter();
   const [rows, setRows] = useState<SessionRow[] | null>(null);
   const [error, setError] = useState("");
   const [hint, setHint] = useState("");
@@ -720,7 +723,19 @@ export function SessionsPanel() {
                   {r.ip ? ` · ${r.ip}` : ""}
                 </p>
               </div>
-              {r.current ? null : (
+              {r.current ? (
+                <button
+                  type="button"
+                  className="chip shrink-0"
+                  disabled={busy}
+                  onClick={() => {
+                    logout();
+                    router.push("/giris");
+                  }}
+                >
+                  {t("sess.endThis")}
+                </button>
+              ) : (
                 <button type="button" className="chip shrink-0" disabled={busy} onClick={() => void revoke({ scope: "one", id: r.id })}>
                   {t("sess.end")}
                 </button>

@@ -36,13 +36,23 @@ async function deviceId() {
 }
 
 /** Pending second step after a correct password; carries no session rights by itself. */
-export async function setLoginChallenge(res: NextResponse, userId: string) {
-  res.cookies.set(COOKIE_2FA, await sign({ typ: "2fa" }, userId, CHALLENGE_MAX_AGE), sessionCookieOptions(CHALLENGE_MAX_AGE));
+export async function setLoginChallenge(res: NextResponse, userId: string, remember = false) {
+  res.cookies.set(
+    COOKIE_2FA,
+    await sign({ typ: "2fa", rm: remember ? 1 : 0 }, userId, CHALLENGE_MAX_AGE),
+    sessionCookieOptions(CHALLENGE_MAX_AGE),
+  );
 }
 
 export async function readLoginChallenge() {
   const payload = await verify((await cookies()).get(COOKIE_2FA)?.value, "2fa");
   return payload?.sub ?? null;
+}
+
+/** Beni Hatırla is fixed into the signed challenge so the second step cannot flip it. */
+export async function loginChallengeRemembers() {
+  const payload = await verify((await cookies()).get(COOKIE_2FA)?.value, "2fa");
+  return payload?.rm === 1;
 }
 
 export function clearLoginChallenge(res: NextResponse) {
