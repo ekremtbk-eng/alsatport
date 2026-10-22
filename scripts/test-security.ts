@@ -203,6 +203,200 @@ async function main() {
       `${known.status}/${String(known.json.error)} vs ${unknown.status}/${String(unknown.json.error)}`,
     );
 
+    const guest = await guestCsrf();
+    const passwordLogin = await call("POST", "/api/auth/login", guest, { identifier: a.email, password: PASSWORD, remember: true });
+    const issued = passwordLogin.headers.getSetCookie?.() ?? [];
+    const refreshCookie = issued.find((c) => c.startsWith("ap_refresh=")) ?? "";
+    const maxAge = Number(/Max-Age=(\d+)/i.exec(refreshCookie)?.[1] ?? "0");
+    const userJson = passwordLogin.json.user as { id?: string } | undefined;
+    check("L1", "Correct email and password signs in", passwordLogin.status === 200 && userJson?.id === a.id, `status ${passwordLogin.status} ${String(passwordLogin.json.error ?? "")}`);
+    check(
+      "L2",
+      "Refresh cookie is HttpOnly, Secure, SameSite=Lax, and about 30 days",
+      /HttpOnly/i.test(refreshCookie) && /Secure/i.test(refreshCookie) && /SameSite=Lax/i.test(refreshCookie) && maxAge >= 29 * 86400 && maxAge <= 30 * 86400,
+      `maxAge=${maxAge}`,
+    );
+    const sessionRow = await prisma.userSession.findFirst({
+      where: { userId: a.id, revokedAt: null },
+      orderBy: { createdAt: "desc" },
+    });
+    const sessionDays = sessionRow ? (sessionRow.expiresAt.getTime() - Date.now()) / 86_400_000 : 0;
+    check("L3", "Server session lasts about 30 days", !!sessionRow && sessionDays > 29 && sessionDays <= 30.1, `days=${sessionDays.toFixed(2)}`);
+
+    const wrongPw = await call("POST", "/api/auth/login", await guestCsrf(), { identifier: a.email, password: "Wrong!pass12" });
+    check("L4", "Wrong password stays a generic failure", wrongPw.status === 401 && wrongPw.json.error === "auth.err.wrong", `status ${wrongPw.status} ${String(wrongPw.json.error)}`);
+
+    const weak = await prisma.user.create({
+      data: {
+        email: `weak-${TAG}@sectest.invalid`,
+        username: `sectest_weak_${TAG}`,
+        role: "seller",
+        passwordHash: await bcrypt.hash("shortpw", 10),
+        emailVerifiedAt: new Date(),
+        profile: { create: { displayName: "Weak", fullName: "Weak User", profileComplete: true } },
+      },
+    });
+    const weakLogin = await call("POST", "/api/auth/login", await guestCsrf(), { identifier: weak.email, password: "shortpw" });
+    check("L5", "A stored password signs in even if it predates the strength policy", weakLogin.status === 200, `status ${weakLogin.status} ${String(weakLogin.json.error ?? "")}`);
+
+    const googleOnly = await prisma.user.create({
+      data: {
+        email: `google-${TAG}@sectest.invalid`,
+        username: `sectest_google_${TAG}`,
+        role: "seller",
+        provider: "google",
+        providerSub: `sub-${TAG}`,
+        emailVerifiedAt: new Date(),
+        profile: { create: { displayName: "Google", fullName: "Google User", profileComplete: true } },
+      },
+    });
+    const googleTry = await call("POST", "/api/auth/login", await guestCsrf(), { identifier: googleOnly.email, password: PASSWORD });
+    const googleCookies = googleTry.headers.getSetCookie?.() ?? [];
+    const googleSessions = await prisma.userSession.count({ where: { userId: googleOnly.id } });
+    check(
+      "L6",
+      "Google-only account is not treated as a password and no session is created",
+      googleTry.status === 401 && googleTry.json.error === "auth.err.googleOnly" && googleSessions === 0 && !googleCookies.some((c) => c.startsWith("ap_session=") && !/Max-Age=0/i.test(c)),
+      `status ${googleTry.status} ${String(googleTry.json.error)} sessions=${googleSessions}`,
+    );
+
+    const jarA = `${issued.map((c) => c.split(";")[0]).join("; ")}; ap_csrf=${guest.csrf}`;
+    const asA: Sess = { sid: sessionRow?.id ?? "", cookie: jarA, csrf: guest.csrf };
+    if (sessionRow) {
+      await prisma.userSession.update({
+        where: { id: sessionRow.id },
+        data: { expiresAt: new Date(Date.now() + 10 * 86_400_000), lastSeenAt: new Date(Date.now() - 10 * 60_000) },
+      });
+      await call("GET", "/api/auth/session", asA);
+      const slid = await prisma.userSession.findUnique({ where: { id: sessionRow.id }, select: { expiresAt: true } });
+      const slidDays = slid ? (slid.expiresAt.getTime() - Date.now()) / 86_400_000 : 0;
+      check("L7", "Member session slides back to 30 days when under 15 days remain", slidDays > 29 && slidDays <= 30.1, `days=${slidDays.toFixed(2)}`);
+    } else {
+      check("L7", "Member session slides back to 30 days when under 15 days remain", false, "no session");
+    }
+
+    const adminSess = await makeSession(admin, { mfa: true });
+    const adminExpiry = new Date(Date.now() + 10 * 86_400_000);
+    await prisma.userSession.update({
+      where: { id: adminSess.sid },
+      data: { expiresAt: adminExpiry, lastSeenAt: new Date(Date.now() - 10 * 60_000) },
+    });
+    await call("GET", "/api/auth/session", adminSess);
+    const adminRow = await prisma.userSession.findUnique({ where: { id: adminSess.sid }, select: { expiresAt: true } });
+    const adminDelta = adminRow ? Math.abs(adminRow.expiresAt.getTime() - adminExpiry.getTime()) : 999999;
+    check("L8", "Admin session is not extended to 30 days", adminDelta < 5_000, `deltaMs=${adminDelta}`);
+
+    const switched = await call("POST", "/api/auth/login", asA, { identifier: b.email, password: PASSWORD });
+    const switchedUser = switched.json.user as { id?: string } | undefined;
+    const jarB = `${(switched.headers.getSetCookie?.() ?? []).map((c) => c.split(";")[0]).join("; ")}; ap_csrf=${guest.csrf}`;
+    const asB: Sess = { sid: "", cookie: jarB, csrf: guest.csrf };
+    const whoB = await call("GET", "/api/auth/session", asB);
+    const aStill = sessionRow
+      ? await prisma.userSession.findUnique({ where: { id: sessionRow.id }, select: { revokedAt: true, userId: true } })
+      : null;
+    check(
+      "L9",
+      "Signing in as another account replaces the browser session without revoking the previous one",
+      switched.status === 200 && switchedUser?.id === b.id && whoB.json.userId === b.id && aStill?.userId === a.id && aStill.revokedAt === null,
+      `status ${switched.status} sessionUser=${String(whoB.json.userId)}`,
+    );
+
+    const loggedOut = await call("POST", "/api/auth/logout", asB, {});
+    const afterOut = await call("GET", "/api/account/sessions", asB);
+    check(
+      "L10",
+      "Logout ends this device and protected account routes reject it",
+      loggedOut.status === 200 && afterOut.status === 401,
+      `logout ${loggedOut.status} sessions ${afterOut.status}`,
+    );
+
+    const remembered = await makeUser("remember", "member");
+    const off = await call("POST", "/api/auth/login", await guestCsrf(), { identifier: remembered.email, password: PASSWORD });
+    const offSet = off.headers.getSetCookie?.() ?? [];
+    const offRefresh = offSet.find((c) => c.startsWith("ap_refresh=")) ?? "";
+    const offAccess = offSet.find((c) => c.startsWith("ap_session=")) ?? "";
+    const sessionCookie = (c: string) =>
+      !!c && /HttpOnly/i.test(c) && /Secure/i.test(c) && /SameSite=Lax/i.test(c) && !/Max-Age=/i.test(c) && !/Expires=/i.test(c);
+    check(
+      "RM1",
+      "Unchecked Beni Hatırla issues a browser session cookie, not a persistent refresh cookie",
+      off.status === 200 && sessionCookie(offRefresh) && sessionCookie(offAccess),
+      `status ${off.status} refresh=${offRefresh.slice(0, 80)}`,
+    );
+    const explicitOff = await call("POST", "/api/auth/login", await guestCsrf(), {
+      identifier: remembered.email,
+      password: PASSWORD,
+      remember: false,
+    });
+    const explicitRefresh = (explicitOff.headers.getSetCookie?.() ?? []).find((c) => c.startsWith("ap_refresh=")) ?? "";
+    check("RM2", "remember:false stays a browser session cookie", explicitOff.status === 200 && sessionCookie(explicitRefresh), `status ${explicitOff.status}`);
+    const loose = await call("POST", "/api/auth/login", await guestCsrf(), {
+      identifier: remembered.email,
+      password: PASSWORD,
+      remember: "true",
+    });
+    check("RM3", "A string remember flag is rejected", loose.status === 400, `status ${loose.status}`);
+
+    let offSid = "";
+    try {
+      const offToken = decodeURIComponent(offRefresh.split(";")[0]?.slice("ap_refresh=".length) ?? "");
+      const { payload } = await jwtVerify(offToken, key, { algorithms: ["HS256"] });
+      offSid = typeof payload.sid === "string" ? payload.sid : "";
+    } catch {
+      offSid = "";
+    }
+    const pinnedExpiry = new Date(Date.now() + 10 * 86_400_000);
+    if (offSid) {
+      await prisma.userSession.update({
+        where: { id: offSid },
+        data: { expiresAt: pinnedExpiry, lastSeenAt: new Date(Date.now() - 10 * 60_000) },
+      });
+    }
+    const offJar = offSet.map((c) => c.split(";")[0]).join("; ");
+    await call("GET", "/api/auth/session", { sid: offSid, cookie: offJar, csrf: "" });
+    const pinnedAfter = offSid ? await prisma.userSession.findUnique({ where: { id: offSid }, select: { expiresAt: true } }) : null;
+    const pinnedDelta = pinnedAfter ? Math.abs(pinnedAfter.expiresAt.getTime() - pinnedExpiry.getTime()) : 999999;
+    check("RM4", "A browser session is not renewed toward 30 days", !!offSid && pinnedDelta < 5_000, `deltaMs=${pinnedDelta}`);
+
+    const on = await call("POST", "/api/auth/login", await guestCsrf(), { identifier: remembered.email, password: PASSWORD, remember: true });
+    const onRefresh = (on.headers.getSetCookie?.() ?? []).find((c) => c.startsWith("ap_refresh=")) ?? "";
+    const onMax = Number(/Max-Age=(\d+)/i.exec(onRefresh)?.[1] ?? "0");
+    check(
+      "RM5",
+      "Checked Beni Hatırla sets a persistent refresh cookie of about 30 days",
+      on.status === 200 && /HttpOnly/i.test(onRefresh) && /Secure/i.test(onRefresh) && onMax >= 29 * 86400 && onMax <= 30 * 86400,
+      `maxAge=${onMax}`,
+    );
+
+    let oauthRemember = false;
+    let oauthPlain = true;
+    r = await call("GET", "/api/auth/oauth/google/start?remember=1");
+    const rememberLoc = r.headers.get("location") ?? "";
+    if (rememberLoc.startsWith("https://accounts.google.com/")) {
+      const st = new URL(rememberLoc).searchParams.get("state") ?? "";
+      const { payload } = await jwtVerify(st, key, { algorithms: ["HS256"] });
+      oauthRemember = payload.remember === true;
+    }
+    r = await call("GET", "/api/auth/oauth/google/start");
+    const plainLoc = r.headers.get("location") ?? "";
+    if (plainLoc.startsWith("https://accounts.google.com/")) {
+      const st = new URL(plainLoc).searchParams.get("state") ?? "";
+      const { payload } = await jwtVerify(st, key, { algorithms: ["HS256"] });
+      oauthPlain = payload.remember === true;
+    }
+    check("RM6", "Google start carries Beni Hatırla only inside the signed state", oauthRemember && !oauthPlain, rememberLoc.slice(0, 40));
+    const linkFresh = await makeSession(a);
+    r = await call("GET", "/api/auth/oauth/google/start?intent=link&remember=1", linkFresh);
+    let linkIgnored = false;
+    const linkLoc = r.headers.get("location") ?? "";
+    if (linkLoc.startsWith("https://accounts.google.com/")) {
+      const st = new URL(linkLoc).searchParams.get("state") ?? "";
+      const { payload } = await jwtVerify(st, key, { algorithms: ["HS256"] });
+      const link = payload.link as { uid?: string } | undefined;
+      linkIgnored = link?.uid === a.id && payload.remember !== true;
+    }
+    check("RM7", "Linking a Google account does not turn the preference into a new login session", linkIgnored, linkLoc.slice(0, 40));
+
     let throttled = false;
     for (let i = 0; i < 8; i++) {
       const t = await call("POST", "/api/auth/login", await guestCsrf(), { identifier: `brute-${TAG}@sectest.invalid`, password: "Wrong!pass12" });

@@ -66,7 +66,8 @@ export async function GET(req: Request, ctx: Ctx) {
       link = { uid: auth.user.id, sid: auth.session.id };
     }
     const nonce = crypto.randomUUID();
-    const state = await signOAuthState({ provider, next: link ? LINK_RETURN : next, nonce, link });
+    const remember = !link && params.get("remember") === "1";
+    const state = await signOAuthState({ provider, next: link ? LINK_RETURN : next, nonce, link, remember });
     const res = NextResponse.redirect(authorizationUrl(provider, state));
     res.cookies.set("ap_oauth_nonce", nonce, {
       httpOnly: true,

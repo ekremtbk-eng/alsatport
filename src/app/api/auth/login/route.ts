@@ -8,7 +8,6 @@ import { findUserByIdentifier } from "@/lib/security/userStore";
 import { requireMutatingRequest } from "@/lib/security/session";
 import { readJson } from "@/lib/security/parseBody";
 import { loginBodySchema } from "@/lib/security/schemas";
-import { isStrongPassword } from "@/lib/security/passwordPolicy";
 import { completeLogin, needsSecondFactor, sendLoginCode } from "@/lib/security/loginFlow";
 import { setLoginChallenge } from "@/lib/security/twoFactor";
 import { THROTTLE, throttle, tooMany } from "@/lib/security/throttle";
@@ -25,6 +24,7 @@ export async function POST(req: Request) {
   const ip = clientIp(req);
   const identifier = sanitizeText(parsed.data.identifier, 80);
   const password = parsed.data.password;
+  const remember = parsed.data.remember === true;
   const id = identifier.toLowerCase();
 
   const limited = await throttle(
@@ -37,11 +37,17 @@ export async function POST(req: Request) {
   );
   if (!limited.ok) return tooMany(limited.retryAfter);
 
-  if (!identifier || !password || !isStrongPassword(password)) return wrong();
+  if (!identifier || !password) return wrong();
 
   const user = await findUserByIdentifier(identifier);
   const ok = await verifyPasswordOrDummy(password, user?.passwordHash);
-  if (!user?.passwordHash || !ok) {
+  if (!user || !ok) {
+    // Passwordless accounts must not look like a wrong password, and must not be told to register.
+    // Unknown identifiers stay on the same generic error so existence is not disclosed.
+    if (user && !user.passwordHash) {
+      const error = user.provider === "google" ? "auth.err.googleOnly" : "auth.err.noPassword";
+      return NextResponse.json({ ok: false, error }, { status: 401 });
+    }
     if (user?.role === "admin") {
       after(async () => {
         await writeAudit({
@@ -68,9 +74,9 @@ export async function POST(req: Request) {
     const sent = await sendLoginCode(user);
     if (!sent.ok) return NextResponse.json({ ok: false, error: "auth.err.mail" }, { status: 503 });
     const res = NextResponse.json({ ...sent, twoFactor: true });
-    await setLoginChallenge(res, user.id);
+    await setLoginChallenge(res, user.id, remember);
     return res;
   }
 
-  return completeLogin(user, req, { method: "password" });
+  return completeLogin(user, req, { method: "password", remember });
 }

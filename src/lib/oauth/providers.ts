@@ -51,8 +51,9 @@ export function oauthConfigured(provider: OAuthProvider) {
 /** `link` binds the round-trip to the signed-in user and session that asked to link a provider. */
 export type OAuthLinkIntent = { uid: string; sid: string };
 
-export async function signOAuthState(input: { provider: OAuthProvider; next: string; nonce: string; link?: OAuthLinkIntent }) {
-  return new SignJWT(input)
+export async function signOAuthState(input: { provider: OAuthProvider; next: string; nonce: string; link?: OAuthLinkIntent; remember?: boolean }) {
+  const claims = input.remember === true && !input.link ? { ...input, remember: true } : { provider: input.provider, next: input.next, nonce: input.nonce, link: input.link };
+  return new SignJWT(claims)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("10m")
@@ -70,6 +71,7 @@ export async function verifyOAuthState(token: string, provider: OAuthProvider) {
     next: typeof payload.next === "string" ? payload.next : "/profil",
     nonce: payload.nonce,
     link,
+    remember: payload.remember === true && !link,
   };
 }
 

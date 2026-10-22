@@ -28,13 +28,14 @@ export function cookieSecure() {
   return process.env.NODE_ENV === "production";
 }
 
-export function sessionCookieOptions(maxAge: number) {
+export function sessionCookieOptions(maxAge: number, opts?: { persistent?: boolean }) {
+  const persistent = opts?.persistent !== false;
   return {
     httpOnly: true,
     secure: cookieSecure(),
     sameSite: "lax" as const,
     path: "/",
-    maxAge,
+    ...(persistent ? { maxAge } : {}),
   };
 }
 

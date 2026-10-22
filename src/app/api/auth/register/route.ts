@@ -76,7 +76,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
   }
   if (await findUserByEmail(email)) {
-    return NextResponse.json({ ok: false, error: "auth.err.taken" }, { status: 409 });
+    // Same cost as a real hash, and no "already registered" text, so the response does not confirm the address.
+    await hashPassword(password);
+    return NextResponse.json({ ok: false, error: "auth.err.signup" }, { status: 400 });
   }
   let uniqueName = username.replace(/[^a-z0-9._-]+/g, "") || "uye";
   if (await findUserByUsername(uniqueName)) {

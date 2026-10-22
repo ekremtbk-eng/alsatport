@@ -11,6 +11,8 @@ type TokenInput = {
   username: string;
   pc: 0 | 1;
   ev: 0 | 1;
+  /** 1 only for a member who checked Beni Hatırla. Absent or 0 is a browser session. */
+  rm?: 0 | 1;
 };
 
 export type AccessClaims = {
@@ -22,6 +24,7 @@ export type AccessClaims = {
   username: string;
   pc: 0 | 1;
   ev?: 0 | 1;
+  rm?: 0 | 1;
   typ: "access" | "refresh";
 } & JWTPayload;
 
@@ -31,8 +34,9 @@ function secretKey() {
 
 export const ACCESS_TTL = "15m";
 export const ACCESS_MAX_AGE = 60 * 15;
-export const REFRESH_MAX_AGE = 60 * 60 * 24 * 7;
-/** Admin sessions are short-lived regardless of activity. */
+/** Member refresh cookie and server session. Activity inside the last 15 days slides this forward. */
+export const REFRESH_MAX_AGE = 60 * 60 * 24 * 30;
+/** Admin sessions stay absolute and short. Activity does not extend them. */
 export const ADMIN_SESSION_MAX_AGE = 60 * 60 * 12;
 
 export async function signAccessToken(input: TokenInput) {
