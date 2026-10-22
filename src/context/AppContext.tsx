@@ -224,7 +224,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const parsed = raw ? JSON.parse(raw) : {};
       const owner = typeof parsed.accountId === "string" ? parsed.accountId : null;
       if (nextId && owner && owner !== nextId) switched = true;
-      if (switched) {
+      // Session cookies vanish on browser close without running logout. The next
+      // visit is signed out while this tab still holds the previous account's cache.
+      const scrubStale = !nextId && !prevId && !!owner;
+      if (switched || scrubStale) {
         favPending.current.clear();
         setFavorites([]);
         setNotifications([]);
@@ -318,6 +321,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      let accountScoped = "";
+      let pendingSearches: SavedSearch[] | null = null;
+      let pendingNotifications: AppNotification[] | null = null;
       try {
         const raw =
           localStorage.getItem(KEY) ?? LEGACY_KEYS.map((k) => localStorage.getItem(k)).find(Boolean) ?? null;
@@ -333,8 +339,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             }
             setReviews([...map.values()]);
           }
-          if (parsed.savedSearches) setSavedSearches(parsed.savedSearches);
-          if (parsed.notifications) setNotifications(parsed.notifications);
+          accountScoped = typeof parsed.accountId === "string" ? parsed.accountId : "";
+          if (Array.isArray(parsed.savedSearches)) pendingSearches = parsed.savedSearches;
+          if (Array.isArray(parsed.notifications)) pendingNotifications = parsed.notifications;
+          // Guest cache can paint immediately. An account's cache waits until that session is confirmed.
+          if (!accountScoped) {
+            if (pendingSearches) setSavedSearches(pendingSearches);
+            if (pendingNotifications) setNotifications(pendingNotifications);
+          }
           if (parsed.notifPrefs) setNotifPrefsState({ ...DEFAULT_NOTIF_PREFS, ...parsed.notifPrefs });
           if (parsed.geo) setGeo(parsed.geo);
           if (parsed.watchedPrices) setWatchedPrices(readWatchedPrices(parsed.watchedPrices));
@@ -345,6 +357,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       try {
         await getCsrfToken();
         if (!cancelled) await refreshSessionRef.current();
+        if (!cancelled && accountScoped && userRef.current?.id === accountScoped) {
+          if (pendingSearches) setSavedSearches(pendingSearches);
+          if (pendingNotifications) setNotifications(pendingNotifications);
+        }
         const db = await apiGet<{ ok?: boolean; listings?: Listing[] }>("/api/listings");
         if (!cancelled) {
           const remote = (db.listings ?? []).filter((l) => !isBlockedLiveAnimalListing(l));
