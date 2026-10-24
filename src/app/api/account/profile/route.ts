@@ -9,6 +9,7 @@ import { saveUser } from "@/lib/security/userStore";
 import { attachSession, requireMutatingRequest, requireUser } from "@/lib/security/session";
 import { readJson } from "@/lib/security/parseBody";
 import { profileBodySchema, profileFieldErrors } from "@/lib/security/schemas";
+import { resolveMemberPlace } from "@/lib/geo/neighborhoods";
 
 export async function POST(req: Request) {
   const blocked = await requireMutatingRequest(req);
@@ -31,6 +32,11 @@ export async function POST(req: Request) {
   const displayName = sanitizeText(body.displayName, 40);
   const phone = digitsOnly(body.phone, 11);
   const address = sanitizeMultiline(body.address, 400).replace(/\s+/g, " ").trim();
+  const placeSent = body.city !== undefined || body.district !== undefined || body.neighborhood !== undefined;
+  const place = placeSent ? resolveMemberPlace(body.city ?? "", body.district ?? "", body.neighborhood ?? "") : null;
+  if (placeSent && !place) {
+    return NextResponse.json({ ok: false, error: "auth.err.place" }, { status: 400 });
+  }
 
   const fieldErr = profileFieldErrors({ fullName, phone, address });
   if (fieldErr) {
@@ -44,6 +50,9 @@ export async function POST(req: Request) {
     phone: phone || auth.user.profile.phone,
     address: address || auth.user.profile.address,
     displayName: displayName || fullName || auth.user.profile.displayName,
+    ...(place
+      ? { city: place.city, district: place.district, neighborhood: place.neighborhood }
+      : {}),
   });
   const role = roleForProfile(merged.verified, auth.user.role);
   const user = await saveUser({

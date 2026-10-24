@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { readJson } from "@/lib/security/parseBody";
-import { LIMITS, clientIp, rateLimit } from "@/lib/security/rateLimit";
+import { LIMITS, clientIp } from "@/lib/security/rateLimit";
+import { throttle, tooMany } from "@/lib/security/throttle";
 import { accountSettingsSchema } from "@/lib/security/schemas";
 import { requireMutatingRequest, requireUser } from "@/lib/security/session";
 import { findUserById } from "@/lib/security/userStore";
+import { recordMarketingChoice } from "@/lib/privacy/consents";
 
 export async function PATCH(req: Request) {
   const blocked = await requireMutatingRequest(req);
@@ -12,13 +14,8 @@ export async function PATCH(req: Request) {
   const auth = await requireUser("member", { allowUnverified: true });
   if ("error" in auth) return auth.error;
 
-  const limited = rateLimit(`settings:${clientIp(req)}:${auth.user.id}`, LIMITS.apiWrite.limit, LIMITS.apiWrite.windowMs);
-  if (!limited.ok) {
-    return NextResponse.json(
-      { ok: false, error: "auth.err.rateLimit" },
-      { status: 429, headers: { "Retry-After": String(limited.retryAfter) } },
-    );
-  }
+  const limited = await throttle([{ key: `settings:${clientIp(req)}:${auth.user.id}`, ...LIMITS.apiWrite }], req);
+  if (!limited.ok) return tooMany(limited.retryAfter);
 
   const parsed = await readJson(req, accountSettingsSchema);
   if (!parsed.ok) return parsed.response;
@@ -34,6 +31,12 @@ export async function PATCH(req: Request) {
       ...(marketingTouched ? { marketingUpdatedAt: new Date() } : {}),
     },
   });
+  if (marketingEmail !== undefined) {
+    await recordMarketingChoice(auth.user.id, "email", marketingEmail, "settings");
+  }
+  if (marketingSms !== undefined) {
+    await recordMarketingChoice(auth.user.id, "sms", marketingSms, "settings");
+  }
   const user = (await findUserById(auth.user.id))!;
   return NextResponse.json({ ok: true, user: user.profile });
 }

@@ -16,6 +16,10 @@ import { sendSignupVerificationEmail } from "@/lib/mail/authMail";
 import { verifyRecaptchaToken } from "@/lib/security/recaptcha";
 import { readJson } from "@/lib/security/parseBody";
 import { registerBodySchema } from "@/lib/security/schemas";
+import { resolveMemberPlace } from "@/lib/geo/neighborhoods";
+import { isValidPhone, nationalPhoneDigits } from "@/lib/profile";
+import { marketingChoices } from "@/lib/privacy/marketingChoices";
+import { recordMarketingChoice } from "@/lib/privacy/consents";
 
 export const maxDuration = 60;
 
@@ -69,8 +73,34 @@ export async function POST(req: Request) {
   const lastName = sanitizeText(body.lastName, 40);
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
   const password = body.password;
-  const phone = body.phone.replace(/\D/g, "").slice(0, 11);
+  const modern =
+    body.city.length > 0 ||
+    body.termsAccepted !== undefined ||
+    body.kvkkRead !== undefined ||
+    body.marketingEmail !== undefined ||
+    body.marketingSms !== undefined ||
+    body.passwordConfirm.length > 0;
+  const phone = body.phone.trim() ? (isValidPhone(body.phone) ? `0${nationalPhoneDigits(body.phone)}` : "") : "";
   const username = normalizeUsername(sanitizeText(body.username, 40) || email.split("@")[0] || "uye");
+  const place = body.city ? resolveMemberPlace(body.city, body.district, body.neighborhood) : null;
+
+  if (body.phone.trim() && !phone) {
+    return NextResponse.json({ ok: false, error: "complete.err.phone" }, { status: 400 });
+  }
+  if (modern) {
+    if (body.termsAccepted !== true) {
+      return NextResponse.json({ ok: false, error: "auth.err.terms" }, { status: 400 });
+    }
+    if (body.passwordConfirm !== password) {
+      return NextResponse.json({ ok: false, error: "auth.err.passMatch" }, { status: 400 });
+    }
+    if (!phone) {
+      return NextResponse.json({ ok: false, error: "complete.err.phone" }, { status: 400 });
+    }
+    if (!place) {
+      return NextResponse.json({ ok: false, error: "auth.err.place" }, { status: 400 });
+    }
+  }
 
   if (!fullName || fullName.split(/\s+/).length < 2) {
     return NextResponse.json({ ok: false, error: "auth.err.required" }, { status: 400 });
@@ -93,6 +123,9 @@ export async function POST(req: Request) {
     email,
     phone,
     address: "",
+    city: place?.city ?? "",
+    district: place?.district ?? "",
+    neighborhood: place?.neighborhood ?? "",
     emailVerified: false,
     profileComplete: false,
     authProvider: "email",
@@ -108,12 +141,27 @@ export async function POST(req: Request) {
     role: "seller",
     profile: stampVerification(profile),
   });
-  if (body.marketing) {
-    await prisma.profile.update({
-      where: { userId: user.id },
-      data: { marketingEmail: true, marketingUpdatedAt: new Date() },
-    });
-    user.profile.marketingEmail = true;
+  const choice = marketingChoices(body);
+  const now = new Date();
+  await prisma.profile.update({
+    where: { userId: user.id },
+    data: {
+      ...(body.kvkkRead === true ? { kvkkNotifiedAt: now } : {}),
+      ...(body.termsAccepted === true ? { termsAcceptedAt: now } : {}),
+      ...(choice.email || choice.sms ? { marketingUpdatedAt: now } : {}),
+      marketingEmail: choice.email,
+      marketingSms: choice.sms,
+      phoneVerifiedAt: null,
+    },
+  });
+  user.profile.marketingEmail = choice.email;
+  user.profile.marketingSms = choice.sms;
+  user.profile.phoneVerified = false;
+  if (modern || body.marketing !== undefined || body.marketingEmail !== undefined) {
+    await recordMarketingChoice(user.id, "email", choice.email, "register");
+  }
+  if (modern || body.marketingSms !== undefined) {
+    await recordMarketingChoice(user.id, "sms", choice.sms, "register");
   }
   await recordAccountSignals(user.id, req);
   await sendSignupVerificationEmail({

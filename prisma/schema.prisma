@@ -184,6 +184,7 @@ model User {
   businessReviews     BusinessAccount[]  @relation("BusinessReviewer")
   vehicleRequests     VehicleCatalogRequest[] @relation("VehicleRequester")
   vehicleReviews      VehicleCatalogRequest[] @relation("VehicleReviewer")
+  marketingConsents   MarketingConsent[]
 
   @@unique([provider, providerSub], map: "users_provider_sub_uidx")
   @@index([role], map: "users_role_idx")
@@ -201,6 +202,12 @@ model Profile {
   nationalId              String?   @map("national_id")
   address                 String?
   city                    String?
+  /// Private residence place. Never copied into the public profile address.
+  district                String?
+  neighborhood            String?
+  /// Acknowledgement that the KVKK notice was shown. This is not marketing consent.
+  kvkkNotifiedAt          DateTime? @map("kvkk_notified_at") @db.Timestamptz(6)
+  termsAcceptedAt         DateTime? @map("terms_accepted_at") @db.Timestamptz(6)
   verified                Boolean   @default(false)
   businessName            String?   @map("business_name")
   businessVerifiedAt      DateTime? @map("business_verified_at") @db.Timestamptz(6)
@@ -235,6 +242,24 @@ model Profile {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("profiles")
+}
+
+/// One row per marketing choice (grant or refusal). İYS is not called from here:
+/// `iysStatus` stays `not_submitted` until a provider is configured.
+model MarketingConsent {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  channel     String
+  granted     Boolean
+  source      String
+  textVersion String   @map("text_version")
+  iysStatus   String   @default("not_submitted") @map("iys_status")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, channel, createdAt], map: "marketing_consents_user_channel_idx")
+  @@map("marketing_consents")
 }
 
 /// Corporate application + public store. Tax data stays private (admin and owner only).

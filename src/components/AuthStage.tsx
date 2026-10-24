@@ -13,7 +13,6 @@ import { SocialAuth } from "@/components/SocialAuth";
 import { SOCIAL_PROVIDERS } from "@/components/GoogleAuth";
 import { LegalText } from "@/components/legal/LegalText";
 import { PasswordRules } from "@/components/PasswordRules";
-import { AccountAgreementModal } from "@/components/AccountAgreementModal";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Logo } from "@/components/Logo";
 import { CategoryIcon } from "@/components/CategoryIcon";
@@ -26,6 +25,7 @@ import { apiGet } from "@/lib/security/client";
 import { executeRecaptcha, preloadRecaptcha } from "@/lib/security/recaptchaClient";
 import { RecaptchaNotice } from "@/components/RecaptchaNotice";
 import { HOME_HUBS } from "@/data/homeHubs";
+import { PlaceSelects } from "@/components/auth/PlaceSelects";
 
 export type AuthTab = "login" | "signup";
 
@@ -53,10 +53,15 @@ export function AuthStage({
   const [remember, setRemember] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [emailExtra, setEmailExtra] = useState("");
   const [terms, setTerms] = useState(false);
-  const [marketing, setMarketing] = useState(false);
-  const [agreement, setAgreement] = useState(false);
+  const [kvkkRead, setKvkkRead] = useState(false);
+  const [marketingEmail, setMarketingEmail] = useState(false);
+  const [marketingSms, setMarketingSms] = useState(false);
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [phone, setPhone] = useState("");
+  const [city, setCity] = useState("");
+  const [district, setDistrict] = useState("");
+  const [neighborhood, setNeighborhood] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [challenge, setChallenge] = useState<TwoFactorChallenge | null>(null);
@@ -238,15 +243,15 @@ export function AuthStage({
     e.preventDefault();
     setError("");
     const id = identifier.trim();
-    if (!id) {
-      setError("auth.err.required");
-      return;
-    }
-    if (!emailId && !phoneId) {
-      setError("auth.err.contact");
-      return;
-    }
     if (tab === "login") {
+      if (!id) {
+        setError("auth.err.required");
+        return;
+      }
+      if (!emailId && !phoneId) {
+        setError("auth.err.contact");
+        return;
+      }
       setBusy(true);
       const res = await loginWithPassword(id, password, remember);
       setBusy(false);
@@ -263,7 +268,7 @@ export function AuthStage({
       return;
     }
 
-    const mail = emailId ? id : emailExtra.trim();
+    const mail = id;
     if (!isValidEmail(mail)) {
       setError("auth.err.email");
       return;
@@ -274,6 +279,19 @@ export function AuthStage({
     }
     if (!isStrongPassword(password)) {
       setError("auth.err.passPolicy");
+      return;
+    }
+    if (passwordConfirm !== password) {
+      setError("auth.err.passMatch");
+      return;
+    }
+    const national = phone.replace(/\D/g, "");
+    if (!isValidPhone(national)) {
+      setError("complete.err.phone");
+      return;
+    }
+    if (!city || !district || !neighborhood) {
+      setError("auth.err.place");
       return;
     }
     if (!terms) {
@@ -292,10 +310,17 @@ export function AuthStage({
       username: local,
       email: mail,
       password,
+      passwordConfirm,
       firstName: firstName.trim(),
       lastName: lastName.trim(),
-      marketing,
-      phone: phoneId ? identifier.replace(/\D/g, "") : undefined,
+      marketingEmail,
+      marketingSms,
+      phone: `+90${national.replace(/^(90|0)/, "")}`,
+      city,
+      district,
+      neighborhood,
+      termsAccepted: true,
+      kvkkRead,
       recaptchaToken,
     });
     setBusy(false);
@@ -460,32 +485,54 @@ export function AuthStage({
                 </div>
               ) : null}
 
-              <label className="auth-gate-label">
-                {t("auth.gate.contact")}
-                <span className="auth-gate-field">
-                  <Mail className="h-4 w-4" aria-hidden />
-                  <input
-                    className="auth-gate-input"
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder={t("auth.gate.contactPh")}
-                    autoComplete={tab === "login" ? "username" : "email"}
-                    inputMode="email"
-                    enterKeyHint="go"
-                  />
-                </span>
-              </label>
-
-              {tab === "signup" && phoneId ? (
+              {tab === "signup" ? (
                 <label className="auth-gate-label">
-                  {t("contact.email")}
+                  {t("auth.email")}
                   <span className="auth-gate-field">
                     <Mail className="h-4 w-4" aria-hidden />
                     <input
                       className="auth-gate-input"
-                      value={emailExtra}
-                      onChange={(e) => setEmailExtra(e.target.value)}
+                      type="email"
+                      value={identifier}
+                      onChange={(e) => setIdentifier(e.target.value)}
                       autoComplete="email"
+                    />
+                  </span>
+                </label>
+              ) : null}
+
+              {tab === "signup" ? (
+                <label className="auth-gate-label" htmlFor="reg-phone">
+                  {t("auth.phone")}
+                  <span className="auth-gate-phone">
+                    <b>+90</b>
+                    <input
+                      id="reg-phone"
+                      className="auth-gate-input is-plain"
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                      maxLength={10}
+                      placeholder="5XXXXXXXXX"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                    />
+                  </span>
+                </label>
+              ) : null}
+
+              {tab === "login" ? (
+                <label className="auth-gate-label">
+                  {t("auth.gate.contact")}
+                  <span className="auth-gate-field">
+                    <Mail className="h-4 w-4" aria-hidden />
+                    <input
+                      className="auth-gate-input"
+                      value={identifier}
+                      onChange={(e) => setIdentifier(e.target.value)}
+                      placeholder={t("auth.gate.contactPh")}
+                      autoComplete="username"
+                      inputMode="email"
+                      enterKeyHint="go"
                     />
                   </span>
                 </label>
@@ -505,7 +552,34 @@ export function AuthStage({
                 </span>
               </label>
 
+              {tab === "signup" ? (
+                <label className="auth-gate-label">
+                  {t("auth.passConfirm")}
+                  <span className="auth-gate-field">
+                    <Lock className="h-4 w-4" aria-hidden />
+                    <input
+                      type="password"
+                      className="auth-gate-input"
+                      value={passwordConfirm}
+                      onChange={(e) => setPasswordConfirm(e.target.value)}
+                      autoComplete="new-password"
+                    />
+                  </span>
+                </label>
+              ) : null}
+
               {tab === "signup" ? <PasswordRules value={password} /> : null}
+
+              {tab === "signup" ? (
+                <PlaceSelects
+                  city={city}
+                  district={district}
+                  neighborhood={neighborhood}
+                  onCity={setCity}
+                  onDistrict={setDistrict}
+                  onNeighborhood={setNeighborhood}
+                />
+              ) : null}
 
               {tab === "login" ? (
                 <div className="auth-gate-row">
@@ -529,24 +603,36 @@ export function AuthStage({
                   </button>
                 </div>
               ) : (
-                <>
+                <div className="auth-gate-checks">
+                  <LegalText className="auth-gate-legal" text={t("auth.kvkkInfo")} />
+                  <label className="auth-gate-check">
+                    <input type="checkbox" checked={kvkkRead} onChange={(e) => setKvkkRead(e.target.checked)} />
+                    <span>
+                      <a className="auth-gate-legal-link" href="/kvkk">
+                        {t("auth.kvkk.link")}
+                      </a>
+                      {t("auth.kvkk.read")}
+                    </span>
+                  </label>
                   <label className="auth-gate-check">
                     <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} />
                     <span>
-                      {t("auth.terms.before")}
-                      {t("auth.terms.before") ? " " : null}
-                      <button type="button" className="auth-gate-legal-link" onClick={() => setAgreement(true)}>
+                      <a className="auth-gate-legal-link" href="/kullanim-kosullari">
                         {t("auth.terms.link")}
-                      </button>
-                      {t("auth.terms.after")}
+                      </a>
+                      {t("auth.terms.accept")}
                     </span>
                   </label>
-                  <LegalText className="auth-gate-legal" text={t("auth.kvkkInfo")} />
                   <label className="auth-gate-check">
-                    <input type="checkbox" checked={marketing} onChange={(e) => setMarketing(e.target.checked)} />
-                    <span>{t("auth.marketing")}</span>
+                    <input type="checkbox" checked={marketingEmail} onChange={(e) => setMarketingEmail(e.target.checked)} />
+                    <span>{t("auth.mkt.email")}</span>
                   </label>
-                </>
+                  <label className="auth-gate-check">
+                    <input type="checkbox" checked={marketingSms} onChange={(e) => setMarketingSms(e.target.checked)} />
+                    <span>{t("auth.mkt.sms")}</span>
+                  </label>
+                  <p className="auth-gate-legal">{t("auth.mkt.note")}</p>
+                </div>
               )}
 
               {notice && tab === "login" ? (
@@ -589,7 +675,6 @@ export function AuthStage({
         <p className="auth-gate-foot">{t("auth.gate.foot")}</p>
       </div>
 
-      {agreement ? <AccountAgreementModal onClose={() => setAgreement(false)} /> : null}
     </div>
   );
 }
