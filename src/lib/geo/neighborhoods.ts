@@ -2,10 +2,12 @@ import rawPlaces from "../../../data/tr-neighborhoods.json";
 import { TURKEY_CITIES, districtsOf } from "@/data/turkey";
 
 /**
- * Neighborhood names come from bertugfahriozer/il_ilce_mahalle (İçişleri / TÜİK derived lists).
+ * Neighborhood and village names come from onurusluca/turkey-geo-api (MIT).
+ * The October 2026 package is aligned with NVI address data. Streets are not included.
+ * The MIT notice is in data/tr-neighborhoods.LICENSE.
  * Provinces and districts stay on the names already used by listings (`TURKEY_CITIES`).
  * A district with no matching list returns nothing. Names are never invented.
- * "Merkez" in the product list is the dataset key "{İL}-İL MERKEZİ".
+ * "Merkez" also accepts the older dataset key "{İL}-İL MERKEZİ".
  */
 
 type RawPlaces = Record<string, Record<string, string[]>>;
