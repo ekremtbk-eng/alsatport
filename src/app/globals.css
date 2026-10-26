@@ -9241,6 +9241,81 @@ html.auth-lock body {
   grid-template-columns: 1fr;
   gap: 0.55rem;
 }
+.auth-gate-pair {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.55rem;
+  min-width: 0;
+}
+.auth-gate-pair .auth-gate-label,
+.auth-gate-place .auth-gate-label {
+  min-width: 0;
+}
+.auth-pass-meter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+}
+.auth-pass-meter span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  min-height: 1.6rem;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #4b5563;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.auth-pass-meter span.is-ok {
+  background: #ecfdf5;
+  color: #047857;
+}
+.auth-gate.is-signup .auth-gate-form {
+  gap: 0.5rem;
+}
+.auth-gate.is-signup .auth-gate-tabs {
+  margin-bottom: 0.55rem;
+}
+.auth-gate.is-signup .auth-gate-tabs button {
+  height: 2.35rem;
+}
+.auth-gate.is-signup .auth-gate-or {
+  margin: 0.45rem 0 0.1rem;
+}
+.auth-gate.is-signup .auth-gate-input {
+  height: 2.5rem;
+}
+.auth-gate.is-signup .auth-gate-label {
+  gap: 0.18rem;
+  font-size: 0.8rem;
+}
+.auth-gate.is-signup .auth-gate-check {
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.7rem;
+  background: #f8fafc;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+.auth-gate.is-signup .auth-gate-check:has(input:checked) {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+.auth-gate.is-signup .auth-gate-checks {
+  gap: 0.4rem;
+}
+.auth-gate.is-signup .auth-gate-checks > .auth-gate-legal {
+  margin: 0;
+  text-align: start;
+  font-size: 0.75rem;
+}
 .tfa-methods {
   display: grid;
   gap: 0.6rem;

@@ -858,6 +858,53 @@ html[data-device="phone"] .auth-gate.has-biz .auth-biz-full {
 html[data-device="phone"] .auth-gate.has-biz .auth-biz-mini {
   display: flex;
 }
+
+/* Signup page: one centered card, wide enough for paired fields. Login keeps the side layout. */
+@media (min-width: 768px) {
+  html[data-device="desktop"] .auth-gate.has-biz.is-signup .auth-gate-layout,
+  html[data-device="tablet"] .auth-gate.has-biz.is-signup .auth-gate-layout,
+  .auth-gate.has-biz.is-signup:not(.is-overlay) .auth-gate-layout {
+    grid-template-columns: minmax(0, 1fr);
+    width: min(52.5rem, calc(100% - 2rem));
+    max-width: 52.5rem;
+    margin-inline: auto;
+    justify-content: center;
+    align-items: start;
+    gap: 0.7rem;
+    padding-top: 0.45rem;
+    padding-bottom: 0.7rem;
+  }
+  .auth-gate.is-signup:not(.is-overlay) .auth-gate-promo,
+  .auth-gate.is-signup:not(.is-overlay) .auth-gate-cats,
+  .auth-gate.is-signup:not(.is-overlay) .auth-gate-foot,
+  .auth-gate.is-signup:not(.is-overlay) .auth-biz-full {
+    display: none;
+  }
+  .auth-gate.is-signup:not(.is-overlay) .auth-biz-mini {
+    display: flex;
+  }
+  .auth-gate.is-signup:not(.is-overlay) .auth-gate-card {
+    width: 100%;
+    padding: 0.9rem 1.15rem 1rem;
+  }
+  .auth-gate.is-signup:not(.is-overlay) .auth-gate-pair {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.45rem 0.7rem;
+  }
+  .auth-gate.is-signup:not(.is-overlay) .auth-gate-pair.is-contact {
+    grid-template-columns: minmax(0, 1.3fr) minmax(12rem, 0.9fr);
+  }
+  .auth-gate.is-signup:not(.is-overlay) .auth-gate-place {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.45rem 0.7rem;
+  }
+  .auth-gate.is-signup:not(.is-overlay) .auth-gate-checks {
+    grid-template-columns: 1fr 1fr;
+  }
+  .auth-gate.is-signup:not(.is-overlay) .auth-gate-checks > .auth-gate-legal {
+    grid-column: 1 / -1;
+  }
+}
 .auth-gate.is-kb .auth-biz {
   display: none;
 }
