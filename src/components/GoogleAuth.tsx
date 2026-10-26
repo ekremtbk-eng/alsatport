@@ -31,6 +31,7 @@ export function SocialAuth({
   const { t } = useI18n();
   const params = useSearchParams();
   const [busy, setBusy] = useState<SocialProvider | null>(null);
+  const [googleDetailsOpen, setGoogleDetailsOpen] = useState(false);
 
   const googleLabel =
     variant === "gate"
@@ -106,7 +107,19 @@ export function SocialAuth({
           <span>{busy === provider ? t("auth.connecting") : labels[provider]}</span>
         </button>
       ))}
-      {LEGAL_SERVICES.google ? <LegalText className="auth-oauth-note" text={t("auth.google.notice")} /> : null}
+      {LEGAL_SERVICES.google ? (
+        mode === "register" ? (
+          <div className="auth-oauth-compact">
+            <LegalText className="auth-oauth-note" text={t("auth.google.notice.short")} />
+            <details className="auth-oauth-details" onToggle={(event) => setGoogleDetailsOpen(event.currentTarget.open)}>
+              <summary>{googleDetailsOpen ? t("auth.google.notice.less") : t("auth.google.notice.more")}</summary>
+              <LegalText className="auth-oauth-note" text={t("auth.google.notice")} />
+            </details>
+          </div>
+        ) : (
+          <LegalText className="auth-oauth-note" text={t("auth.google.notice")} />
+        )
+      ) : null}
     </div>
   );
 }
