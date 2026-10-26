@@ -1,10 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Bell, ChevronDown, ChevronRight, Heart, LogIn, MapPin, Search } from "lucide-react";
+import { Bell, ChevronDown, ChevronRight, Heart, LogIn, MapPin, Search } from "lucide-react";
 import { findCategory, hrefForCategory, type Category } from "@/data/categories";
 import { CategoryIcon, iconTone } from "@/components/CategoryIcon";
 import { catName, useI18n } from "@/context/I18nContext";
@@ -12,13 +11,12 @@ import { useApp } from "@/context/AppContext";
 import { useAuthModal } from "@/context/AuthModalContext";
 import { NotificationPanel } from "@/components/NotificationPanel";
 import { Logo } from "@/components/Logo";
-import { AuthGateLink } from "@/components/AuthGateLink";
+import { MarketPanel } from "@/components/home/MarketPanel";
 import { SearchSuggest } from "@/components/SearchSuggest";
 import { LocationOptions } from "@/components/LocationOptions";
 import { SmartSearch } from "@/components/home/SmartSearch";
 import { applyLocationPick, placeLabel } from "@/data/locations";
 import { isPublicListing } from "@/lib/categoryCounts";
-import { BRAND_MARK } from "@/lib/brand";
 import { warmVehicleBrandSearch } from "@/data/searchVehicleBrands";
 import type { Listing } from "@/data/store";
 
@@ -158,31 +156,7 @@ export function MobileHome() {
         </div>
       </form>
 
-      <section className="mh-hero" aria-label={t("home.hero.freeTitle")}>
-        <div className="mh-hero-copy">
-          <h1>
-            <span>{t("home.h1a")}</span> <span className="mh-hero-b">{t("home.h1b")}</span>
-          </h1>
-          <p>{t("home.tag")}</p>
-          <AuthGateLink href="/ilan-ver" className="mh-hero-cta">
-            {t("home.hero.freeTitle")}
-            <ArrowRight className="h-4 w-4" aria-hidden />
-          </AuthGateLink>
-        </div>
-        {/*
-          No `priority`: cold phone path already preloads the same mark via MobileSplash;
-          without priority, next/image stays lazy so CSS-hidden desk mounts do not force a fetch/preload.
-        */}
-        <Image
-          src={BRAND_MARK.src}
-          alt=""
-          width={112}
-          height={112}
-          className="mh-hero-mark"
-          sizes="112px"
-          unoptimized
-        />
-      </section>
+      <MarketPanel />
 
       <section className="mh-sec" aria-labelledby="mh-cats">
         <div className="mh-sec-head">

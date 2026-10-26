@@ -5,17 +5,16 @@ import {
   Banknote,
   CalendarDays,
   FileText,
-  Headphones,
   LayoutGrid,
   MapPin,
   Search,
   Settings2,
-  ShieldCheck,
   SlidersHorizontal,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 import { SearchSuggest } from "@/components/SearchSuggest";
+import { MarketPanel } from "@/components/home/MarketPanel";
 import { SmartSearch } from "@/components/home/SmartSearch";
 import { STD_DATE_PRESETS } from "@/components/StdFilterSidebar";
 import { useI18n } from "@/context/I18nContext";
@@ -127,46 +126,7 @@ export function HomeHero() {
   return (
     <section className="hp-hero">
       <div className="hp-hero-inner">
-        <div className="hp-hero-top">
-          <div className="hp-hero-copy">
-            <p className="hp-hero-kicker">{t("auth.gate.platform")}</p>
-            <h1 className="hp-hero-title">
-              <span className="hp-hero-title-a">{t("home.h1a")}</span>
-              <span className="hp-hero-title-b">{t("home.h1b")}</span>
-            </h1>
-            <p className="hp-hero-sub">{t("home.hero.lead")}</p>
-          </div>
-          <ul className="hp-hero-trust">
-            <li>
-              <FileText className="h-5 w-5" aria-hidden />
-              <span>
-                <b>{t("home.trust.pay")}</b>
-                <small>{t("home.trust.pay.s")}</small>
-              </span>
-            </li>
-            <li>
-              <ShieldCheck className="h-5 w-5" aria-hidden />
-              <span>
-                <b>{t("home.trust.ver")}</b>
-                <small>{t("home.trust.ver.s")}</small>
-              </span>
-            </li>
-            <li>
-              <MapPin className="h-5 w-5" aria-hidden />
-              <span>
-                <b>{t("home.why.tr")}</b>
-                <small>{t("home.why.p5")}</small>
-              </span>
-            </li>
-            <li>
-              <Headphones className="h-5 w-5" aria-hidden />
-              <span>
-                <b>{t("home.trust.sup")}</b>
-                <small>{t("home.trust.sup.s")}</small>
-              </span>
-            </li>
-          </ul>
-        </div>
+        <MarketPanel />
         <SmartSearch />
 
         <div className="hp-search-panel">
