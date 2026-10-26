@@ -334,7 +334,7 @@ export function AuthStage({
   return (
     <div
       ref={gateRef}
-      className={`auth-gate ${variant === "overlay" ? "is-overlay" : "has-biz"}`}
+      className={`auth-gate ${variant === "overlay" ? "is-overlay" : "has-biz"}${tab === "signup" ? " is-signup" : ""}`}
       role={variant === "overlay" ? "dialog" : undefined}
       aria-modal={variant === "overlay" || undefined}
     >
@@ -486,38 +486,37 @@ export function AuthStage({
               ) : null}
 
               {tab === "signup" ? (
-                <label className="auth-gate-label">
-                  {t("auth.email")}
-                  <span className="auth-gate-field">
-                    <Mail className="h-4 w-4" aria-hidden />
-                    <input
-                      className="auth-gate-input"
-                      type="email"
-                      value={identifier}
-                      onChange={(e) => setIdentifier(e.target.value)}
-                      autoComplete="email"
-                    />
-                  </span>
-                </label>
-              ) : null}
-
-              {tab === "signup" ? (
-                <label className="auth-gate-label" htmlFor="reg-phone">
-                  {t("auth.phone")}
-                  <span className="auth-gate-phone">
-                    <b>+90</b>
-                    <input
-                      id="reg-phone"
-                      className="auth-gate-input is-plain"
-                      inputMode="numeric"
-                      autoComplete="tel-national"
-                      maxLength={10}
-                      placeholder="5XXXXXXXXX"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                    />
-                  </span>
-                </label>
+                <div className="auth-gate-pair is-contact">
+                  <label className="auth-gate-label">
+                    {t("auth.email")}
+                    <span className="auth-gate-field">
+                      <Mail className="h-4 w-4" aria-hidden />
+                      <input
+                        className="auth-gate-input"
+                        type="email"
+                        value={identifier}
+                        onChange={(e) => setIdentifier(e.target.value)}
+                        autoComplete="email"
+                      />
+                    </span>
+                  </label>
+                  <label className="auth-gate-label" htmlFor="reg-phone">
+                    {t("auth.phone")}
+                    <span className="auth-gate-phone">
+                      <b>+90</b>
+                      <input
+                        id="reg-phone"
+                        className="auth-gate-input is-plain"
+                        inputMode="numeric"
+                        autoComplete="tel-national"
+                        maxLength={10}
+                        placeholder="5XXXXXXXXX"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                      />
+                    </span>
+                  </label>
+                </div>
               ) : null}
 
               {tab === "login" ? (
@@ -538,38 +537,6 @@ export function AuthStage({
                 </label>
               ) : null}
 
-              <label className="auth-gate-label">
-                {t("auth.pass")}
-                <span className="auth-gate-field">
-                  <Lock className="h-4 w-4" aria-hidden />
-                  <input
-                    type="password"
-                    className="auth-gate-input"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete={tab === "login" ? "current-password" : "new-password"}
-                  />
-                </span>
-              </label>
-
-              {tab === "signup" ? (
-                <label className="auth-gate-label">
-                  {t("auth.passConfirm")}
-                  <span className="auth-gate-field">
-                    <Lock className="h-4 w-4" aria-hidden />
-                    <input
-                      type="password"
-                      className="auth-gate-input"
-                      value={passwordConfirm}
-                      onChange={(e) => setPasswordConfirm(e.target.value)}
-                      autoComplete="new-password"
-                    />
-                  </span>
-                </label>
-              ) : null}
-
-              {tab === "signup" ? <PasswordRules value={password} /> : null}
-
               {tab === "signup" ? (
                 <PlaceSelects
                   city={city}
@@ -580,6 +547,53 @@ export function AuthStage({
                   onNeighborhood={setNeighborhood}
                 />
               ) : null}
+
+              {tab === "signup" ? (
+                <div className="auth-gate-pair">
+                  <label className="auth-gate-label">
+                    {t("auth.pass")}
+                    <span className="auth-gate-field">
+                      <Lock className="h-4 w-4" aria-hidden />
+                      <input
+                        type="password"
+                        className="auth-gate-input"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        autoComplete="new-password"
+                      />
+                    </span>
+                  </label>
+                  <label className="auth-gate-label">
+                    {t("auth.passConfirm")}
+                    <span className="auth-gate-field">
+                      <Lock className="h-4 w-4" aria-hidden />
+                      <input
+                        type="password"
+                        className="auth-gate-input"
+                        value={passwordConfirm}
+                        onChange={(e) => setPasswordConfirm(e.target.value)}
+                        autoComplete="new-password"
+                      />
+                    </span>
+                  </label>
+                </div>
+              ) : (
+                <label className="auth-gate-label">
+                  {t("auth.pass")}
+                  <span className="auth-gate-field">
+                    <Lock className="h-4 w-4" aria-hidden />
+                    <input
+                      type="password"
+                      className="auth-gate-input"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      autoComplete="current-password"
+                    />
+                  </span>
+                </label>
+              )}
+
+              {tab === "signup" ? <PasswordRules value={password} compact /> : null}
 
               {tab === "login" ? (
                 <div className="auth-gate-row">
