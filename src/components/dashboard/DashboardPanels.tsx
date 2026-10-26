@@ -17,6 +17,7 @@ import {
 import { ListingCard } from "@/components/ListingCard";
 import { ListingGrid } from "@/components/ListingGrid";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { PlaceSelects } from "@/components/auth/PlaceSelects";
 import { useApp } from "@/context/AppContext";
 import { useI18n } from "@/context/I18nContext";
 import { isPublicListing } from "@/lib/categoryCounts";
@@ -403,13 +404,16 @@ function PersonalPanel() {
   const { t } = useI18n();
   const router = useRouter();
   const search = useSearchParams();
-  const [edit, setEdit] = useState<"none" | "name" | "display" | "phone" | "email" | "address">("none");
+  const [edit, setEdit] = useState<"none" | "name" | "display" | "phone" | "email" | "address" | "place">("none");
   const [fullName, setFullName] = useState(user?.fullName ?? "");
   const [displayName, setDisplayName] = useState(user?.displayName ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [address, setAddress] = useState(user?.address ?? "");
+  const [city, setCity] = useState(user?.city ?? "");
+  const [district, setDistrict] = useState(user?.district ?? "");
+  const [neighborhood, setNeighborhood] = useState(user?.neighborhood ?? "");
   const [error, setError] = useState("");
-  const [fieldErr, setFieldErr] = useState<{ name?: string; phone?: string; address?: string }>({});
+  const [fieldErr, setFieldErr] = useState<{ name?: string; phone?: string; address?: string; place?: string }>({});
   const [hint, setHint] = useState("");
   const [phoneOtp, setPhoneOtp] = useState("");
   const [phoneCode, setPhoneCode] = useState("");
@@ -425,6 +429,9 @@ function PersonalPanel() {
     setDisplayName(user.displayName ?? "");
     setPhone(user.phone ?? "");
     setAddress(user.address ?? "");
+    setCity(user.city ?? "");
+    setDistrict(user.district ?? "");
+    setNeighborhood(user.neighborhood ?? "");
   }, [user]);
 
   if (!user) return null;
@@ -448,13 +455,24 @@ function PersonalPanel() {
     if (!needsProfile && next) router.push(safeNextPath(next));
   }
 
-  async function persist(patch: { fullName?: string; phone?: string; address?: string; displayName?: string }) {
+  async function persist(patch: {
+    fullName?: string;
+    phone?: string;
+    address?: string;
+    displayName?: string;
+    city?: string;
+    district?: string;
+    neighborhood?: string;
+  }) {
     setBusy(true);
     const res = await completeProfile({
       fullName: patch.fullName ?? user!.fullName ?? "",
       phone: patch.phone ?? user!.phone ?? "",
       address: patch.address ?? user!.address ?? "",
       displayName: patch.displayName ?? user!.displayName,
+      ...(patch.city !== undefined
+        ? { city: patch.city, district: patch.district ?? "", neighborhood: patch.neighborhood ?? "" }
+        : {}),
     });
     setBusy(false);
     if (!res.ok) {
@@ -471,9 +489,10 @@ function PersonalPanel() {
     if (!isValidFullName(fullName)) nextErr.name = t("complete.err.name");
     if (!isValidPhone(phone)) nextErr.phone = t("complete.err.phone");
     if (!isValidOpenAddress(address)) nextErr.address = t("complete.err.address");
+    if (!city || !district || !neighborhood) nextErr.place = t("auth.err.place");
     setFieldErr(nextErr);
-    if (nextErr.name || nextErr.phone || nextErr.address) return;
-    await persist({ fullName, phone, address, displayName });
+    if (nextErr.name || nextErr.phone || nextErr.address || nextErr.place) return;
+    await persist({ fullName, phone, address, displayName, city, district, neighborhood });
   }
 
   async function saveName() {
@@ -494,6 +513,16 @@ function PersonalPanel() {
     }
     setFieldErr({});
     await persist({ phone });
+  }
+
+  async function savePlace() {
+    setError("");
+    if (!city || !district || !neighborhood) {
+      setFieldErr({ place: t("auth.err.place") });
+      return;
+    }
+    setFieldErr({});
+    await persist({ city, district, neighborhood });
   }
 
   async function saveAddress() {
@@ -646,6 +675,17 @@ function PersonalPanel() {
             <p className="mt-1 text-[11px] text-muted">{t("complete.phoneHint")}</p>
             <FieldError msg={fieldErr.phone} />
           </label>
+          <PlaceSelects
+            idPrefix="complete"
+            city={city}
+            district={district}
+            neighborhood={neighborhood}
+            onCity={setCity}
+            onDistrict={setDistrict}
+            onNeighborhood={setNeighborhood}
+          />
+          <p className="text-[11px] text-muted">{t("profile.place.private")}</p>
+          <FieldError msg={fieldErr.place} />
           <label className="block" htmlFor="profile-address">
             <span className="dash-row-label">{t("bilgi.address")}</span>
             <textarea
@@ -757,6 +797,31 @@ function PersonalPanel() {
           ) : user.phoneVerified ? (
             <p className="text-sm font-semibold text-lime">{t("bilgi.phoneOk")}</p>
           ) : null}
+        </div>
+      ) : null}
+
+      <InfoRow
+        label={t("profile.place")}
+        value={[user.city, user.district, user.neighborhood].filter(Boolean).join(" / ") || "—"}
+        action={t("dash.update")}
+        onAction={() => openEdit("place")}
+      />
+      <p className="-mt-1 mb-2 text-xs text-muted">{t("profile.place.private")}</p>
+      {edit === "place" ? (
+        <div className="dash-inline-form">
+          <PlaceSelects
+            idPrefix="profile"
+            city={city}
+            district={district}
+            neighborhood={neighborhood}
+            onCity={setCity}
+            onDistrict={setDistrict}
+            onNeighborhood={setNeighborhood}
+          />
+          <FieldError msg={fieldErr.place} />
+          <button type="button" className="btn-primary h-10 px-4 text-sm" disabled={busy} onClick={() => void savePlace()}>
+            {t("complete.save")}
+          </button>
         </div>
       ) : null}
 

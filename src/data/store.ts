@@ -56,6 +56,9 @@ export type UserProfile = {
   followers: number;
   following: number;
   city: string;
+  /** Owner-only residence place. Not a public profile address. */
+  district?: string;
+  neighborhood?: string;
   plan: "standart" | "profesyonel" | "vip";
   freeListingQuota?: number;
   listingsPosted?: number;

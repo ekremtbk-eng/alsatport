@@ -9211,6 +9211,35 @@ html.auth-lock body {
 .auth-gate-check input {
   margin-top: 0.15rem;
   accent-color: var(--ds-green, #00c853);
+  flex: 0 0 auto;
+}
+.auth-gate-check span {
+  min-width: 0;
+}
+.auth-gate-checks {
+  display: grid;
+  gap: 0.65rem;
+}
+.auth-gate-phone {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.auth-gate-phone > b {
+  flex: 0 0 auto;
+  color: #166534;
+  font-size: 0.85rem;
+}
+.auth-gate-phone .auth-gate-input {
+  flex: 1 1 auto;
+}
+.auth-gate-input.is-plain {
+  padding-left: 0.8rem;
+}
+.auth-gate-place {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.55rem;
 }
 .tfa-methods {
   display: grid;

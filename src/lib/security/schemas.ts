@@ -37,14 +37,24 @@ export const loginBodySchema = z.object({
   remember: z.boolean().optional(),
 });
 
+const placeName = z.string().trim().max(120);
+
 export const registerBodySchema = z.object({
   email: emailField,
   password: passwordField,
+  passwordConfirm: z.string().max(128).optional().default(""),
   firstName: z.string().trim().max(40).optional().default(""),
   lastName: z.string().trim().max(40).optional().default(""),
   username: z.string().trim().max(40).optional().default(""),
   phone: z.string().max(20).optional().default(""),
+  city: placeName.optional().default(""),
+  district: placeName.optional().default(""),
+  neighborhood: placeName.optional().default(""),
+  termsAccepted: z.boolean().optional(),
+  kvkkRead: z.boolean().optional(),
   marketing: z.boolean().optional(),
+  marketingEmail: z.boolean().optional(),
+  marketingSms: z.boolean().optional(),
   recaptchaToken: recaptchaField,
 });
 
@@ -53,6 +63,9 @@ export const profileBodySchema = z.object({
   displayName: z.string().max(40).optional().default(""),
   phone: z.string().max(20).optional().default(""),
   address: z.string().max(400).optional().default(""),
+  city: placeName.optional(),
+  district: placeName.optional(),
+  neighborhood: placeName.optional(),
 });
 
 /** `current` is only optional for accounts without a password (Google/Apple sign-up). */

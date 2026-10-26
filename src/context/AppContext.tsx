@@ -69,10 +69,18 @@ type AppState = {
     username: string;
     email: string;
     password: string;
+    passwordConfirm?: string;
     firstName?: string;
     lastName?: string;
     marketing?: boolean;
+    marketingEmail?: boolean;
+    marketingSms?: boolean;
     phone?: string;
+    city?: string;
+    district?: string;
+    neighborhood?: string;
+    termsAccepted?: boolean;
+    kvkkRead?: boolean;
     recaptchaToken?: string;
   }) => Promise<AuthResult>;
   completeProfile: (input: {
@@ -80,6 +88,9 @@ type AppState = {
     phone: string;
     address: string;
     displayName?: string;
+    city?: string;
+    district?: string;
+    neighborhood?: string;
   }) => Promise<AuthResult>;
   startEmailVerify: () => Promise<{ ok: boolean; error?: string; sandboxCode?: string; already?: boolean }>;
   confirmEmailVerify: (otp: string) => Promise<AuthResult>;
@@ -763,10 +774,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       username: string;
       email: string;
       password: string;
+      passwordConfirm?: string;
       firstName?: string;
       lastName?: string;
       marketing?: boolean;
+      marketingEmail?: boolean;
+      marketingSms?: boolean;
       phone?: string;
+      city?: string;
+      district?: string;
+      neighborhood?: string;
+      termsAccepted?: boolean;
+      kvkkRead?: boolean;
       recaptchaToken?: string;
     }): Promise<AuthResult> => {
       const res = await apiPost<{ ok: boolean; error?: string; needsProfile?: boolean; user?: UserProfile }>(
@@ -786,6 +805,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       phone: string;
       address: string;
       displayName?: string;
+      city?: string;
+      district?: string;
+      neighborhood?: string;
     }): Promise<AuthResult> => {
       const res = await apiPost<{ ok: boolean; error?: string; user?: UserProfile; needsProfile?: boolean }>(
         "/api/account/profile",

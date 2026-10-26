@@ -7,6 +7,7 @@ import { throttle } from "@/lib/security/throttle";
 import { attachSession, requireMutatingRequest, requireUser } from "@/lib/security/session";
 import { findUserById, saveUser } from "@/lib/security/userStore";
 import { verifyEmailOtp } from "@/lib/security/emailOtp";
+import { smsReady } from "@/lib/sms";
 import { roleForProfile } from "@/lib/security/rbac";
 import { readJson } from "@/lib/security/parseBody";
 import { otpBodySchema } from "@/lib/security/schemas";
@@ -26,8 +27,11 @@ export async function POST(req: Request) {
 
   const parsed = await readJson(req, otpBodySchema);
   if (!parsed.ok) return parsed.response;
+  if (!smsReady()) {
+    return NextResponse.json({ ok: false, error: "phone.err.smsOff" }, { status: 503 });
+  }
   const otp = digitsOnly(parsed.data.otp, 6);
-  if (otp.length !== 6 || !(await verifyEmailOtp(auth.user.id, otp, "phone"))) {
+  if (otp.length !== 6 || !(await verifyEmailOtp(auth.user.id, otp, "phone", "sms"))) {
     return NextResponse.json({ ok: false, error: "complete.err.emailCode" }, { status: 401 });
   }
 

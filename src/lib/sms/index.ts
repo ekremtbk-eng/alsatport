@@ -61,8 +61,13 @@ export async function sendSms(phone: string, message: string): Promise<{ ok: boo
 }
 
 /** Last line follows the WebOTP format so Android Chrome can offer the code for autofill. */
-export function otpSmsText(otp: string, purpose: "login" | "setup") {
-  const head = purpose === "login" ? "AlsatPort giriş doğrulama kodunuz" : "AlsatPort iki aşamalı doğrulama kodunuz";
+export function otpSmsText(otp: string, purpose: "login" | "setup" | "phone") {
+  const head =
+    purpose === "login"
+      ? "AlsatPort giriş doğrulama kodunuz"
+      : purpose === "phone"
+        ? "AlsatPort telefon doğrulama kodunuz"
+        : "AlsatPort iki aşamalı doğrulama kodunuz";
   const host = envStr("SMS_WEBOTP_DOMAIN") || "alsatport.com";
   return `${head}: ${otp}. Kod 10 dakika geçerlidir, kimseyle paylaşmayın.\n\n@${host} #${otp}`;
 }
