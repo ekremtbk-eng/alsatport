@@ -870,9 +870,9 @@ html[data-device="phone"] .auth-gate.has-biz .auth-biz-mini {
     margin-inline: auto;
     justify-content: center;
     align-items: start;
-    gap: 0.7rem;
-    padding-top: 0.45rem;
-    padding-bottom: 0.7rem;
+    gap: 0.45rem;
+    padding-top: 0.2rem;
+    padding-bottom: 0.45rem;
   }
   .auth-gate.is-signup:not(.is-overlay) .auth-gate-promo,
   .auth-gate.is-signup:not(.is-overlay) .auth-gate-cats,
@@ -885,7 +885,7 @@ html[data-device="phone"] .auth-gate.has-biz .auth-biz-mini {
   }
   .auth-gate.is-signup:not(.is-overlay) .auth-gate-card {
     width: 100%;
-    padding: 0.9rem 1.15rem 1rem;
+    padding: 0.6rem 1.15rem 0.65rem;
   }
   .auth-gate.is-signup:not(.is-overlay) .auth-gate-pair {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
