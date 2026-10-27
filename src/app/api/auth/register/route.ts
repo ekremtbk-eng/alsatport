@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { normalizeUsername } from "@/lib/auth";
 import { hashPassword } from "@/lib/security/password";
@@ -20,6 +21,18 @@ import { resolveMemberPlace } from "@/lib/geo/neighborhoods";
 import { isValidPhone, nationalPhoneDigits } from "@/lib/profile";
 import { marketingChoices } from "@/lib/privacy/marketingChoices";
 import { recordMarketingChoice } from "@/lib/privacy/consents";
+
+function isUniqueConstraint(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
+}
+
+function uniqueTarget(err: unknown): string {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError)) return "";
+  const meta = err.meta as { target?: string | string[] } | undefined;
+  const target = meta?.target;
+  if (Array.isArray(target)) return target.join(",");
+  return typeof target === "string" ? target : "";
+}
 
 export const maxDuration = 60;
 
@@ -120,6 +133,17 @@ export async function POST(req: Request) {
     await hashPassword(password);
     return NextResponse.json({ ok: false, error: "auth.err.signup" }, { status: 400 });
   }
+  // profiles_phone_uidx (partial unique): colliding phone must be a 400, never an uncaught 500.
+  if (phone) {
+    const phoneTaken = await prisma.profile.findFirst({
+      where: { phone },
+      select: { userId: true },
+    });
+    if (phoneTaken) {
+      await hashPassword(password);
+      return NextResponse.json({ ok: false, error: "auth.err.phoneTaken" }, { status: 400 });
+    }
+  }
   let uniqueName = username.replace(/[^a-z0-9._-]+/g, "") || "uye";
   if (await findUserByUsername(uniqueName)) {
     uniqueName = `${uniqueName}${Math.floor(Math.random() * 99)}`;
@@ -142,36 +166,60 @@ export async function POST(req: Request) {
     role: "seller",
     verified: false,
   });
-  const user = await saveUser({
-    id: profile.id,
-    email,
-    username: uniqueName,
-    passwordHash,
-    provider: "email",
-    role: "seller",
-    profile: stampVerification(profile),
-  });
-  const choice = marketingChoices(body);
-  const now = new Date();
-  await prisma.profile.update({
-    where: { userId: user.id },
-    data: {
-      ...(body.kvkkRead === true ? { kvkkNotifiedAt: now } : {}),
-      ...(body.termsAccepted === true ? { termsAcceptedAt: now } : {}),
-      ...(choice.email || choice.sms ? { marketingUpdatedAt: now } : {}),
-      marketingEmail: choice.email,
-      marketingSms: choice.sms,
-      phoneVerifiedAt: null,
-    },
-  });
-  user.profile.marketingEmail = choice.email;
-  user.profile.marketingSms = choice.sms;
-  user.profile.phoneVerified = false;
-  if (modern || body.marketing !== undefined || body.marketingEmail !== undefined) {
-    await recordMarketingChoice(user.id, "email", choice.email, "register");
-  }
-  if (modern || body.marketingSms !== undefined) {
-    await recordMarketingChoice(user.id, "sms", choice.sms, "register");
+  let user;
+  try {
+    user = await saveUser({
+      id: profile.id,
+      email,
+      username: uniqueName,
+      passwordHash,
+      provider: "email",
+      role: "seller",
+      profile: stampVerification(profile),
+    });
+    const choice = marketingChoices(body);
+    const now = new Date();
+    await prisma.profile.update({
+      where: { userId: user.id },
+      data: {
+        ...(body.kvkkRead === true ? { kvkkNotifiedAt: now } : {}),
+        ...(body.termsAccepted === true ? { termsAcceptedAt: now } : {}),
+        ...(choice.email || choice.sms ? { marketingUpdatedAt: now } : {}),
+        marketingEmail: choice.email,
+        marketingSms: choice.sms,
+        phoneVerifiedAt: null,
+      },
+    });
+    user.profile.marketingEmail = choice.email;
+    user.profile.marketingSms = choice.sms;
+    user.profile.phoneVerified = false;
+    if (modern || body.marketing !== undefined || body.marketingEmail !== undefined) {
+      await recordMarketingChoice(user.id, "email", choice.email, "register");
+    }
+    if (modern || body.marketingSms !== undefined) {
+      await recordMarketingChoice(user.id, "sms", choice.sms, "register");
+    }
+  } catch (err) {
+    if (isUniqueConstraint(err)) {
+      const target = uniqueTarget(err);
+      console.warn("register unique constraint", {
+        stage: "register",
+        reason: "unique",
+        target: target || "unknown",
+      });
+      // Match pre-check messaging; email/username collisions stay opaque.
+      const error =
+        /\bphone\b/i.test(target) || target.includes("profiles_phone")
+          ? "auth.err.phoneTaken"
+          : "auth.err.signup";
+      return NextResponse.json({ ok: false, error }, { status: 400 });
+    }
+    console.error("register persist failed", {
+      stage: "register",
+      reason: "persist",
+      code: err instanceof Prisma.PrismaClientKnownRequestError ? err.code : "unknown",
+    });
+    return NextResponse.json({ ok: false, error: "auth.err.server" }, { status: 500 });
   }
   await recordAccountSignals(user.id, req);
   await sendSignupVerificationEmail({
