@@ -31,6 +31,8 @@ export async function verifyRecaptchaToken(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const secret = recaptchaSecret();
   if (!secret) {
+    // Do not log the secret value — only that verification cannot run.
+    console.warn("recaptcha secret missing", { tokenReceived: typeof token === "string" });
     return { ok: false, error: "auth.err.recaptcha" };
   }
   if (typeof token !== "string") {
