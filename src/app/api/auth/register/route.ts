@@ -66,6 +66,11 @@ export async function POST(req: Request) {
   const body = parsed.data;
   const captcha = await verifyRecaptchaToken(body.recaptchaToken, "register", ip);
   if (!captcha.ok) {
+    console.warn("register captcha rejected", {
+      stage: "register",
+      reason: "recaptcha",
+      tokenPresent: typeof body.recaptchaToken === "string" && body.recaptchaToken.length >= 20,
+    });
     return NextResponse.json({ ok: false, error: captcha.error }, { status: 400 });
   }
   const email = body.email;

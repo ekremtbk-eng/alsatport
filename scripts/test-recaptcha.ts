@@ -127,6 +127,22 @@ async function main() {
     check("R9", "configured site key check skipped (env unset)", true, "skipped");
   }
 
+  // Regression: Google stores clients under numeric widget ids, not the site key string.
+  // A gate that requires clients[siteKey] blocks every real signup while execute() still works.
+  {
+    const siteKey = "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI";
+    const clients = { "100000": { sitekey: siteKey } } as Record<string, unknown>;
+    const buggyRequiresSiteKeyProp =
+      Object.prototype.hasOwnProperty.call(clients, siteKey) && clients[siteKey] != null;
+    const correctAnyClient = Object.keys(clients).length > 0;
+    check(
+      "R10",
+      "numeric client ids must not be treated as unregistered",
+      buggyRequiresSiteKeyProp === false && correctAnyClient === true,
+      "clients keyed by id:100000",
+    );
+  }
+
   const failed = results.filter((r) => !r.pass);
   console.log(`\n${results.length - failed.length}/${results.length} passed`);
   if (failed.length) process.exit(1);
