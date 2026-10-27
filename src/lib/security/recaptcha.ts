@@ -44,6 +44,18 @@ export async function verifyRecaptchaToken(
     return { ok: false, error: "auth.err.recaptcha" };
   }
 
+  // Loopback E2E only: never on Vercel. Captcha still required in Production.
+  if (
+    process.env.ALSATPORT_LOOPBACK_TEST === "1" &&
+    process.env.RECAPTCHA_E2E_STUB === "1" &&
+    !process.env.VERCEL &&
+    value.startsWith("e2e-test-token-") &&
+    value.length >= 24
+  ) {
+    console.info("recaptcha loopback e2e stub ok", { stage: "siteverify", action: expectedAction });
+    return { ok: true };
+  }
+
   const body = new URLSearchParams({ secret, response: value });
   const ip = usableRemoteIp(remoteIp);
   if (ip) body.set("remoteip", ip);

@@ -143,6 +143,39 @@ async function main() {
     );
   }
 
+  // Loopback E2E stub must not activate under Vercel (Production safety).
+  {
+    const prev = {
+      loop: process.env.ALSATPORT_LOOPBACK_TEST,
+      stub: process.env.RECAPTCHA_E2E_STUB,
+      vercel: process.env.VERCEL,
+      secret: process.env.RECAPTCHA_SECRET_KEY,
+    };
+    process.env.RECAPTCHA_SECRET_KEY = "test-secret-not-real";
+    process.env.ALSATPORT_LOOPBACK_TEST = "1";
+    process.env.RECAPTCHA_E2E_STUB = "1";
+    process.env.VERCEL = "1";
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ success: false, "error-codes": ["bad-request"] }), {
+        status: 200,
+      })) as typeof fetch;
+    const blocked = await verifyRecaptchaToken("e2e-test-token-abcdefghijklmnopqrstuvwxyz", "register");
+    check(
+      "R11",
+      "loopback captcha stub disabled when VERCEL is set",
+      blocked.ok === false,
+    );
+    if (prev.loop === undefined) delete process.env.ALSATPORT_LOOPBACK_TEST;
+    else process.env.ALSATPORT_LOOPBACK_TEST = prev.loop;
+    if (prev.stub === undefined) delete process.env.RECAPTCHA_E2E_STUB;
+    else process.env.RECAPTCHA_E2E_STUB = prev.stub;
+    if (prev.vercel === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = prev.vercel;
+    if (prev.secret === undefined) delete process.env.RECAPTCHA_SECRET_KEY;
+    else process.env.RECAPTCHA_SECRET_KEY = prev.secret;
+    globalThis.fetch = originalFetch;
+  }
+
   const failed = results.filter((r) => !r.pass);
   console.log(`\n${results.length - failed.length}/${results.length} passed`);
   if (failed.length) process.exit(1);
