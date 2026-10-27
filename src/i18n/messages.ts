@@ -1003,6 +1003,13 @@ export const MESSAGES = pack({
   "auth.err.passShort": ["Şifre en az 8 karakter olmalı.", "Password must be at least 8 characters.", "Mindestens 8 Zeichen.", "كلمة المرور 8 أحرف على الأقل.", "Пароль не короче 8 символов."],
   "auth.err.passPolicy": ["Şifre en az 8 karakter olmalı; büyük/küçük harf, rakam ve özel karakter içermelidir.", "Password needs 8+ chars with upper, lower, number and a special character.", "Passwort: min. 8 Zeichen, Groß-/Kleinbuchstaben, Zahl und Sonderzeichen.", "كلمة المرور: 8 أحرف على الأقل مع أحرف كبيرة وصغيرة ورقم ورمز.", "Пароль: 8+ символов, верхний/нижний регистр, цифра и спецсимвол."],
   "auth.err.rateLimit": ["Çok fazla deneme. Lütfen biraz sonra tekrar deneyin.", "Too many attempts. Try again later.", "Zu viele Versuche. Später erneut versuchen.", "محاولات كثيرة. حاول لاحقاً.", "Слишком много попыток. Попробуйте позже."],
+  "auth.err.rateLimitWait": [
+    "Çok fazla deneme. Yaklaşık {minutes} dakika sonra tekrar deneyin.",
+    "Too many attempts. Try again in about {minutes} minutes.",
+    "Zu viele Versuche. In etwa {minutes} Minuten erneut versuchen.",
+    "محاولات كثيرة. أعد المحاولة بعد حوالي {minutes} دقيقة.",
+    "Слишком много попыток. Повторите примерно через {minutes} мин.",
+  ],
   "auth.err.csrf": ["Oturum doğrulaması başarısız. Sayfayı yenileyip tekrar deneyin.", "Session verification failed. Refresh and try again.", "Sitzungsprüfung fehlgeschlagen. Seite neu laden.", "فشل التحقق. حدّث الصفحة.", "Ошибка проверки сессии. Обновите страницу."],
   "auth.err.recaptcha": ["Güvenlik doğrulaması başarısız. Sayfayı yenileyip tekrar deneyin.", "Security check failed. Refresh the page and try again.", "Sicherheitsprüfung fehlgeschlagen. Seite neu laden.", "فشل التحقق الأمني. حدّث الصفحة وحاول مجدداً.", "Проверка безопасности не прошла. Обновите страницу."],
   "recaptcha.notice": ["Bu form Google reCAPTCHA ile korunur.", "This form is protected by Google reCAPTCHA.", "Dieses Formular ist durch Google reCAPTCHA geschützt.", "هذا النموذج محمي بواسطة Google reCAPTCHA.", "Эта форма защищена Google reCAPTCHA."],

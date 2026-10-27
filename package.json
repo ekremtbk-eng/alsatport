@@ -19,6 +19,7 @@
     "test:brand-marks": "tsx scripts/test-brand-marks.ts",
     "test:security": "tsx scripts/test-security.ts",
     "test:recaptcha": "tsx scripts/test-recaptcha.ts",
+    "test:register-throttle": "tsx scripts/test-register-throttle.ts",
     "test:mobile-filters": "tsx scripts/test-mobile-filters.ts",
     "test:markets": "tsx scripts/test-markets.ts",
     "db:setup": "prisma migrate deploy && prisma db seed"

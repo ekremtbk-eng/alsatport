@@ -788,11 +788,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       kvkkRead?: boolean;
       recaptchaToken?: string;
     }): Promise<AuthResult> => {
-      const res = await apiPost<{ ok: boolean; error?: string; needsProfile?: boolean; user?: UserProfile }>(
-        "/api/auth/register",
-        input,
-      );
-      if (!res.ok || !res.user) return { ok: false, error: res.error ?? "auth.err.required" };
+      const res = await apiPost<{
+        ok: boolean;
+        error?: string;
+        needsProfile?: boolean;
+        user?: UserProfile;
+        retryAfter?: number;
+      }>("/api/auth/register", input);
+      if (!res.ok || !res.user) {
+        return {
+          ok: false,
+          error: res.error ?? "auth.err.required",
+          ...(typeof res.retryAfter === "number" && res.retryAfter > 0 ? { retryAfter: res.retryAfter } : {}),
+        };
+      }
       commitUser(res.user);
       return { ok: true, needsProfile: !!res.needsProfile, needsEmailVerify: true };
     },

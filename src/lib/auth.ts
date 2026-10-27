@@ -29,7 +29,7 @@ export type TwoFactorChallenge = {
 
 export type AuthResult =
   | { ok: true; needsProfile: boolean; needsEmailVerify?: boolean; twoFactor?: TwoFactorChallenge }
-  | { ok: false; error: string };
+  | { ok: false; error: string; retryAfter?: number };
 
 export const SEED_OWNER_ID = "u-ekrem";
 export const DEMO_ACCOUNT_ID = "acc-demo-ekrem";

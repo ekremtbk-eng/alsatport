@@ -63,6 +63,7 @@ export function AuthStage({
   const [district, setDistrict] = useState("");
   const [neighborhood, setNeighborhood] = useState("");
   const [error, setError] = useState("");
+  const [retryAfterSec, setRetryAfterSec] = useState(0);
   const [busy, setBusy] = useState(false);
   const [challenge, setChallenge] = useState<TwoFactorChallenge | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
@@ -76,6 +77,7 @@ export function AuthStage({
   useEffect(() => {
     setPassword("");
     setError("");
+    setRetryAfterSec(0);
     setChallenge(null);
     setQrOpen(false);
     setForgotOpen(false);
@@ -242,6 +244,7 @@ export function AuthStage({
   async function onContinue(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setRetryAfterSec(0);
     const id = identifier.trim();
     if (tab === "login") {
       if (!id) {
@@ -328,6 +331,7 @@ export function AuthStage({
     setBusy(false);
     if (!res.ok) {
       setError(res.error);
+      setRetryAfterSec(res.error === "auth.err.rateLimit" && res.retryAfter ? res.retryAfter : 0);
       return;
     }
     finish(true, true);
@@ -656,7 +660,13 @@ export function AuthStage({
                   {t(notice)}
                 </p>
               ) : null}
-              {error ? <p className="m-0 text-xs font-semibold text-orange">{t(error)}</p> : null}
+              {error ? (
+                <p className="m-0 text-xs font-semibold text-orange">
+                  {error === "auth.err.rateLimit" && retryAfterSec > 0
+                    ? t("auth.err.rateLimitWait", { minutes: Math.max(1, Math.ceil(retryAfterSec / 60)) })
+                    : t(error)}
+                </p>
+              ) : null}
 
               {tab === "signup" ? <RecaptchaNotice /> : null}
 
