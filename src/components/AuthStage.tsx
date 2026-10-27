@@ -299,6 +299,7 @@ export function AuthStage({
       return;
     }
     setBusy(true);
+    // New token every submit; form fields stay in React state on failure (password never persisted).
     const recaptchaToken = await executeRecaptcha("register");
     if (!recaptchaToken) {
       setBusy(false);
