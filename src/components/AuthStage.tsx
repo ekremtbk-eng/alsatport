@@ -299,10 +299,11 @@ export function AuthStage({
       return;
     }
     setBusy(true);
-    // New token every submit; form fields stay in React state on failure (password never persisted).
+    // Fresh token every submit (never reuse). Fields stay in React state; password is not persisted.
     const recaptchaToken = await executeRecaptcha("register");
     if (!recaptchaToken) {
       setBusy(false);
+      // No POST — client could not mint a token. Same user message; detail is in [recaptcha] console diag.
       setError("auth.err.recaptcha");
       return;
     }

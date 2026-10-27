@@ -63,6 +63,7 @@ export async function verifyRecaptchaToken(
 
   if (!data.success) {
     console.warn("recaptcha siteverify failed", {
+      stage: "siteverify",
       tokenReceived: true,
       success: false,
       hostname: data.hostname ?? "",
@@ -89,6 +90,7 @@ export async function verifyRecaptchaToken(
     return { ok: false, error: "auth.err.recaptcha" };
   }
   console.info("recaptcha siteverify ok", {
+    stage: "siteverify",
     tokenReceived: true,
     success: true,
     hostname: data.hostname ?? "",
