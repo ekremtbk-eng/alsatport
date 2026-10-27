@@ -58,12 +58,12 @@ export async function POST(req: Request) {
   const blocked = await requireMutatingRequest(req);
   if (blocked) return blocked;
   const ip = clientIp(req);
-  const limited = await throttle([{ key: `register:ip:${ip}`, ...THROTTLE.register }], req);
-  if (!limited.ok) return tooMany(limited.retryAfter);
 
   const parsed = await readJson(req, registerBodySchema);
   if (!parsed.ok) return parsed.response;
   const body = parsed.data;
+  // Captcha before register throttle: failed security checks must not burn the hourly IP quota.
+  // Broader write budgets still apply in middleware (apiWrite / apiWriteIp).
   const captcha = await verifyRecaptchaToken(body.recaptchaToken, "register", ip);
   if (!captcha.ok) {
     console.warn("register captcha rejected", {
@@ -72,6 +72,11 @@ export async function POST(req: Request) {
       tokenPresent: typeof body.recaptchaToken === "string" && body.recaptchaToken.length >= 20,
     });
     return NextResponse.json({ ok: false, error: captcha.error }, { status: 400 });
+  }
+  const limited = await throttle([{ key: `register:ip:${ip}`, ...THROTTLE.register }], req);
+  if (!limited.ok) {
+    console.warn("register throttled", { stage: "register", reason: "rate-limit", retryAfter: limited.retryAfter });
+    return tooMany(limited.retryAfter);
   }
   const email = body.email;
   const firstName = sanitizeText(body.firstName, 40);

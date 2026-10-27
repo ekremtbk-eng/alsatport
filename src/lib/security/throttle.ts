@@ -75,8 +75,9 @@ export const THROTTLE = {
 } as const;
 
 export function tooMany(retryAfter: number) {
+  const wait = Math.max(1, Math.floor(retryAfter) || 1);
   return Response.json(
-    { ok: false, error: "auth.err.rateLimit" },
-    { status: 429, headers: { "Retry-After": String(retryAfter) } },
+    { ok: false, error: "auth.err.rateLimit", retryAfter: wait },
+    { status: 429, headers: { "Retry-After": String(wait) } },
   );
 }

@@ -167,7 +167,7 @@ export async function apiDelete<T>(url: string, body?: unknown): Promise<T & { s
   return apiSend<T>("DELETE", url, body);
 }
 
-async function apiSend<T>(method: string, url: string, body?: unknown): Promise<T & { status: number }> {
+async function apiSend<T>(method: string, url: string, body?: unknown): Promise<T & { status: number; retryAfter?: number }> {
   const fp = await deviceFingerprint();
   const payload = body === undefined ? undefined : JSON.stringify(body);
   const res = await withCsrfRetry((token) =>
@@ -183,6 +183,12 @@ async function apiSend<T>(method: string, url: string, body?: unknown): Promise<
       body: payload,
     }),
   );
-  const data = (await res.json().catch(() => ({ ok: false, error: "auth.err.server" }))) as T;
-  return { ...data, status: res.status };
+  const data = (await res.json().catch(() => ({ ok: false, error: "auth.err.server" }))) as T & {
+    retryAfter?: number;
+  };
+  const retryAfter =
+    typeof data.retryAfter === "number" && data.retryAfter > 0
+      ? Math.floor(data.retryAfter)
+      : Number(res.headers.get("Retry-After")) || 0;
+  return { ...data, status: res.status, ...(retryAfter > 0 ? { retryAfter } : {}) };
 }
