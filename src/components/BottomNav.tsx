@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Home, LayoutGrid, MessageCircle, Plus, UserRound } from "lucide-react";
-import { useApp } from "@/context/AppContext";
+import { Home, LayoutGrid, Plus, Search, UserRound } from "lucide-react";
 import { useI18n } from "@/context/I18nContext";
 import { AuthGateLink } from "@/components/AuthGateLink";
 
@@ -19,21 +18,38 @@ function isTypingTarget(el: EventTarget | null) {
 
 export function BottomNav() {
   const path = usePathname();
-  const { conversations } = useApp();
   const { t } = useI18n();
   const [typing, setTyping] = useState(false);
-  const unread = conversations.reduce((a, c) => a + c.unread, 0);
   const items = [
-    { href: "/", label: t("nav.home"), icon: Home, active: path === "/" },
+    { href: "/", label: t("nav.vitrine"), icon: Home, active: path === "/" },
     {
       href: "/kategoriler",
-      label: t("nav.catHome"),
-      icon: LayoutGrid,
-      active: path.startsWith("/kategoriler") || path.startsWith("/ara"),
+      label: t("nav.arama"),
+      icon: Search,
+      active:
+        path.startsWith("/kategoriler") ||
+        path.startsWith("/ara") ||
+        path.startsWith("/is-ilanlari") ||
+        path.startsWith("/ustalar-hizmetler"),
     },
     { href: "/ilan-ver", label: t("nav.post"), icon: Plus, special: true, active: path.startsWith("/ilan-ver") },
-    { href: "/mesajlar", label: t("nav.messages"), icon: MessageCircle, active: path.startsWith("/mesajlar") },
-    { href: "/profil", label: t("nav.profile"), icon: UserRound, active: path.startsWith("/profil") },
+    {
+      href: "/servisler",
+      label: t("nav.services"),
+      icon: LayoutGrid,
+      active: path.startsWith("/servisler") || path.startsWith("/acil"),
+    },
+    {
+      href: "/profil",
+      label: t("nav.banaOzel"),
+      icon: UserRound,
+      active:
+        path.startsWith("/profil") ||
+        path.startsWith("/mesajlar") ||
+        path.startsWith("/favoriler") ||
+        path.startsWith("/ilanlarim") ||
+        path.startsWith("/bildirim"),
+    },
   ];
 
   // The iOS keyboard lifts fixed bars over the field being typed in, so the nav steps aside meanwhile.
@@ -49,7 +65,7 @@ export function BottomNav() {
   }, []);
 
   return (
-    <nav className={`bottom-nav fixed inset-x-0 bottom-0 z-50 ${typing ? "is-typing" : ""}`}>
+    <nav className={`bottom-nav fixed inset-x-0 bottom-0 z-50 ${typing ? "is-typing" : ""}`} aria-label={t("nav.vitrine")}>
       <ul className="grid grid-cols-5 px-1 pt-1.5 pb-[max(0.35rem,env(safe-area-inset-bottom))]">
         {items.map((item) => {
           const Icon = item.icon;
@@ -65,14 +81,11 @@ export function BottomNav() {
               </li>
             );
           }
-          const gated = item.href === "/mesajlar" || item.href === "/profil";
+          const gated = item.href === "/profil";
           const inner = (
             <>
               <span className="relative">
                 <Icon className="h-5 w-5" />
-                {item.href === "/mesajlar" && unread > 0 && (
-                  <span className="bn-dot" />
-                )}
               </span>
               {item.label}
             </>

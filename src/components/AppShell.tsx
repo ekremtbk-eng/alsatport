@@ -32,10 +32,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // Phone chrome pages render their own top bar (logo once); hide .site-header via .is-home CSS.
+  const phoneChrome = path === "/" || path.startsWith("/servisler");
+
   return (
     <AuthModalProvider>
       <CompareProvider>
-      <div dir={dir} className={`app-shell min-h-screen${path === "/" ? " is-home" : ""}`}>
+      <div dir={dir} className={`app-shell min-h-screen${phoneChrome ? " is-home" : ""}`}>
         <MobileSplash />
         <CompletionGuard />
         {isServicesPortalPath(path) ? <ServicesPortalNav /> : <Header />}
