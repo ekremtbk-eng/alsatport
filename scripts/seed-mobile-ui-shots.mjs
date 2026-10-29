@@ -130,7 +130,7 @@ const LISTINGS = [
     city: "Bursa",
     district: "Nilüfer",
     neighborhood: "Özlüce",
-    images: [U("photo-1533473359331-0135ef1b58bf"), U("photo-1519641471654-76ce0107ad1b")],
+    images: [U("photo-1700943937372-12c2611b5af8"), U("photo-1678037055154-492f436ea5a4")],
     specs: [
       { label: "Marka", value: "Ford" },
       { label: "Seri", value: "Ranger" },
