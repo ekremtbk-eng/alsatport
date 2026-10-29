@@ -146,6 +146,7 @@ export function DashboardApp({ initialPanel }: { initialPanel?: DashPanelId }) {
         <div className="dash-m-head">
           <SellerAvatar src={user.avatar} name={user.displayName || user.username} className="dash-m-avatar" />
           <div className="min-w-0 flex-1">
+            <p className="dash-m-kicker">{t("nav.banaOzel")}</p>
             <p className="dash-m-name">{user.displayName}</p>
             <p className="dash-m-sub">{user.email || `@${user.username}`}</p>
           </div>

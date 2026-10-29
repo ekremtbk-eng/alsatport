@@ -28,6 +28,8 @@ import { useAuthModal } from "@/context/AuthModalContext";
 import { isBlockedLiveAnimalListing } from "@/lib/liveAnimalPolicy";
 import { isServiceListing, serviceFirmHref } from "@/lib/serviceFirm";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { MembershipBadge } from "@/components/MembershipBadge";
+import { membershipTenureFromSinceLabel } from "@/lib/membershipTenure";
 import { StoreRefCard } from "@/components/business/StoreBits";
 import { SellerChatPopup } from "@/components/SellerChatPopup";
 import { SellerRatingBlock } from "@/components/SellerRatingBlock";
@@ -131,8 +133,8 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
     () => (listing ? schemaForCategoryId(listing.categoryId) : schemaForCategoryId("phones")),
     [listing],
   );
-  const sinceYear = listing?.sellerSince?.match(/(\d{4})/)?.[1];
-  const memberYears = sinceYear ? Math.max(0, 2026 - Number(sinceYear)) : 0;
+  const tenure = membershipTenureFromSinceLabel(listing?.sellerSince);
+  const memberYears = tenure?.kind === "years" ? tenure.years : 0;
 
   if (listing && isServiceListing(listing)) {
     return (
@@ -487,16 +489,20 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
           <section className="rounded-xl border border-line bg-card p-3 shadow-sm">
             {listing.store ? (
               <>
-                <StoreRefCard store={listing.store} main />
+                <div className="flex flex-wrap items-center gap-2">
+                  <StoreRefCard store={listing.store} main />
+                  <MembershipBadge sinceLabel={listing.sellerSince} />
+                </div>
                 <SellerRatingBlock reviews={reviews} verified={listing.sellerVerified} />
               </>
             ) : (
               <div className="flex items-start gap-3">
                 <SellerAvatar src={listing.sellerAvatar} name={listingSellerLabel(listing)} className="h-12 w-12 rounded-full object-cover" />
                 <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-1.5 font-semibold text-ink">
+                  <p className="flex flex-wrap items-center gap-1.5 font-semibold text-ink">
                     {listingSellerLabel(listing)}
                     {listing.sellerVerified && <VerifiedBadge size={18} />}
+                    <MembershipBadge sinceLabel={listing.sellerSince} />
                   </p>
                   <p className="text-xs text-muted">
                     {listing.sellerVerified ? t("list.seller.v") : t("prof.member")}

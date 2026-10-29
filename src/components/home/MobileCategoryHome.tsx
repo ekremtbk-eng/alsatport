@@ -50,15 +50,18 @@ export function MobileCategoryHome() {
 
   return (
     <div className="mc">
-      <h1 className="mc-title">{t("nav.catHome")}</h1>
+      <header className="mc-head">
+        <h1 className="mc-title">{t("nav.arama")}</h1>
+        <p className="mc-lead">{t("nav.arama.lead")}</p>
+      </header>
       <form className="mc-search" role="search" onSubmit={(e) => e.preventDefault()}>
         <Search className="mc-search-ico" aria-hidden />
         <input
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder={t("cat.find")}
-          aria-label={t("cat.find")}
+          placeholder={t("nav.catHome.search")}
+          aria-label={t("nav.catHome.search")}
           enterKeyHint="search"
           autoComplete="off"
         />
