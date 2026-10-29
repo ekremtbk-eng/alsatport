@@ -259,12 +259,14 @@ async function dbSection() {
       currency: "TRY",
       images: [ownedUrl(userId, `${TAG}-eids.jpg`)],
     });
+    const eidsDraft = "listing" in eidsCreate ? eidsCreate.listing : undefined;
     check(
       "D3",
-      "createListing vasita blocked by EİDS",
-      "error" in eidsCreate && eidsCreate.error === "listing.err.eidsRequired",
+      "createListing vasita saves as EİDS draft (not active)",
+      !!eidsDraft && eidsDraft.status === "draft" && !eidsDraft.expiresAt && !("error" in eidsCreate),
       JSON.stringify(eidsCreate),
     );
+    if (eidsDraft) listingIds.push(eidsDraft.id);
 
     // --- fixture rows for visibility matrix ---
     const withPhoto = await prisma.listing.create({

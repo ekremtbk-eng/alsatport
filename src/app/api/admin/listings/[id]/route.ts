@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { isLiveRow, newPeriod, notifyFavoriters, notifyListingEvent } from "@/lib/listings/lifecycle";
+import { eidsBlocksActivePublish, eidsPublishBlockedResponse } from "@/lib/listings/eidsPublishLock";
 import { writeAudit } from "@/lib/admin/audit";
 import { isUuid } from "@/lib/ids";
 import { requireAdmin, requireMutatingRequest, stepUpError } from "@/lib/security/session";
@@ -29,6 +30,11 @@ export async function POST(req: Request, ctx: Ctx) {
 
   const wasLive = isLiveRow(existing);
   if (body?.action === "approve") {
+    // A1: admin cannot bypass the EİDS active-publish lock for emlak/vasıta.
+    if (eidsBlocksActivePublish(existing.categoryId, existing)) {
+      const blocked = eidsPublishBlockedResponse();
+      return NextResponse.json({ ok: false, error: blocked.error }, { status: blocked.status });
+    }
     const row = await prisma.listing.update({
       where: { id },
       data: { status: "active", rejectedReason: null, soldAt: null, ...(wasLive ? {} : newPeriod()) },

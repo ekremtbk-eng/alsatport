@@ -24,6 +24,7 @@ import {
 export function PostSuccess({ listing, onNew }: { listing: Listing; onNew: () => void }) {
   const { t, formatMoney } = useI18n();
   const live = listing.status === "active";
+  const eidsDraft = listing.status === "draft";
   const url = listingPublicUrl(listing.id);
   const priceLabel = formatMoney(listing.price, listing.currency);
   const share = listingWebShareData({ title: listing.title, priceLabel, url });
@@ -59,9 +60,9 @@ export function PostSuccess({ listing, onNew }: { listing: Listing; onNew: () =>
         {live ? <Check className="h-9 w-9" strokeWidth={3} /> : <Clock3 className="h-9 w-9" strokeWidth={2.4} />}
       </div>
       <h2 id="post-done-title" className="post-done-title">
-        {live ? t("post.doneTitle") : t("post.reviewTitle")}
+        {live ? t("post.doneTitle") : eidsDraft ? t("post.eidsDraftTitle") : t("post.reviewTitle")}
       </h2>
-      <p className="post-done-lead">{live ? t("post.doneLead") : t("post.reviewLead")}</p>
+      <p className="post-done-lead">{live ? t("post.doneLead") : eidsDraft ? t("post.eidsDraftLead") : t("post.reviewLead")}</p>
 
       <div className="post-done-card">
         {listing.images[0] ? (
