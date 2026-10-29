@@ -945,13 +945,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }>("/api/listings", payload).catch(() => ({ ok: false as const, error: "post.err.network", status: 0 }));
     if (!res.ok) return { ok: false, error: res.error ?? "auth.err.server", status: res.status };
     const nextListing = res.listing ?? { ...listing, status: "active" as const };
+    const isDraft = nextListing.status === "draft";
     setListings((prev) => [nextListing, ...prev.filter((l) => l.id !== nextListing.id)]);
     setUser((u) =>
       u
         ? {
             ...u,
-            listings: u.listings + (res.duplicate ? 0 : 1),
-            listingsPosted: res.listingsPosted ?? (u.listingsPosted ?? 0) + 1,
+            // EİDS drafts are saved but do not count as published listings.
+            listings: u.listings + (res.duplicate || isDraft ? 0 : 1),
+            listingsPosted: isDraft
+              ? u.listingsPosted ?? 0
+              : (res.listingsPosted ?? (u.listingsPosted ?? 0) + (res.duplicate ? 0 : 1)),
           }
         : u,
     );

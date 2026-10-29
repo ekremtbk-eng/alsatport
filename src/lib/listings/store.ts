@@ -24,7 +24,11 @@ import { type ListingRef, isLiveRow, newPeriod } from "@/lib/listings/lifecycle"
 import { invalidateCategoryCounts, publicCountWhere, publicLiveWithImageWhere } from "@/lib/listings/categoryCounts";
 import { enforcePetSpecs } from "@/lib/listings/petSpecPolicy";
 import { vehicleSpecError } from "@/lib/listings/vehicleSpecPolicy";
-import { eidsBlocksActivePublish, eidsPublishBlockedResponse } from "@/lib/listings/eidsPublishLock";
+import {
+  eidsBlocksActivePublish,
+  eidsPublishBlockedResponse,
+  eidsRequiresDraftSave,
+} from "@/lib/listings/eidsPublishLock";
 import type { ApprovedVehicle } from "@/data/vehicleRequests";
 import { approvedVehicles } from "@/lib/vehicleRequests/store";
 import { type ListingCurrency, listingCurrencyOf, parseListingCurrency } from "@/lib/listings/currency";
@@ -105,19 +109,21 @@ export function toClientListing(row: ListingWithRelations): Listing {
     .sort((a, b) => Number(b.isCover) - Number(a.isCover) || a.sortOrder - b.sortOrder)
     .map((i) => i.url);
   const status: Listing["status"] =
-    row.deletedAt || row.status === "removed" || row.status === "draft"
+    row.deletedAt || row.status === "removed"
       ? "passive"
-      : row.status === "expired" || (row.status === "active" && !isLiveRow(row))
-        ? "expired"
-        : row.status === "active"
-          ? "active"
-          : row.status === "sold"
-            ? "sold"
-            : row.status === "pending"
-              ? "pending"
-              : row.status === "rejected"
-                ? "rejected"
-                : "passive";
+      : row.status === "draft"
+        ? "draft"
+        : row.status === "expired" || (row.status === "active" && !isLiveRow(row))
+          ? "expired"
+          : row.status === "active"
+            ? "active"
+            : row.status === "sold"
+              ? "sold"
+              : row.status === "pending"
+                ? "pending"
+                : row.status === "rejected"
+                  ? "rejected"
+                  : "passive";
   const postedAt = (row.postedAt ?? row.createdAt).getTime();
   const phone =
     row.seller.profile?.phoneVerifiedAt && row.seller.profile.phone && !storeHidesPhone(row.seller.business)
@@ -495,7 +501,9 @@ export async function createListing(user: StoredUser, input: ListingInput) {
   if (input.urgent && !(await sellerCanUseUrgent(user.id))) {
     return { error: "urgent.err.businessOnly" as const, status: 403 as const };
   }
-  if (eidsBlocksActivePublish(input.categoryId)) {
+  // A1: EİDS-gated categories save as owner-only drafts; never create them as active while locked.
+  const asEidsDraft = eidsRequiresDraftSave(input.categoryId);
+  if (!asEidsDraft && eidsBlocksActivePublish(input.categoryId)) {
     return eidsPublishBlockedResponse();
   }
   input.images = ownedImages(input.images, user.id);
@@ -512,7 +520,8 @@ export async function createListing(user: StoredUser, input: ListingInput) {
   const id = clientId && !taken ? clientId : crypto.randomUUID();
   const listingNo =
     input.listingNo || `AP-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 8)}`;
-  const period = newPeriod();
+  // Drafts do not start the 15-day live window; postedAt/expiresAt stay null until real publish.
+  const period = asEidsDraft ? { postedAt: null as Date | null, expiresAt: null as Date | null } : newPeriod();
   const outcome = await prisma
     .$transaction(async (tx) => {
     const created = await tx.listing.create({
@@ -531,23 +540,27 @@ export async function createListing(user: StoredUser, input: ListingInput) {
         neighborhood: input.neighborhood || "",
         lat: input.coords?.lat ?? null,
         lng: input.coords?.lng ?? null,
-        status: "active",
-        featured: !!input.featured,
-        vip: !!input.vip,
-        urgent: !!input.urgent,
+        status: asEidsDraft ? "draft" : "active",
+        featured: asEidsDraft ? false : !!input.featured,
+        vip: asEidsDraft ? false : !!input.vip,
+        urgent: asEidsDraft ? false : !!input.urgent,
         refurbished: !!input.refurbished,
         specs: (input.specs ?? []) as Prisma.InputJsonValue,
         features: (input.features ?? []) as Prisma.InputJsonValue,
         chassis: input.chassis ? (input.chassis as Prisma.InputJsonValue) : undefined,
-        ...period,
+        postedAt: period.postedAt,
+        expiresAt: period.expiresAt,
         images: { create: nestedImages(input.images) },
       },
       include: listingInclude,
     });
-    await tx.profile.update({
-      where: { userId: user.id },
-      data: { listingsPosted: { increment: 1 } },
-    });
+    // Published listings consume quota; EİDS drafts do not until they go live.
+    if (!asEidsDraft) {
+      await tx.profile.update({
+        where: { userId: user.id },
+        data: { listingsPosted: { increment: 1 } },
+      });
+    }
     return { kind: "created" as const, row: created };
   })
     .catch(async (err: unknown) => {
@@ -559,8 +572,13 @@ export async function createListing(user: StoredUser, input: ListingInput) {
       throw err;
     });
   if (outcome.kind === "existing") return { listing: outcome.listing, ref: null, duplicate: true as const };
-  invalidateCategoryCounts();
-  return { listing: toClientListing(outcome.row), ref: listingRef(outcome.row), duplicate: false as const };
+  if (!asEidsDraft) invalidateCategoryCounts();
+  return {
+    listing: toClientListing(outcome.row),
+    ref: listingRef(outcome.row),
+    duplicate: false as const,
+    eidsDraft: asEidsDraft,
+  };
 }
 
 function listingRef(row: { id: string; title: string; sellerId: string; expiresAt: Date | null }): ListingRef {

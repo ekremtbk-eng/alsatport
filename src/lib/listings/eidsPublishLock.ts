@@ -82,6 +82,14 @@ export function eidsBlocksActivePublish(
   return true;
 }
 
+/**
+ * A1: while the publish lock is on, gated categories may be saved as `draft`
+ * (owner-only) but must not become publicly `active` without a later EİDS path.
+ */
+export function eidsRequiresDraftSave(categoryId: string): boolean {
+  return isEidsPublishLockActive() && isEidsGateCategory(categoryId);
+}
+
 export function eidsPublishBlockedResponse(): { error: typeof EIDS_REQUIRED_ERROR; status: 403 } {
   return { error: EIDS_REQUIRED_ERROR, status: 403 };
 }

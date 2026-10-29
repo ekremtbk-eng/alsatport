@@ -305,6 +305,11 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
             </Link>
           </div>
         ) : null}
+        {listing.status === "draft" ? (
+          <p className="mx-4 mt-2 rounded-xl border border-orange/30 bg-orange/10 px-3 py-2 text-sm font-semibold text-orange" role="status">
+            {t("listing.eidsDraftBanner")}
+          </p>
+        ) : null}
         {user?.id === listing.sellerId ? <PublishNotifCard listingId={listing.id} /> : null}
         <ClassifiedListingView
           listing={listing}
@@ -402,6 +407,11 @@ export function ListingDetailClient({ initialListing }: { initialListing?: Listi
             {t("post.edit")}
           </Link>
         </div>
+      ) : null}
+      {listing.status === "draft" ? (
+        <p className="mx-4 mt-2 rounded-xl border border-orange/30 bg-orange/10 px-3 py-2 text-sm font-semibold text-orange" role="status">
+          {t("listing.eidsDraftBanner")}
+        </p>
       ) : null}
       {user?.id === listing.sellerId ? <PublishNotifCard listingId={listing.id} /> : null}
 

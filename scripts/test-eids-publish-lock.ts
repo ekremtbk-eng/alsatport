@@ -246,16 +246,22 @@ async function apiSection() {
       { label: "Kimden", value: "Sahibinden" },
     ],
   });
+  // A1 product change: gated creates succeed as owner-only drafts (not active).
+  const draftOk =
+    blockedCreate.status === 200 &&
+    blockedCreate.json.ok === true &&
+    blockedCreate.json.listing?.status === "draft" &&
+    !blockedCreate.json.listing?.expiresAt;
   check(
     "A1",
-    "POST vasita create → 403 eidsRequired",
-    blockedCreate.status === 403 && blockedCreate.json.error === "listing.err.eidsRequired",
-    `status=${blockedCreate.status} err=${String(blockedCreate.json.error)}`,
+    "POST vasita create → 200 draft (not active)",
+    draftOk,
+    `status=${blockedCreate.status} listingStatus=${String(blockedCreate.json.listing?.status)}`,
   );
 
   const blockedEmlak = await call("POST", "/api/listings", sess, {
     title: `EIDS emlak ${TAG}`,
-    description: "Should be blocked",
+    description: "Should be draft",
     categoryId: "emlak-konut-satilik-daire",
     city: "İstanbul",
     district: "Kadıköy",
@@ -265,10 +271,19 @@ async function apiSection() {
   });
   check(
     "A2",
-    "POST emlak create → 403 eidsRequired",
-    blockedEmlak.status === 403 && blockedEmlak.json.error === "listing.err.eidsRequired",
-    `status=${blockedEmlak.status}`,
+    "POST emlak create → 200 draft (not active)",
+    blockedEmlak.status === 200 && blockedEmlak.json.listing?.status === "draft",
+    `status=${blockedEmlak.status} listingStatus=${String(blockedEmlak.json.listing?.status)}`,
   );
+  if (blockedCreate.json.listing?.id) {
+    const anonGet = await call("GET", `/api/listings/${blockedCreate.json.listing.id}`);
+    check(
+      "A1b",
+      "anonymous GET draft → 404",
+      anonGet.status === 404,
+      `status=${anonGet.status}`,
+    );
+  }
 
   const titleEdit = await call("PUT", `/api/listings/${live.id}`, sess, { title: `EIDS edited ${TAG}` });
   check("A3", "PUT title on already-active vasita allowed", titleEdit.status === 200, `status=${titleEdit.status}`);

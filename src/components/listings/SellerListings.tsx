@@ -27,6 +27,8 @@ const EMPTY: Record<Tab, string> = {
 
 function inTab(l: Listing, tab: Tab) {
   if (tab === "passive") return l.status === "passive" || l.status === "rejected";
+  // A1: EİDS drafts surface under "pending" until a real publish path exists.
+  if (tab === "pending") return l.status === "pending" || l.status === "draft";
   return l.status === tab;
 }
 
@@ -117,6 +119,12 @@ export function SellerListings({ rounded = "rounded-xl" }: { rounded?: string })
                     </p>
                   ) : null}
                   {l.status === "rejected" ? <p className="mt-1 text-xs font-bold text-orange">{t("my.rejected")}</p> : null}
+                  {l.status === "draft" ? (
+                    <p className="mt-1 text-xs font-bold text-orange" role="status">
+                      {t("my.draftChip")}
+                      <span className="mt-0.5 block font-semibold text-muted">{t("listing.eidsDraftBanner")}</span>
+                    </p>
+                  ) : null}
                   {(l.status === "active" || l.status === "expired") && l.expiresAt ? (
                     <p className="text-[11px] text-muted">
                       {t("my.postedOn", { date: shortDate(l.postedAt) })} · {t("my.endsOn", { date: shortDate(l.expiresAt) })}

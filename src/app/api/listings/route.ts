@@ -124,6 +124,10 @@ export async function POST(req: Request) {
     const listingId = created.listing.id;
     after(() => fillMissingListingCoords(listingId).catch(() => undefined));
   }
+  // EİDS drafts are owner-only; do not notify as published or burn a listing slot.
+  if (created.eidsDraft || created.listing.status === "draft") {
+    return publishedResponse(auth.user.profile, created.listing, 0);
+  }
   const ref = created.ref;
   after(() => notifyListingEvent(ref, "listing.published"));
   return publishedResponse(auth.user.profile, created.listing, 1);
