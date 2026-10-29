@@ -247,16 +247,18 @@ async function apiSection() {
     ],
   });
   // A1 product change: gated creates succeed as owner-only drafts (not active).
+  type ListingJson = { status?: string; expiresAt?: number | null; id?: string };
+  const vasitaListing = blockedCreate.json.listing as ListingJson | undefined;
   const draftOk =
     blockedCreate.status === 200 &&
     blockedCreate.json.ok === true &&
-    blockedCreate.json.listing?.status === "draft" &&
-    !blockedCreate.json.listing?.expiresAt;
+    vasitaListing?.status === "draft" &&
+    !vasitaListing?.expiresAt;
   check(
     "A1",
     "POST vasita create → 200 draft (not active)",
     draftOk,
-    `status=${blockedCreate.status} listingStatus=${String(blockedCreate.json.listing?.status)}`,
+    `status=${blockedCreate.status} listingStatus=${String(vasitaListing?.status)}`,
   );
 
   const blockedEmlak = await call("POST", "/api/listings", sess, {
@@ -269,14 +271,15 @@ async function apiSection() {
     images: [imgUrl],
     specs: [],
   });
+  const emlakListing = blockedEmlak.json.listing as ListingJson | undefined;
   check(
     "A2",
     "POST emlak create → 200 draft (not active)",
-    blockedEmlak.status === 200 && blockedEmlak.json.listing?.status === "draft",
-    `status=${blockedEmlak.status} listingStatus=${String(blockedEmlak.json.listing?.status)}`,
+    blockedEmlak.status === 200 && emlakListing?.status === "draft",
+    `status=${blockedEmlak.status} listingStatus=${String(emlakListing?.status)}`,
   );
-  if (blockedCreate.json.listing?.id) {
-    const anonGet = await call("GET", `/api/listings/${blockedCreate.json.listing.id}`);
+  if (vasitaListing?.id) {
+    const anonGet = await call("GET", `/api/listings/${vasitaListing.id}`, { cookie: "", csrf: "" });
     check(
       "A1b",
       "anonymous GET draft → 404",
